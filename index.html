@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Embalaje de perfiles</title>
+  <link rel="stylesheet" href="static/estilo.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Embalaje de perfiles</h1>
+      <p class="sub">Mete los perfiles del pedido y te dice qué cajas hacen falta y cómo van colocados.</p>
+    </div>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="pedido" aria-selected="true">Pedido</button>
+      <button role="tab" data-tab="cajas" aria-selected="false">Cajas</button>
+      <button role="tab" data-tab="perfiles" aria-selected="false">Perfiles</button>
+    </div>
+  </header>
+  <div id="estado" role="status"></div>
+  <div id="cat-bar" class="panel" hidden></div>
+
+  <section id="tab-pedido" class="bench">
+    <div class="panel">
+      <h2>Pedido</h2>
+      <div class="seg" id="tipos">
+        <label><input type="radio" name="tipo" id="tipo-carton" value="carton">Cartón <small>envío local</small></label>
+        <label><input type="radio" name="tipo" id="tipo-cerrada" value="cerrada">Madera cerrada <small>marítimo</small></label>
+        <label><input type="radio" name="tipo" id="tipo-abierta" value="abierta">Madera abierta <small>terrestre</small></label>
+      </div>
+      <label class="drop" id="drop"><input type="file" id="pdf" accept="application/pdf,.pdf">Arrastra aquí la hoja de corte<small>PDF, o pulsa para elegirla. Lee referencia, largo y cantidad de cada perfil.</small></label>
+      <div id="leidas"></div>
+      <form id="f-linea" class="row">
+        <label style="grid-column:1/-1">Perfil<select id="l-perfil" required></select></label>
+        <label>Largo (mm)<input id="l-largo" type="number" min="1" step="1" required></label>
+        <label>Cantidad<input id="l-cant" type="number" min="1" step="1" value="1" required></label>
+        <button class="btn" style="grid-column:1/-1">Añadir al pedido</button>
+      </form>
+      <div id="lineas"></div>
+      <label>Holgura por bulto (mm)<input id="holgura" type="number" min="0" step="1"></label>
+      <button class="btn ghost" id="vaciar" type="button">Vaciar pedido</button>
+    </div>
+    <div class="panel" id="resultado"></div>
+  </section>
+
+  <section id="tab-cajas" class="panel" hidden>
+    <h2>Cajas disponibles</h2>
+    <form id="f-caja" class="row">
+      <label>Nombre<input id="c-nombre" required></label>
+      <label>Tipo<select id="c-tipo"><option value="carton">Cartón</option><option value="cerrada">Madera cerrada</option><option value="abierta">Madera abierta</option></select></label>
+      <label>Largo interior<input id="c-il" type="number" min="1" required></label>
+      <label>Ancho interior<input id="c-ia" type="number" min="1" required></label>
+      <label>Alto interior<input id="c-ih" type="number" min="1" required></label>
+      <label>Largo exterior<input id="c-el" type="number" min="1" required></label>
+      <label>Ancho exterior<input id="c-ea" type="number" min="1" required></label>
+      <label>Alto exterior<input id="c-eh" type="number" min="1" required></label>
+      <button class="btn" id="c-guardar" style="align-self:end">Guardar caja</button>
+    </form>
+    <p class="sub">Todas las medidas en milímetros.</p>
+    <div id="lista-cajas" class="scroll"></div>
+  </section>
+
+  <section id="tab-perfiles" class="panel" hidden>
+    <h2>Perfiles envueltos</h2>
+    <form id="f-perfil" class="row">
+      <label>Nombre<input id="p-nombre" required></label>
+      <label>Referencia<input id="p-ref"></label>
+      <label>Ancho envuelto<input id="p-ancho" type="number" min="1" required></label>
+      <label>Alto envuelto<input id="p-alto" type="number" min="1" required></label>
+      <label>Piezas por bulto<input id="p-uds" type="number" min="1" value="1" required></label>
+      <button class="btn" id="p-guardar" style="align-self:end">Guardar perfil</button>
+    </form>
+    <p class="sub">Sección del bulto ya envuelto, en milímetros. Si se envuelven varias piezas juntas (por ejemplo 2 lamas), indica cuántas van en cada bulto.</p>
+    <div id="lista-perfiles" class="scroll"></div>
+  </section>
+</div>
+
+<script src="vendor/pdfjs/pdf.min.js"></script>
+<script src="static/nucleo.js"></script>
+<script src="static/app.js"></script>
+</body>
+</html>
