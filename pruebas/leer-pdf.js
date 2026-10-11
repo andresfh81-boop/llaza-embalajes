@@ -21,7 +21,8 @@ const cat=JSON.parse(fs.readFileSync(path.join(raiz,'datos','catalogo.json'),'ut
   const tipo=process.argv[3]||'carton',items=[];
   for(const l of leidas){
     const p=cat.perfiles.find(x=>String(x.ref)===l.ref);
-    console.log(l.ref,'|',l.desc,'|',l.largo,'mm |',l.cant,'uds |',p?p.nombre:'SIN PERFIL',l.dudosa?'| cantidad dudosa':'');
+    const m=(cat.montados||[]).find(x=>String(x.ref)===l.ref);
+    console.log(l.ref,'|',l.desc,'|',l.largo,'mm |',l.cant,'uds |',p?p.nombre:m?'va montado en '+m.en:'SIN PERFIL',l.dudosa?'| cantidad dudosa':'');
     if(!p) continue;
     for(let i=0;i<Math.ceil(l.cant/(p.uds||1));i++) items.push({p,L:l.largo,w:p.ancho+5,h:p.alto+5});
   }

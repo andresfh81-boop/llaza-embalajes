@@ -67,10 +67,11 @@ let leidas=[],hojaNombre='';
 function renderLeidas(){
   const el=$('leidas');
   if(!leidas.length){el.innerHTML='';return;}
-  const sin=leidas.filter(l=>!l.pid).length;
+  const sin=leidas.filter(l=>!l.pid&&!l.montado).length,mont=leidas.filter(l=>!l.pid&&l.montado).length;
   el.innerHTML=`<h3>Leído de ${esc(hojaNombre)}</h3>`+
     (sin?`<div class="note">${sin} ${sin===1?'línea no tiene':'líneas no tienen'} perfil asignado: su referencia no está en el catálogo. Elige el perfil o se quedará fuera.</div>`:'')+
-    `<div class="scroll"><table><thead><tr><th>Ref.</th><th>Pieza</th><th>Largo</th><th>Uds</th><th>Perfil</th></tr></thead><tbody>${leidas.map((l,i)=>`<tr><td>${esc(l.ref)}</td><td>${esc(l.desc)}</td><td><input type="number" min="1" id="lh-l${i}" data-k="largo" data-i="${i}" value="${l.largo}" aria-label="Largo"></td><td><input type="number" min="1" id="lh-c${i}" data-k="cant" data-i="${i}" value="${l.cant}" aria-label="Cantidad"></td><td><select id="lh-p${i}" data-k="pid" data-i="${i}" aria-label="Perfil"><option value="">No embalar</option>${perfiles.map(p=>`<option value="${esc(p.id)}"${p.id===l.pid?' selected':''}>${esc(p.nombre)}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div>
+    (mont?`<div class="sub">${mont} ${mont===1?'línea va montada':'líneas van montadas'} en otro perfil y no ${mont===1?'ocupa':'ocupan'} sitio aparte.</div>`:'')+
+    `<div class="scroll"><table><thead><tr><th>Ref.</th><th>Pieza</th><th>Largo</th><th>Uds</th><th>Perfil</th></tr></thead><tbody>${leidas.map((l,i)=>`<tr><td>${esc(l.ref)}</td><td>${esc(l.desc)}</td><td><input type="number" min="1" id="lh-l${i}" data-k="largo" data-i="${i}" value="${l.largo}" aria-label="Largo"></td><td><input type="number" min="1" id="lh-c${i}" data-k="cant" data-i="${i}" value="${l.cant}" aria-label="Cantidad"></td><td><select id="lh-p${i}" data-k="pid" data-i="${i}" aria-label="Perfil"><option value="">${l.montado?'Va montado en '+esc(l.montado.en):'No embalar'}</option>${perfiles.map(p=>`<option value="${esc(p.id)}"${p.id===l.pid?' selected':''}>${esc(p.nombre)}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div>
     <div class="acciones"><button class="btn" type="button" id="leidas-ok">Añadir al pedido</button><button class="btn ghost" type="button" id="leidas-no">Descartar</button></div>`;
 }
 async function leerPDF(file){
@@ -90,7 +91,7 @@ async function leerPDF(file){
     }
     const filas=parseHoja(lineas);
     if(!filas.length){estado(letras<40?'Este PDF es una imagen escaneada, no tiene texto que leer. Mete los perfiles a mano.':'No he encontrado líneas de perfiles en este PDF. Mete los perfiles a mano.');return;}
-    leidas=filas.map(l=>{const p=perfiles.find(x=>String(x.ref).trim()===l.ref);return Object.assign(l,{pid:p?p.id:''});});
+    leidas=filas.map(l=>{const p=perfiles.find(x=>String(x.ref).trim()===l.ref);return Object.assign(l,{pid:p?p.id:'',montado:p?null:base.montados.find(x=>String(x.ref).trim()===l.ref)||null});});
     hojaNombre=file.name;renderLeidas();
     estado(`${filas.length} líneas leídas. Revísalas y pulsa Añadir al pedido.`);
   }catch(e){estado('No se ha podido leer el PDF.');}
@@ -113,7 +114,7 @@ async function leerPDF(file){
       const ok=leidas.filter(l=>l.pid&&l.largo&&l.cant);
       ok.forEach(l=>pedido.lineas.push({pid:l.pid,largo:l.largo,cant:l.cant}));
       const fuera=leidas.length-ok.length;leidas=[];renderLeidas();guardarPedido();renderPedido();
-      estado(`${ok.length} líneas añadidas al pedido`+(fuera?`, ${fuera} sin embalar.`:'.'));
+      estado(`${ok.length} líneas añadidas al pedido`+(fuera?`, ${fuera} sin bulto propio.`:'.'));
     }
   });
 })();
@@ -166,7 +167,7 @@ function renderCatalogo(){
 }
 function exportar(){
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([JSON.stringify({perfiles,cajas},null,2)+'\n'],{type:'application/json'}));
+  a.href=URL.createObjectURL(new Blob([JSON.stringify({perfiles,cajas,montados:base.montados},null,2)+'\n'],{type:'application/json'}));
   a.download='catalogo.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   estado('Catálogo exportado a catalogo.json.');
 }
@@ -246,7 +247,7 @@ renderTodo();
     const r=await fetch('datos/catalogo.json',{cache:'no-cache'});
     if(!r.ok) throw new Error(r.status);
     const g=await r.json();
-    base={perfiles:g.perfiles||[],cajas:g.cajas||[]};
+    base={perfiles:g.perfiles||[],cajas:g.cajas||[],montados:g.montados||[]};
   }catch(e){sinDatos=true;renderTodo();return;}
   let c={};
   try{c=JSON.parse(localStorage.getItem(CLAVE_CAT)||'null')||{};}catch(e){}

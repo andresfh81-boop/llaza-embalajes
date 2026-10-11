@@ -27,6 +27,8 @@ Para verla en local hace falta servirla (abierta como archivo suelto no carga el
 - Lo que alguien da de alta, cambia o borra desde la app se guarda solo en su navegador (`localStorage`, clave `catalogo-embalaje`) como diferencias sobre el común: `{perfiles:{id: ficha | null}, cajas:{...}}`, con `null` = borrado.
 - En las pestañas Cajas y Perfiles hay una barra que dice cuántos cambios propios hay, con **Exportar catálogo** (descarga `catalogo.json` con el catálogo completo tal como lo ve esa persona), **Importar catálogo** y **Descartar mis cambios**.
 - Para pasar cambios al común: sustituir `datos/catalogo.json` por el archivo exportado y publicar. Como los cambios locales se comparan con el común, al coincidir desaparecen solos.
+- `montados` (solo en `datos/catalogo.json`, no se edita desde la app): referencias que van montadas en otro perfil y no llevan bulto propio — tapas, soporte medio lama, transmisión y LED perimetral en la viga; tapa pilar en el pilar. La app las lee de la hoja y las marca «Va montado en…» sin avisar de que faltan.
+- Lama LED (33020) y media lama (33000) se envuelven igual que la lama normal, en bultos de 2 (dicho por Andrés, 11/10/2026).
 - Cada ficha lleva un `id` fijo (en los perfiles iniciales, la referencia). Las líneas del pedido apuntan a ese `id`: no cambiarlo.
 - El pedido en curso también se guarda en el navegador (clave `pedido-embalaje`).
 
@@ -53,16 +55,13 @@ Para verla en local hace falta servirla (abierta como archivo suelto no carga el
 
 - Solo hay dos cajas en el catálogo común, las dos de cartón: C-5000 y C-7000 (alta de Andrés, 11/10/2026). Faltan las de madera cerrada y abierta.
 - La lectura del PDF está comprobada con una hoja de corte real (módulo 4060×6000, 11/10/2026): leyó bien las 19 líneas. Para repetirlo sin navegador: `node pruebas/leer-pdf.js "hoja.pdf"`. Las hojas reales no se suben al repo (es público).
-- **Faltan perfiles en el catálogo**: en esa hoja quedaron sin embalar 33016 tapa luz, 33019 tapa lateral viga, 33018 tapa superior viga, 33009 soporte medio lama, 33005 tapa pilar, 33008 transmisión, 33010 LED perimetral y 33020 lama LED. Hay que medir cómo se envuelven.
 - No coloca dos perfiles cortos uno detrás de otro dentro de la misma caja.
 - No tiene en cuenta peso ni peso máximo por caja.
-- "MEDIA LAMA" lleva la misma referencia que la lama (33000) y se asigna al bulto de 2 lamas.
 - No comprueba que los bultos queden apoyados (el encaje es geométrico).
 - No es instalable ni funciona sin conexión (no lleva `manifest.json` ni `sw.js` como la app de etiquetas).
 
 ## Siguiente paso
 
 1. Dar de alta las cajas reales y subirlas al catálogo común.
-2. Medir y dar de alta los perfiles que faltan (tapas, LED, transmisión, lama LED).
 
 Ideas para después: colocar piezas cortas en fila, límite de peso, imprimir la lista de embalaje por caja, etiquetas por caja.
