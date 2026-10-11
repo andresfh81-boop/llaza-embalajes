@@ -101,3 +101,12 @@ line.cota.hueco{stroke:var(--warn);stroke-dasharray:3 3;pointer-events:none}
 text.cota.hueco{paint-order:stroke;stroke:var(--box);stroke-width:4px;stroke-linejoin:round}
 rect.bulto.aire{stroke:var(--warn);stroke-width:3;stroke-dasharray:6 4}
 .boxcard .note{font-size:14px;padding:8px 10px}
+.boxcard .cab{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+svg.seccion,svg.planta{cursor:zoom-in}
+.boxcard.ampliada svg.seccion,.boxcard.ampliada svg.planta{cursor:zoom-out}
+.boxcard.ampliada{position:fixed;inset:10px;z-index:20;overflow:auto;background:var(--panel);box-shadow:0 0 0 100vmax rgba(0,0,0,.55);padding:16px 20px}
+.boxcard.ampliada svg.seccion{max-height:82vh;max-width:min(100%,82vh);margin:0 auto}
+.boxcard.ampliada svg.planta{max-width:1500px;margin:0 auto}
+body.con-lupa{overflow:hidden}
+.fantasma{z-index:30}
+.boxcard.ampliada>*{flex-shrink:0}

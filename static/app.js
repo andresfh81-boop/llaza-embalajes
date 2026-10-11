@@ -28,6 +28,8 @@ function renderPedido(){
 // Mientras no cambien pedido, tipo, holgura ni catálogo, los retoques a mano se conservan; con «Guardar reparto» también al recargar.
 const CLAVE_REP='reparto-embalaje';
 let reparto=null,repartoClave='',repartoManual=false,repartoGuardado=false,avisoMov='',modelosAct=[];
+// Caja ampliada a pantalla completa (lupa) y si el último gesto fue un arrastre, para no confundirlo con un clic.
+let ampliada=null,arrastrado=false;
 function bulto(p,L){
   const hol=num(pedido.holgura),it={p,g:p.grupo||'',L,w:num(p.ancho)+hol,h:num(p.alto)+hol};
   if(num(p.capL)&&num(p.anchoMedio)&&num(p.anchoMedio)<num(p.ancho)) it.cap={l:num(p.capL),w:num(p.anchoMedio)+hol};
@@ -118,10 +120,10 @@ function dibujoPlanta(b,i,col){
     else g=`<rect x="${x0}" y="${y0}" width="${L}" height="${h}" ${c}/>`;
     return g+(h>=fc*1.1?`<text x="${x0+L/2}" y="${y0+h/2}" font-size="${Math.min(fc,h*.7)}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)} · ${p.it.L}</text>`:'');
   };
-  return `<svg viewBox="${-mg} -2 ${W+mg+2} ${H+mg+2}" role="img" aria-label="Caja ${i+1} vista desde arriba"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,n)=>({p,n})).sort((u,v)=>u.p.y-v.p.y).map(({p,n})=>pieza(p,n)).join('')}${cota(M.intL,ocL,k,H,mg,fc,false)}<text class="cota" font-size="${fc}" text-anchor="middle" dominant-baseline="central" transform="translate(${-mg*.5} ${H/2}) rotate(-90)">${M.intA} mm</text></svg>`;
+  return `<svg class="planta" viewBox="${-mg} -2 ${W+mg+2} ${H+mg+2}" role="img" aria-label="Caja ${i+1} vista desde arriba"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,n)=>({p,n})).sort((u,v)=>u.p.y-v.p.y).map(({p,n})=>pieza(p,n)).join('')}${cota(M.intL,ocL,k,H,mg,fc,false)}<text class="cota" font-size="${fc}" text-anchor="middle" dominant-baseline="central" transform="translate(${-mg*.5} ${H/2}) rotate(-90)">${M.intA} mm</text></svg>`;
 }
 function renderResultado(recalcular){
-  const el=$('resultado');ultimoResumen='';
+  const el=$('resultado');ultimoResumen='';document.body.classList.remove('con-lupa');
   const head='<h2>Cajas necesarias</h2>';
   if(sinDatos){el.innerHTML=head+'<div class="note">No se ha podido cargar el catálogo. Recarga la página; si la has abierto como archivo suelto, ábrela desde su dirección web.</div>';return;}
   if(!base){el.innerHTML=head+'<div class="empty">Cargando catálogo…</div>';return;}
@@ -144,6 +146,8 @@ function renderResultado(recalcular){
     }
     repartoClave=clave;avisoMov='';
   }
+  if(ampliada!==null&&!reparto.bins[ampliada]) ampliada=null;
+  document.body.classList.toggle('con-lupa',ampliada!==null);
   const r=reparto,col=new Map(perfiles.map((p,ci)=>[p.id,ci%6]));
   const nb=r.bins.reduce((s,b)=>s+b.items.length,0)+r.unfit.length;
   const m3=volBins(r.bins)/1e9;
@@ -163,8 +167,8 @@ function renderResultado(recalcular){
     const cont=Object.values(g),gs=[...new Set(cont.map(c=>c.p.grupo||''))],gtxt=gs.length>1?'Mezcla':(GRUPOS[gs[0]]||'');
     lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.p.nombre} ${c.L} mm`).join(', '));
     const flot=b.items.filter(p=>!apoyado(p,b));if(flot.length)lineasTxt.push(`  OJO, sin apoyo: ${flot.map(nombreB).join(', ')}`);
-    return `<div class="boxcard" data-caja="${i}"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}<span class="tag">De frente · ancho × alto</span>${dibujoSeccion(b,i,col,hol)}<span class="tag">Desde arriba · largo × ancho (ancho ampliado ×${AMPLIA})</span>${dibujoPlanta(b,i,col)}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm</li>`).join('')}</ul></div>`;
-  }).join('')+'<div class="boxcard nueva" data-caja="nueva"><span class="tag">Caja nueva</span><p>Suelta aquí un bulto para ponerlo en una caja aparte.</p></div></div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, desplazarlo a lo largo. Si choca con otro o se sale, te aviso y se queda donde estaba. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
+    return `<div class="boxcard${ampliada===i?' ampliada':''}" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><button class="btn small ghost" type="button" data-act="ampliar" data-i="${i}">${ampliada===i?'Cerrar ampliación':'Ampliar'}</button></div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}<span class="tag">De frente · ancho × alto</span>${dibujoSeccion(b,i,col,hol)}<span class="tag">Desde arriba · largo × ancho (ancho ampliado ×${AMPLIA})</span>${dibujoPlanta(b,i,col)}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm</li>`).join('')}</ul></div>`;
+  }).join('')+'<div class="boxcard nueva" data-caja="nueva"><span class="tag">Caja nueva</span><p>Suelta aquí un bulto para ponerlo en una caja aparte.</p></div></div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Pulsa en un dibujo (el ratón sale como lupa) o en «Ampliar» para verlo en grande; Esc o volver a pulsar lo cierra. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, desplazarlo a lo largo. Si choca con otro o se sale, te aviso y se queda donde estaba. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
   ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas (${desg}), ${m3.toFixed(2)} m³\nBultos en total: ${nb+r.bins.length} (${nb} de perfil + ${r.bins.length} cajas)\n`+lineasTxt.join('\n');
   el.innerHTML=html;
 }
@@ -261,6 +265,7 @@ function soltarPlanta(b,k,off){
     const a=arr;arr=null;a.f.remove();marcar(null);document.body.classList.remove('arrastrando');
     document.querySelectorAll('rect.cogido').forEach(x=>x.classList.remove('cogido'));
     if(e.type!=='pointerup'||Math.abs(e.clientX-a.x0)+Math.abs(e.clientY-a.y0)<3)return;
+    arrastrado=true;
     if(a.modo==='planta'){
       const M=reparto.bins[a.de].model;
       return soltarPlanta(a.de,a.k,(a.p.off||0)+(enSvg(a.svg,e).x-a.ptx)/(PW/M.intL));
@@ -423,7 +428,12 @@ $('f-perfil').addEventListener('submit',e=>{
   if(!base){estado('No se puede guardar: catálogo no disponible.');return;}
   poner(perfiles,editPerfil,d);editPerfil=null;e.target.reset();guardarCatalogo();
 });
+document.addEventListener('pointerdown',()=>{arrastrado=false;},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ampliada!==null){ampliada=null;renderResultado();}});
 document.addEventListener('click',async e=>{
+  // Clic en un dibujo (sin arrastrar): amplía esa caja, o la devuelve a su tamaño.
+  const dib=e.target.closest('svg.seccion, svg.planta'),tarj=dib&&dib.closest('[data-caja]');
+  if(tarj&&!arrastrado){const n=Number(tarj.dataset.caja);ampliada=ampliada===n?null:n;renderResultado();return;}
   const b=e.target.closest('[data-act]');
   if(e.target.id==='copiar'){
     try{await navigator.clipboard.writeText(ultimoResumen);estado('Resumen copiado.');}catch(err){estado(ultimoResumen);}
@@ -435,6 +445,7 @@ document.addEventListener('click',async e=>{
   else if(a==='cancelar'){confirmar=null;renderCajas();renderPerfiles();renderCatalogo();}
   else if(a==='exportar'){exportar();}
   else if(a==='auto'){renderResultado(true);}
+  else if(a==='ampliar'){const n=Number(b.dataset.i);ampliada=ampliada===n?null:n;renderResultado();}
   else if(a==='guardar-reparto'){guardarReparto();}
   else if(a==='pedir-descartar'){confirmar='descartar';renderCatalogo();}
   else if(a==='descartar'){confirmar=null;try{localStorage.removeItem(CLAVE_CAT);}catch(err){}montar({});renderTodo();estado('Has vuelto al catálogo común.');}
