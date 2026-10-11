@@ -173,7 +173,7 @@ function renderResultado(recalcular){
     lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.p.nombre} ${c.L} mm`).join(', '));
     const flot=b.items.filter(p=>!apoyado(p,b));if(flot.length)lineasTxt.push(`  OJO, sin apoyo: ${flot.map(nombreB).join(', ')}`);
     return `<div class="boxcard${ampliada===i?' ampliada':''}" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><button class="btn small ghost" type="button" data-act="ampliar" data-i="${i}">${ampliada===i?'Cerrar ampliación':'Ampliar'}</button>${cont.length?'':`<button class="btn small danger" type="button" data-act="quitar-caja" data-i="${i}">Quitar caja</button>`}</div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}<span class="tag">De frente · ancho × alto</span>${dibujoSeccion(b,i,col,hol)}<span class="tag">Desde arriba · largo × ancho (ancho ampliado ×${AMPLIA})</span>${dibujoPlanta(b,i,col)}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm</li>`).join('')}</ul></div>`;
-  }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Pulsa en un dibujo (el ratón sale como lupa) o en «Ampliar» para verlo en grande; Esc o volver a pulsar lo cierra. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, desplazarlo a lo largo. Si choca con otro o se sale, te aviso y se queda donde estaba. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
+  }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Pulsa en un dibujo (el ratón sale como lupa) o en «Ampliar» para verlo en grande; Esc o volver a pulsar lo cierra. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, moverlo a lo largo y a lo ancho, también a otra caja. Si choca con otro o se sale, te aviso y se queda donde estaba. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
   ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas (${desg}), ${m3.toFixed(2)} m³\nBultos en total: ${nb+r.bins.length} (${nb} de perfil + ${r.bins.length} cajas)\n`+lineasTxt.join('\n');
   el.innerHTML=html;
 }
@@ -226,13 +226,27 @@ function soltarAuto(de,k,a){
   hecho();bin.items.push(p);if(a==='nueva')B.push(bin);quitarBulto(de,k);
   renderResultado();
 }
-// Desplazado a lo largo en la vista desde arriba.
-function soltarPlanta(b,k,off){
-  const bin=reparto.bins[b],src=bin.items[k],M=bin.model,L=src.it.L,otros=bin.items.filter(o=>o!==src),c=[0,M.intL-L];
-  for(const o of otros){const z=o.off||0;c.push(z+o.it.L,z-L,z,z+o.it.L-L);if(o.medio&&src.medio)c.push(z+o.it.cap.l,z-src.it.cap.l);}
-  const p=Object.assign({},src,{off:Math.round(iman(Math.min(Math.max(off,0),M.intL-L),c,M.intL*.015))});
-  if(libre(p,bin,src)){hecho();bin.items[k]=p;}
-  else{const o=otros.find(o=>chocan(p,o));avisoMov=o?`Ahí no cabe: choca con ${nombreB(o)}.`:`Ahí no cabe: ${nombreB(src)} se sale de la caja ${b+1} a lo largo.`;}
+// Soltado en la vista desde arriba de la caja a: off = cuánto va adelantado a lo largo, x = posición a lo ancho.
+// El alto no se ve desde arriba: se queda a su altura si puede y, si no, en el hueco más bajo que haya en ese sitio.
+function soltarPlanta(de,k,a,off,x){
+  const B=reparto.bins,src=B[de].items[k],bin=B[a],M=bin.model,L=src.it.L,otros=bin.items.filter(o=>o!==src);
+  if(L>M.intL){avisoMov=`No cabe: ${nombreB(src)} es más largo que la caja ${a+1} (${M.nombre}, ${M.intL} mm de largo interior).`;return renderResultado();}
+  const cz=[0,M.intL-L],cx=[0,M.intA-src.w];
+  for(const o of otros){
+    const z=o.off||0;cz.push(z+o.it.L,z-L,z,z+o.it.L-L);cx.push(o.x+o.w,o.x-src.w,o.x);
+    if(o.medio&&src.medio){cz.push(z+o.it.cap.l,z-src.it.cap.l);cx.push(Math.max(o.x+o.w-(src.w-src.medio)/2,o.x+(o.w+o.medio)/2),Math.min(o.x-(src.w+src.medio)/2,o.x+(o.w-o.medio)/2-src.w));}
+  }
+  const p=Object.assign({},src,{off:Math.round(iman(Math.min(Math.max(off,0),M.intL-L),cz,M.intL*.015)),x:iman(Math.round(Math.min(Math.max(x,0),M.intA-src.w)),cx,M.intA*.03)});
+  const ys=(a===de?[src.y]:[]).concat([0,...otros.map(o=>o.y+o.h)].sort(porNum));
+  let ok=false;
+  for(const y of ys){p.y=y;if(libre(p,bin,src)){ok=true;break;}}
+  if(!ok){
+    p.y=ys[0];const o=otros.find(o=>chocan(p,o));
+    avisoMov=o?`Ahí no cabe: choca con ${nombreB(o)}.`:`Ahí no cabe: ${nombreB(src)} se sale de la caja ${a+1}.`;
+    return renderResultado();
+  }
+  hecho();
+  if(a===de) bin.items[k]=p; else{bin.items.push(p);quitarBulto(de,k);}
   renderResultado();
 }
 (function(){
@@ -240,28 +254,27 @@ function soltarPlanta(b,k,off){
   const bajo=e=>document.elementFromPoint(e.clientX,e.clientY);
   const enSvg=(svg,e)=>new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());
   const marcar=c=>document.querySelectorAll('.boxcard.destino').forEach(x=>{if(x!==c)x.classList.remove('destino');});
-  const sitio=e=>{arr.f.style.left=e.clientX-arr.px+'px';if(arr.modo==='seccion')arr.f.style.top=e.clientY-arr.py+'px';};
+  const sitio=e=>{arr.f.style.left=e.clientX-arr.px+'px';arr.f.style.top=e.clientY-arr.py+'px';};
   $('resultado').addEventListener('pointerdown',e=>{
     const r=e.target.closest('rect.bulto, rect.plano');if(!r||e.button)return;
     e.preventDefault();
-    const de=Number(r.dataset.b),k=Number(r.dataset.k),bin=reparto.bins[de],p=bin.items[k],svg=r.ownerSVGElement,pt=enSvg(svg,e),esc_=svg.getScreenCTM().a,f=document.createElement('div');
-    arr={de,k,p,svg,f,x0:e.clientX,y0:e.clientY,modo:r.classList.contains('plano')?'planta':'seccion'};
+    const de=Number(r.dataset.b),k=Number(r.dataset.k),bin=reparto.bins[de],M=bin.model,p=bin.items[k],svg=r.ownerSVGElement,pt=enSvg(svg,e),esc_=svg.getScreenCTM().a,f=document.createElement('div');
+    arr={de,k,p,f,x0:e.clientX,y0:e.clientY,modo:r.classList.contains('plano')?'planta':'seccion'};
     f.className='fantasma';f.textContent=corto(p.it.p);f.style.background=getComputedStyle(r).fill;
+    // El fantasma es el bulto entero a su tamaño; se recuerda, en milímetros, de dónde se ha cogido.
     if(arr.modo==='seccion'){
-      // el fantasma es el bulto entero a su tamaño; se recuerda de dónde se ha cogido
-      arr.gx=pt.x-p.x;arr.gy=pt.y-(bin.model.intH-p.y-p.h);
+      arr.gx=pt.x-p.x;arr.gy=pt.y-(M.intH-p.y-p.h);
       f.style.width=p.w*esc_+'px';f.style.height=p.h*esc_+'px';arr.px=arr.gx*esc_;arr.py=arr.gy*esc_;
     }else{
-      const q=r.getBoundingClientRect();
-      arr.ptx=pt.x;f.style.width=p.it.L*(PW/bin.model.intL)*esc_+'px';f.style.height=Math.max(q.height,16)+'px';
-      arr.px=(pt.x-(p.off||0)*(PW/bin.model.intL))*esc_;f.style.top=q.top+'px';
+      const kx=PW/M.intL,ky=kx*AMPLIA;
+      arr.gl=pt.x/kx-(p.off||0);arr.ga=pt.y/ky-p.x;
+      f.style.width=p.it.L*kx*esc_+'px';f.style.height=p.w*ky*esc_+'px';arr.px=arr.gl*kx*esc_;arr.py=arr.ga*ky*esc_;
     }
     document.body.appendChild(f);document.body.classList.add('arrastrando');r.classList.add('cogido');sitio(e);
   });
   document.addEventListener('pointermove',e=>{
     if(!arr)return;
     e.preventDefault();sitio(e);
-    if(arr.modo!=='seccion')return;
     const t=bajo(e),c=t&&t.closest('[data-caja]');marcar(c);
     if(c&&c.dataset.caja!==String(arr.de))c.classList.add('destino');
   });
@@ -271,14 +284,14 @@ function soltarPlanta(b,k,off){
     document.querySelectorAll('rect.cogido').forEach(x=>x.classList.remove('cogido'));
     if(e.type!=='pointerup'||Math.abs(e.clientX-a.x0)+Math.abs(e.clientY-a.y0)<3)return;
     arrastrado=true;
-    if(a.modo==='planta'){
-      const M=reparto.bins[a.de].model;
-      return soltarPlanta(a.de,a.k,(a.p.off||0)+(enSvg(a.svg,e).x-a.ptx)/(PW/M.intL));
-    }
     const t=bajo(e),c=t&&t.closest('[data-caja]');if(!c)return;
     if(c.dataset.caja==='nueva')return soltarAuto(a.de,a.k,'nueva');
-    const n=Number(c.dataset.caja),sv=t.closest('svg.seccion');
-    if(sv){const pt=enSvg(sv,e),M=reparto.bins[n].model;soltarSeccion(a.de,a.k,n,pt.x-a.gx,M.intH-(pt.y-a.gy)-a.p.h);}
+    // Vale soltar en cualquiera de los dos dibujos de cualquier caja; cada uno fija lo que se ve en él.
+    const n=Number(c.dataset.caja),M=reparto.bins[n].model,fr=t.closest('svg.seccion'),ar=t.closest('svg.planta');
+    if(fr&&a.modo==='seccion'){const pt=enSvg(fr,e);soltarSeccion(a.de,a.k,n,pt.x-a.gx,M.intH-(pt.y-a.gy)-a.p.h);}
+    else if(ar&&a.modo==='planta'){const pt=enSvg(ar,e),kx=PW/M.intL;soltarPlanta(a.de,a.k,n,pt.x/kx-a.gl,pt.y/(kx*AMPLIA)-a.ga);}
+    else if(fr){const pt=enSvg(fr,e);soltarSeccion(a.de,a.k,n,pt.x-a.p.w/2,M.intH-pt.y-a.p.h/2);}
+    else if(ar){const pt=enSvg(ar,e),kx=PW/M.intL;soltarPlanta(a.de,a.k,n,pt.x/kx-a.p.it.L/2,pt.y/(kx*AMPLIA)-a.p.w/2);}
     else if(n!==a.de) soltarAuto(a.de,a.k,n);
   };
   document.addEventListener('pointerup',soltar);document.addEventListener('pointercancel',soltar);
