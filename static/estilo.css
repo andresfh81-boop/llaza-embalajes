@@ -159,3 +159,11 @@ rect.bulto.sel,rect.plano.sel{stroke:var(--accent);stroke-width:4}
 .barra-sel .acciones{align-items:center}
 .barra-sel .ojo{color:var(--warn);font-weight:600}
 @media print{.barra-sel{display:none}}
+.marca-caja{flex-direction:row;align-items:center;gap:5px;text-transform:none;letter-spacing:0;font-size:13px;font-weight:500;cursor:pointer}
+.marca-caja input{width:auto}
+.boxes.completa{position:fixed;inset:0;z-index:20;overflow:auto;background:var(--bg);padding:12px;grid-template-columns:repeat(var(--n),minmax(0,1fr));align-content:start}
+.boxes.completa .boxcard{background:var(--panel)}
+.boxes.completa .boxcard:not(.vista){display:none}
+.boxes.completa .visor{max-height:none}
+.boxes.completa .visor>div{min-width:0}
+@media (max-width:900px){.boxes.completa{grid-template-columns:minmax(0,1fr)}}

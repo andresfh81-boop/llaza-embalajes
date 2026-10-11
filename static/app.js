@@ -30,13 +30,13 @@ function renderPedido(){
 const CLAVE_REP='reparto-embalaje';
 let reparto=null,repartoClave='',repartoManual=false,repartoGuardado=false,avisoMov='',modelosAct=[];
 // Ampliación de cada dibujo con sus botones + y −: zoom[caja+vista]={z, sl, st} (aumento y hasta dónde está desplazado).
-const PASOS=[1,1.5,2,3,4];
+const PASOS=[1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,2.2,2.4,2.6,2.8,3,3.25,3.5,3.75,4];
 let zoom={},arrastrado=false;
-// Caja a pantalla completa (su número) y bulto seleccionado con un clic ({b: caja, k: posición}) para pasarlo a otra caja con la barra de abajo.
-let completa=null,sel=null;
+// Cajas a pantalla completa (conjunto de números, o null), cajas marcadas con su casilla para verlas juntas, y bulto seleccionado con un clic ({b: caja, k: posición}) para pasarlo a otra caja con la barra de abajo.
+let completa=null,marcadas=new Set(),sel=null;
 function visor(i,vista,titulo,svg){
   const id=i+vista,z=(zoom[id]||{}).z||1;
-  return `<div class="vcab"><span class="tag">${titulo}</span><span class="zbot"><button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="-1" aria-label="Reducir"${z<=1?' disabled':''}>−</button><b>${Math.round(z*100)} %</b><button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="1" aria-label="Ampliar"${z>=PASOS[PASOS.length-1]?' disabled':''}>+</button>${z>1?`<button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="0">Normal</button>`:''}</span></div><div class="visor" data-v="${id}"><div style="${completa===i&&vista==='f'?`width:min(${z*100}%,${z*78}vh);margin:0 auto`:`width:${z*100}%`}">${svg}</div></div>`;
+  return `<div class="vcab"><span class="tag">${titulo}</span><span class="zbot"><button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="-1" aria-label="Reducir"${z<=1?' disabled':''}>−</button><b>${Math.round(z*100)} %</b><button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="1" aria-label="Ampliar"${z>=PASOS[PASOS.length-1]?' disabled':''}>+</button>${z>1?`<button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="0">Normal</button>`:''}</span></div><div class="visor" data-v="${id}"><div style="${completa&&completa.has(i)&&vista==='f'?`width:min(${z*100}%,${z*78}vh);margin:0 auto`:`width:${z*100}%`}">${svg}</div></div>`;
 }
 // Cambia el aumento de un dibujo manteniendo a la vista el mismo punto central.
 function cambiarZoom(id,d){
@@ -169,7 +169,8 @@ function renderResultado(recalcular){
     }
     repartoClave=clave;avisoMov='';sel=null;
   }
-  if(completa!==null&&!reparto.bins[completa]) completa=null;
+  if(completa){completa=new Set([...completa].filter(i=>reparto.bins[i]));if(!completa.size)completa=null;}
+  marcadas=new Set([...marcadas].filter(i=>reparto.bins[i]));
   if(sel&&!(reparto.bins[sel.b]&&reparto.bins[sel.b].items[sel.k])) sel=null;
   document.body.classList.toggle('con-lupa',completa!==null);
   const r=reparto,col=new Map(perfiles.map((p,ci)=>[p.id,ci%6]));
@@ -181,6 +182,7 @@ function renderResultado(recalcular){
   // Cuánto se aprovecha: sección ocupada de media y el mínimo de cajas que saldría solo por superficie (cota inferior, no siempre alcanzable).
   const todos=r.bins.flatMap(b=>b.items),secB=todos.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)+r.unfit.reduce((s,it)=>s+it.w*it.h,0),secC=r.bins.reduce((s,b)=>s+b.model.intA*b.model.intH,0),minC=Math.max(1,Math.ceil(secB/Math.max(...modelos.map(m=>m.intA*m.intH))));
   if(secC) html+=`<div class="sub">Sección aprovechada: <b>${Math.round(secB/secC*100)} %</b>. ${r.bins.length<=minC?'Con estas cajas no se puede hacer con menos.':`Solo por superficie cabría en ${minC} ${minC===1?'caja':'cajas'}, pero las piezas no se pueden partir ni encajar sin huecos: es un mínimo teórico, no un fallo.`}</div>`;
+  if(marcadas.size) html+=`<div class="manual">${marcadas.size} ${marcadas.size===1?'caja seleccionada':'cajas seleccionadas'}. <button class="btn small" type="button" data-act="ver-marcadas">Ver en pantalla completa</button> <button class="btn small ghost" type="button" data-act="desmarcar">Quitar selección</button></div>`;
   if(avisoMov) html+=`<div class="note" role="alert">${esc(avisoMov)}</div>`;
   if(repartoManual) html+=`<div class="manual">${repartoGuardado?'Reparto a mano guardado en este navegador.':'Has movido bultos a mano. <button class="btn small" type="button" data-act="guardar-reparto">Guardar reparto</button>'} <button class="btn small ghost" type="button" data-act="auto">Volver al reparto automático</button></div>`;
   if(r.unfit.length){
@@ -190,14 +192,14 @@ function renderResultado(recalcular){
   if(!cajas.some(c=>c.id===modeloNuevo)) modeloNuevo=modelos.slice().sort((x,y)=>vol(x)-vol(y))[0].id;
   const nuevaHtml=`<div class="boxcard nueva" data-caja="nueva"><span class="tag">Añadir caja</span><label>Modelo<select id="modelo-nuevo">${Object.keys(TIPOS).map(t=>{const l=cajas.filter(c=>c.tipo===t);return l.length?`<optgroup label="${TIPOS[t]}">${l.map(c=>`<option value="${esc(c.id)}"${c.id===modeloNuevo?' selected':''}>${esc(c.nombre)} · ${num(c.intL)}×${num(c.intA)}×${num(c.intH)}</option>`).join('')}</optgroup>`:'';}).join('')}</select></label><button class="btn small" type="button" data-act="caja-vacia">Añadir caja vacía</button><p>O suelta aquí un bulto para ponerlo en una caja nueva de ese modelo.</p></div>`;
   const lineasTxt=[];
-  html+='<div class="boxes">'+r.bins.map((b,i)=>{
+  html+=`<div class="boxes${completa?' completa':''}" style="--n:${completa?Math.min(completa.size,3):1}">`+r.bins.map((b,i)=>{
     const M=b.model,usado=b.items.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)/(M.intA*M.intH);
     const g={};b.items.forEach(p=>{const k=p.it.p.id+'|'+p.it.L;const c=(g[k]=g[k]||{p:p.it.p,L:p.it.L,n:0,pz:0,ms:[]});c.n++;c.pz+=p.it.n||1;if(p.it.m)c.ms.push(p.it.m);});
     const cont=Object.values(g),gs=[...new Set(cont.map(c=>c.p.grupo||''))],gtxt=!cont.length?'Vacía':gs.length>1?'Mezcla':(GRUPOS[gs[0]]||'');
     lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.p.nombre} ${c.L} mm${num(c.p.uds)>1?' ('+c.pz+' uds)':''}${c.ms.length?' ['+c.ms.join(', ')+']':''}`).join(', '));
     const flot=b.items.filter(p=>!apoyado(p,b));if(flot.length)lineasTxt.push(`  OJO, sin apoyo: ${flot.map(nombreB).join(', ')}`);
-    return `<div class="boxcard${completa===i?' ampliada':''}" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><button class="btn small ghost" type="button" data-act="completa" data-i="${i}">${completa===i?'Salir de pantalla completa':'Pantalla completa'}</button>${cont.length?'':`<button class="btn small danger" type="button" data-act="quitar-caja" data-i="${i}">Quitar caja</button>`}</div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}${visor(i,'f','De frente · ancho × alto',dibujoSeccion(b,i,col,hol))}${visor(i,'a',`Desde arriba · largo × ancho (ancho ×${AMPLIA})`,dibujoPlanta(b,i,col))}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm${num(c.p.uds)>1?` · ${c.pz} uds`:''}${c.ms.length?` · <b class="marca">${esc(c.ms.join(', '))}</b>`:''}</li>`).join('')}</ul></div>`;
-  }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Para pasar un bulto a una caja que no tienes a la vista, haz clic en él y elige la caja en la barra que sale abajo; también puedes arrastrarlo, y la página se desplaza sola al acercarte al borde. «Pantalla completa» abre una caja en grande. Con los botones − y + de cada dibujo lo reduces o amplías; ampliado, arrastra el fondo del dibujo para moverte por él. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, moverlo a lo largo y a lo ancho, también a otra caja. Si choca con otro o se sale, te aviso y se queda donde estaba. Para girar un bulto: clic derecho encima, o la tecla R mientras lo arrastras. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
+    return `<div class="boxcard${completa&&completa.has(i)?' vista':''}" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><label class="marca-caja"><input type="checkbox" data-marcar="${i}"${marcadas.has(i)?' checked':''}>Seleccionar</label><button class="btn small ghost" type="button" data-act="completa" data-i="${i}">${completa?'Salir de pantalla completa':'Pantalla completa'}</button>${cont.length?'':`<button class="btn small danger" type="button" data-act="quitar-caja" data-i="${i}">Quitar caja</button>`}</div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}${visor(i,'f','De frente · ancho × alto',dibujoSeccion(b,i,col,hol))}${visor(i,'a',`Desde arriba · largo × ancho (ancho ×${AMPLIA})`,dibujoPlanta(b,i,col))}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm${num(c.p.uds)>1?` · ${c.pz} uds`:''}${c.ms.length?` · <b class="marca">${esc(c.ms.join(', '))}</b>`:''}</li>`).join('')}</ul></div>`;
+  }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Para pasar un bulto a una caja que no tienes a la vista, haz clic en él y elige la caja en la barra que sale abajo; también puedes arrastrarlo, y la página se desplaza sola al acercarte al borde. «Pantalla completa» abre una caja en grande; para ver varias a la vez, marca su casilla «Seleccionar» y pulsa «Ver en pantalla completa»: entre ellas se pueden arrastrar bultos. Con los botones − y + de cada dibujo lo reduces o amplías; ampliado, arrastra el fondo del dibujo para moverte por él. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, moverlo a lo largo y a lo ancho, también a otra caja. Si choca con otro o se sale, te aviso y se queda donde estaba. Para girar un bulto: clic derecho encima, o la tecla R mientras lo arrastras. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
   ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas (${desg}), ${m3.toFixed(2)} m³\nBultos en total: ${nb+r.bins.length} (${nb} de perfil + ${r.bins.length} cajas)\n`+lineasTxt.join('\n');
   // Barra del bulto seleccionado: siempre a la vista abajo, para pasarlo a cualquier caja sin tener que arrastrar.
   if(sel){
@@ -560,7 +562,9 @@ document.addEventListener('click',async e=>{
   else if(a==='quitar-caja'){const n=Number(b.dataset.i);if(reparto.bins[n]&&!reparto.bins[n].items.length){reparto.bins.splice(n,1);hecho();renderResultado();}}
   else if(a==='zoom'){cambiarZoom(b.dataset.v,Number(b.dataset.d));}
   else if(a==='imprimir'){imprimirLista();}
-  else if(a==='completa'){const n=Number(b.dataset.i);completa=completa===n?null:n;renderResultado();}
+  else if(a==='completa'){completa=completa?null:new Set([Number(b.dataset.i)]);renderResultado();}
+  else if(a==='ver-marcadas'){completa=new Set(marcadas);renderResultado();}
+  else if(a==='desmarcar'){marcadas=new Set();renderResultado();}
   else if(a==='quitar-sel'){sel=null;avisoMov='';renderResultado();}
   else if(a==='girar-sel'&&sel){const s=sel;girarBulto(s.b,s.k);if(!avisoMov){sel=s;renderResultado();}}
   else if(a==='pasar'&&sel){const n=b.dataset.n==='nueva'?'nueva':Number(b.dataset.n);soltarAuto(sel.b,sel.k,n);if(!sel)estado(n==='nueva'?'Pasado a una caja nueva.':`Pasado a la caja ${n+1}.`);}
@@ -583,7 +587,8 @@ document.addEventListener('click',async e=>{
   }
 });
 
-document.addEventListener('change',e=>{if(e.target.id==='cat-file'){importar(e.target.files[0]);e.target.value='';}if(e.target.id==='modelo-nuevo')modeloNuevo=e.target.value;});
+document.addEventListener('change',e=>{if(e.target.id==='cat-file'){importar(e.target.files[0]);e.target.value='';}if(e.target.id==='modelo-nuevo')modeloNuevo=e.target.value;
+  if(e.target.dataset&&e.target.dataset.marcar!==undefined){const n=Number(e.target.dataset.marcar);if(e.target.checked)marcadas.add(n);else marcadas.delete(n);renderResultado();}});
 
 renderTodo();
 (async()=>{
