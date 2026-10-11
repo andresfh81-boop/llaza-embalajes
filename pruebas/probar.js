@@ -4,7 +4,7 @@ const {plan,planGrupos,parseHoja,aplicar,diferencia}=require(path.join(__dirname
 const G={nombre:'G',intL:6000,intA:600,intH:400,extL:6100,extA:660,extH:460};
 const S={nombre:'S',intL:4000,intA:300,intH:300,extL:4080,extA:350,extH:350};
 const mk=(n,w,h,L)=>Array.from({length:n},()=>({p:{nombre:w+'x'+h},w,h,L}));
-function check(r){for(const b of r.bins)for(const a of b.items){if(a.x<0||a.y<0||a.x+a.w>b.model.intA||a.y+a.h>b.model.intH||a.it.L>b.model.intL)throw new Error('fuera de la caja');for(const c of b.items)if(a!==c&&a.x<c.x+c.w&&c.x<a.x+a.w&&a.y<c.y+c.h&&c.y<a.y+a.h)throw new Error('solape');}}
+function check(r){for(const b of r.bins)for(const a of b.items){if(a.x<0||a.y<0||a.x+a.w>b.model.intA||a.y+a.h>b.model.intH||a.it.L>b.model.intL)throw new Error('fuera de la caja');for(const c of b.items){if(a===c||!(a.y<c.y+c.h&&c.y<a.y+a.h))continue;const med=p=>[p.x+(p.w-p.medio)/2,p.medio],sol=(x1,w1,x2,w2)=>x1<x2+w2-1e-6&&x2<x1+w1-1e-6;if(a.medio&&c.medio&&a.off!==c.off){const [ax,aw]=med(a),[cx,cw]=med(c);if(sol(a.x,a.w,cx,cw)||sol(ax,aw,c.x,c.w))throw new Error('solape alternado');}else if(sol(a.x,a.w,c.x,c.w))throw new Error('solape');}}}
 const items=[...mk(4,180,180,3000),...mk(6,282,275,4500),...mk(2,236,138,5000),...mk(2,147,157,5000)];
 let r=plan(items,[G,S]);check(r);
 assert.strictEqual(r.unfit.length,0);
@@ -26,6 +26,15 @@ console.log('por grupos:',r.bins.map(b=>b.model.nombre+':'+b.items[0].it.g+':'+b
 // Si los restos de dos grupos caben en una caja, se juntan para ahorrar una.
 r=planGrupos([...gr('estructura',1,180,180,2652),...gr('lamas',1,282,275,3855)],[C5,C7]);check(r);
 assert.strictEqual(r.bins.length,1);assert.ok(mezcla(r.bins[0]));
+// Lamas con porexpan en los extremos: alternadas caben 3 por fila en vez de 2 → 16 bultos en 3 cajas en vez de 4.
+const conCap=gr('lamas',16,282,275,3855).map(it=>Object.assign(it,{cap:{l:300,w:205}}));
+r=planGrupos(conCap,[C5,C7]);check(r);
+assert.strictEqual(r.unfit.length,0);assert.deepStrictEqual(r.bins.map(b=>b.items.length),[6,6,4]);
+assert.ok(r.bins[0].items.some(p=>p.off===300)&&r.bins[0].items.some(p=>p.off===0));
+// Si la caja no tiene largo para adelantar un bulto, no se alterna.
+r=planGrupos(conCap.map(it=>Object.assign({},it,{L:4900})),[C5]);check(r);
+assert.strictEqual(r.bins.length,4);assert.ok(!r.bins[0].items.some(p=>p.off));
+console.log('alternadas: ok');
 
 const base=[{id:'a',nombre:'A',ancho:1},{id:'b',nombre:'B',ancho:2},{id:'c',nombre:'C',ancho:3}];
 const mio=[{ancho:1,nombre:'A',id:'a'},{id:'b',nombre:'B',ancho:20},{id:'n1',nombre:'Nueva',ancho:9}];

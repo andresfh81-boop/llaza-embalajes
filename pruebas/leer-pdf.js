@@ -24,7 +24,7 @@ const cat=JSON.parse(fs.readFileSync(path.join(raiz,'datos','catalogo.json'),'ut
     const m=(cat.montados||[]).find(x=>String(x.ref)===l.ref);
     console.log(l.ref,'|',l.desc,'|',l.largo,'mm |',l.cant,'uds |',p?p.nombre:m?'va montado en '+m.en:'SIN PERFIL',l.dudosa?'| cantidad dudosa':'');
     if(!p) continue;
-    for(let i=0;i<Math.ceil(l.cant/(p.uds||1));i++) items.push({p,g:p.grupo||'',L:l.largo,w:p.ancho+5,h:p.alto+5});
+    for(let i=0;i<Math.ceil(l.cant/(p.uds||1));i++) {const it={p,g:p.grupo||'',L:l.largo,w:p.ancho+5,h:p.alto+5};if(p.capL&&p.anchoMedio)it.cap={l:p.capL,w:p.anchoMedio+5};items.push(it);}
   }
   const r=planGrupos(items,cat.cajas.filter(c=>c.tipo===tipo));
   console.log('--- reparto ('+tipo+') ---');

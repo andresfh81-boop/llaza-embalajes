@@ -15,7 +15,7 @@ function newBin(model){return {model, free:[{x:0,y:0,w:model.intA,h:model.intH}]
 function tryPlace(bin,it){
   if(it.L>bin.model.intL) return false;
   let b=null;
-  for(const f of bin.free) for(const o of [[it.w,it.h],[it.h,it.w]]){
+  for(const f of bin.free) for(const o of it.fila?[[it.w,it.h]]:[[it.w,it.h],[it.h,it.w]]){
     const w=o[0],h=o[1];
     if(w<=f.w&&h<=f.h){
       const s=Math.min(f.w-w,f.h-h);
@@ -36,13 +36,35 @@ function tryPlace(bin,it){
   return true;
 }
 function orden(items){return items.slice().sort((a,b)=>b.w*b.h-a.w*a.h||b.L-a.L);}
+// Bultos con protección en los extremos (porexpan): it.cap={l,w} = largo de cada protección y ancho del bulto en el medio (con holgura).
+// Poniéndolos en fila, uno adelantado y el siguiente atrasado, las protecciones no coinciden y caben más a lo ancho.
+// Cada bulto va recto y con la protección centrada: n en fila ocupan (n-1)·(ancho+medio)/2 + ancho, y la fila mide L + protección de largo.
+function anchoFila(n,it){return (n-1)*(it.w+it.cap.w)/2+it.w;}
+function filas(model,items){
+  const out=[],gr={};
+  for(const it of items){
+    if(!it.cap||it.L+it.cap.l>model.intL){out.push(it);continue;}
+    const k=[it.w,it.h,it.cap.w,it.cap.l,it.L].join();(gr[k]=gr[k]||[]).push(it);
+  }
+  for(const g of Object.values(gr)){
+    const it=g[0];let n=1;while(anchoFila(n+1,it)<=model.intA)n++;
+    if(n<2||n<=Math.floor(model.intA/it.w)){out.push(...g);continue;}
+    for(let i=0;i<g.length;i+=n){
+      const parts=g.slice(i,i+n);
+      out.push(parts.length<2?parts[0]:{fila:parts,w:anchoFila(parts.length,it),h:it.h,L:it.L+it.cap.l});
+    }
+  }
+  return out;
+}
 function packWith(model,items){
   const bins=[],unfit=[];
-  for(const it of orden(items)){
+  for(const it of orden(filas(model,items))){
     if(bins.some(b=>tryPlace(b,it))) continue;
     const nb=newBin(model);
-    if(tryPlace(nb,it)) bins.push(nb); else unfit.push(it);
+    if(tryPlace(nb,it)) bins.push(nb); else unfit.push(...(it.fila||[it]));
   }
+  // Las filas se deshacen en sus bultos: cada uno con su sitio, su ancho en el medio y cuánto va adelantado (off).
+  for(const b of bins) b.items=b.items.flatMap(p=>!p.it.fila?[p]:p.it.fila.map((it,i)=>({it,x:p.x+i*(it.w+it.cap.w)/2,y:p.y,w:it.w,h:it.h,medio:it.cap.w,off:i%2?it.cap.l:0})));
   return {bins,unfit};
 }
 function vol(m){return m.extL*m.extA*m.extH;}

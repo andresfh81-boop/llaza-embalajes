@@ -25,8 +25,64 @@ function renderPedido(){
 }
 
 // Reparto en pantalla: sale del cálculo automático y se puede retocar arrastrando bultos entre cajas.
-// Mientras no cambien pedido, tipo, holgura ni catálogo, los retoques a mano se conservan.
-let reparto=null,repartoClave='',repartoManual=false,avisoMov='',modelosAct=[];
+// Mientras no cambien pedido, tipo, holgura ni catálogo, los retoques a mano se conservan; con «Guardar reparto» también al recargar.
+const CLAVE_REP='reparto-embalaje';
+let reparto=null,repartoClave='',repartoManual=false,repartoGuardado=false,avisoMov='',modelosAct=[];
+function bulto(p,L){
+  const hol=num(pedido.holgura),it={p,g:p.grupo||'',L,w:num(p.ancho)+hol,h:num(p.alto)+hol};
+  if(num(p.capL)&&num(p.anchoMedio)&&num(p.anchoMedio)<num(p.ancho)) it.cap={l:num(p.capL),w:num(p.anchoMedio)+hol};
+  return it;
+}
+function guardarReparto(){
+  const par=it=>[it.p.id,it.L];
+  try{
+    localStorage.setItem(CLAVE_REP,JSON.stringify({clave:repartoClave,bins:reparto.bins.map(b=>({m:b.model.id,its:b.items.map(p=>par(p.it))})),sin:reparto.unfit.map(par)}));
+    repartoGuardado=true;estado('Reparto guardado en este navegador.');
+  }catch(e){estado('No se ha podido guardar el reparto en este navegador.');}
+  renderResultado();
+}
+function cargarReparto(clave,modelos){
+  try{
+    const g=JSON.parse(localStorage.getItem(CLAVE_REP)||'null');
+    if(!g||g.clave!==clave) return null;
+    const it=([pid,L])=>bulto(perfiles.find(x=>x.id===pid),L),bins=[];
+    for(const b of g.bins){
+      const r=packWith(modelos.find(m=>m.id===b.m),b.its.map(it));
+      if(r.bins.length!==1||r.unfit.length) return null;
+      bins.push(r.bins[0]);
+    }
+    return {bins,unfit:(g.sin||[]).map(it)};
+  }catch(e){return null;}
+}
+// Cota partida: lo ocupado, lo que queda libre y debajo el total. Horizontal bajo el dibujo o vertical a su izquierda.
+function cota(total,occ,k,base,mg,fc,vert){
+  const o=Math.round(Math.min(occ,total)),lib=Math.round(total)-o;
+  const txt=(pos,d,t,cls)=>`<text class="cota${cls||''}" font-size="${fc}" text-anchor="middle" dominant-baseline="central" ${vert?`transform="translate(${-d} ${base-pos*k}) rotate(-90)"`:`x="${pos*k}" y="${base+d}"`}>${t}</text>`;
+  const raya=pos=>vert?`<line class="cota" x1="${-mg*.5}" x2="0" y1="${base-pos*k}" y2="${base-pos*k}" vector-effect="non-scaling-stroke"/>`:`<line class="cota" x1="${pos*k}" x2="${pos*k}" y1="${base}" y2="${base+mg*.5}" vector-effect="non-scaling-stroke"/>`;
+  return raya(0)+raya(o)+raya(total)+(o?txt(o/2,mg*.27,o):'')+(lib>0?txt((o+total)/2,mg*.27,lib,' libre'):'')+txt(total/2,mg*.76,Math.round(total)+' mm');
+}
+function dibujoSeccion(b,i,col,hol){
+  const M=b.model,mx=Math.max(M.intA,M.intH),fs=mx/14,mg=mx*.17,fc=mx/21;
+  const ocA=Math.max(0,...b.items.map(p=>p.x+p.w)),ocH=Math.max(0,...b.items.map(p=>p.y+p.h));
+  return `<svg viewBox="${-mg} -2 ${M.intA+mg+2} ${M.intH+mg+2}" role="img" aria-label="Sección de la caja ${i+1}"><rect x="0" y="0" width="${M.intA}" height="${M.intH}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,k)=>{
+    // Un bulto alternado se dibuja con su ancho en el medio; la protección del extremo, en línea de puntos.
+    const y=M.intH-p.y-p.h,rw=p.medio||p.w,rx=p.x+(p.w-rw)/2,t=p.it.p.ref||p.it.p.nombre,fm=Math.min(fc*.9,rw/5,p.h/5),f=Math.min(fs,p.h*.3,(rw-fm*2.6)/(String(t).length*.62));
+    return (p.medio?`<rect class="prot" x="${p.x}" y="${y}" width="${p.w}" height="${p.h}" vector-effect="non-scaling-stroke"/>`:'')+`<rect class="bulto" data-b="${i}" data-k="${k}" x="${rx}" y="${y}" width="${rw}" height="${p.h}" fill="var(--p${col.get(p.it.p.id)})" stroke="var(--panel)" stroke-width="1.5" vector-effect="non-scaling-stroke"><title>${esc(p.it.p.nombre)} · ${p.it.L} mm</title></rect><text x="${rx+rw/2}" y="${y+p.h/2}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)}</text><text x="${rx+rw/2}" y="${y+p.h-fm*.7}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${rw-hol}</text><text transform="translate(${rx+fm*.75} ${y+p.h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.h-hol}</text>`;}).join('')}${cota(M.intA,ocA,1,M.intH,mg,fc,false)}${cota(M.intH,ocH,1,M.intH,mg,fc,true)}</svg>`;
+}
+// Vista desde arriba: largo en horizontal y ancho en vertical (el ancho va ampliado para que se vea). Lo de más arriba tapa lo de debajo.
+const AMPLIA=2;
+function dibujoPlanta(b,i,col){
+  const M=b.model,W=600,k=W/M.intL,ky=k*AMPLIA,H=M.intA*ky,mg=42,fc=13;
+  const ocL=Math.max(0,...b.items.map(p=>(p.off||0)+p.it.L));
+  const pieza=(p,n)=>{
+    const c=`fill="var(--p${col.get(p.it.p.id)})" stroke="var(--panel)" stroke-width="1" vector-effect="non-scaling-stroke"`,x0=(p.off||0)*k,L=p.it.L*k,y0=p.x*ky,h=p.w*ky,t=p.it.p.ref||p.it.p.nombre;
+    let g;
+    if(p.medio){const l=Math.min(p.it.cap.l,p.it.L/2)*k,hm=p.medio*ky;g=`<rect x="${x0}" y="${y0+(h-hm)/2}" width="${L}" height="${hm}" ${c}/><rect x="${x0}" y="${y0}" width="${l}" height="${h}" ${c}/><rect x="${x0+L-l}" y="${y0}" width="${l}" height="${h}" ${c}/>`;}
+    else g=`<rect x="${x0}" y="${y0}" width="${L}" height="${h}" ${c}/>`;
+    return g+(h>=fc*1.1?`<text x="${x0+L/2}" y="${y0+h/2}" font-size="${Math.min(fc,h*.7)}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)} · ${p.it.L}</text>`:'');
+  };
+  return `<svg viewBox="${-mg} -2 ${W+mg+2} ${H+mg+2}" role="img" aria-label="Caja ${i+1} vista desde arriba"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.slice().sort((p,q)=>p.y-q.y).map(pieza).join('')}${cota(M.intL,ocL,k,H,mg,fc,false)}<text class="cota" font-size="${fc}" text-anchor="middle" dominant-baseline="central" transform="translate(${-mg*.5} ${H/2}) rotate(-90)">${M.intA} mm</text></svg>`;
+}
 function renderResultado(recalcular){
   const el=$('resultado');ultimoResumen='';
   const head='<h2>Cajas necesarias</h2>';
@@ -37,13 +93,19 @@ function renderResultado(recalcular){
   if(!pedido.lineas.length){el.innerHTML=head+`<div class="empty">Hay ${modelos.length} ${modelos.length===1?'caja':'cajas'} de ${TIPOS[pedido.tipo]} en el catálogo. Añade perfiles al pedido para ver cuántas hacen falta.</div>`;return;}
   const hol=num(pedido.holgura),clave=JSON.stringify([pedido,modelos,perfiles]);
   if(recalcular||!reparto||clave!==repartoClave){
-    const items=[];
-    for(const l of pedido.lineas){
-      const p=perfiles.find(x=>x.id===l.pid);if(!p)continue;
-      const uds=Math.max(1,num(p.uds)),n=Math.ceil(l.cant/uds);
-      for(let i=0;i<n;i++) items.push({p,g:p.grupo||'',L:l.largo,w:num(p.ancho)+hol,h:num(p.alto)+hol});
+    const g=recalcular?null:cargarReparto(clave,modelos);
+    if(g){reparto=g;repartoManual=repartoGuardado=true;}
+    else{
+      const items=[];
+      for(const l of pedido.lineas){
+        const p=perfiles.find(x=>x.id===l.pid);if(!p)continue;
+        const n=Math.ceil(l.cant/Math.max(1,num(p.uds)));
+        for(let i=0;i<n;i++) items.push(bulto(p,l.largo));
+      }
+      reparto=planGrupos(items,modelos);repartoManual=repartoGuardado=false;
+      if(recalcular) try{localStorage.removeItem(CLAVE_REP);}catch(e){}
     }
-    reparto=planGrupos(items,modelos);repartoClave=clave;repartoManual=false;avisoMov='';
+    repartoClave=clave;avisoMov='';
   }
   const r=reparto,col=new Map(perfiles.map((p,ci)=>[p.id,ci%6]));
   const nb=r.bins.reduce((s,b)=>s+b.items.length,0)+r.unfit.length;
@@ -52,24 +114,19 @@ function renderResultado(recalcular){
   const desg=Object.entries(porModelo).map(([n,c])=>`${c} × ${n}`).join(', ');
   let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb}</b> <span>bultos</span></div><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></div><div class="sub">${esc(desg)}</div>`;
   if(avisoMov) html+=`<div class="note" role="alert">${esc(avisoMov)}</div>`;
-  if(repartoManual) html+='<div class="manual">Has movido bultos a mano. <button class="btn small ghost" type="button" data-act="auto">Volver al reparto automático</button></div>';
+  if(repartoManual) html+=`<div class="manual">${repartoGuardado?'Reparto a mano guardado en este navegador.':'Has movido bultos a mano. <button class="btn small" type="button" data-act="guardar-reparto">Guardar reparto</button>'} <button class="btn small ghost" type="button" data-act="auto">Volver al reparto automático</button></div>`;
   if(r.unfit.length){
     const g={};r.unfit.forEach(it=>{const k=it.p.nombre+' de '+it.L+' mm';g[k]=(g[k]||0)+1;});
     html+=`<div class="note">No caben en ninguna caja de ${TIPOS[pedido.tipo]}: ${Object.entries(g).map(([k,c])=>esc(c+' × '+k)).join('; ')}. Hace falta una caja más larga o de más sección.</div>`;
   }
   const lineasTxt=[];
   html+='<div class="boxes">'+r.bins.map((b,i)=>{
-    const M=b.model,usado=b.items.reduce((s,p)=>s+p.w*p.h,0)/(M.intA*M.intH);
+    const M=b.model,usado=b.items.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)/(M.intA*M.intH);
     const g={};b.items.forEach(p=>{const k=p.it.p.id+'|'+p.it.L;(g[k]=g[k]||{p:p.it.p,L:p.it.L,n:0}).n++;});
     const cont=Object.values(g),gs=[...new Set(cont.map(c=>c.p.grupo||''))],gtxt=gs.length>1?'Mezcla':(GRUPOS[gs[0]]||'');
     lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.p.nombre} ${c.L} mm`).join(', '));
-    // Dibujo: sección interior con su cota abajo y a la izquierda; cada bulto lleva su ancho y su alto reales (sin holgura).
-    const mx=Math.max(M.intA,M.intH),fs=mx/14,mg=mx*.1,fc=mx/20;
-    const svg=`<svg viewBox="${-mg} -2 ${M.intA+mg+2} ${M.intH+mg+2}" role="img" aria-label="Sección de la caja ${i+1}"><rect x="0" y="0" width="${M.intA}" height="${M.intH}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,k)=>{
-      const y=M.intH-p.y-p.h,t=p.it.p.ref||p.it.p.nombre,fm=Math.min(fc*.9,p.w/5,p.h/5),f=Math.min(fs,p.h*.3,(p.w-fm*2.6)/(String(t).length*.62));
-      return `<rect class="bulto" data-b="${i}" data-k="${k}" x="${p.x}" y="${y}" width="${p.w}" height="${p.h}" fill="var(--p${col.get(p.it.p.id)})" stroke="var(--panel)" stroke-width="1.5" vector-effect="non-scaling-stroke"><title>${esc(p.it.p.nombre)} · ${p.it.L} mm</title></rect><text x="${p.x+p.w/2}" y="${y+p.h/2}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)}</text><text x="${p.x+p.w/2}" y="${y+p.h-fm*.7}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.w-hol}</text><text transform="translate(${p.x+fm*.75} ${y+p.h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.h-hol}</text>`;}).join('')}<text x="${M.intA/2}" y="${M.intH+mg*.55}" font-size="${fc}" text-anchor="middle" dominant-baseline="central" fill="var(--fg)">${M.intA} mm</text><text transform="translate(${-mg*.5} ${M.intH/2}) rotate(-90)" font-size="${fc}" text-anchor="middle" dominant-baseline="central" fill="var(--fg)">${M.intH} mm</text></svg>`;
-    return `<div class="boxcard" data-caja="${i}"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div>${svg}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm</li>`).join('')}</ul></div>`;
-  }).join('')+'<div class="boxcard nueva" data-caja="nueva"><span class="tag">Caja nueva</span><p>Suelta aquí un bulto para ponerlo en una caja aparte.</p></div></div><p class="sub">Puedes arrastrar un bulto del dibujo a otra caja; si no cabe, te aviso y se queda donde estaba.</p>';
+    return `<div class="boxcard" data-caja="${i}"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><span class="tag">De frente · ancho × alto</span>${dibujoSeccion(b,i,col,hol)}<span class="tag">Desde arriba · largo × ancho (ancho ampliado ×${AMPLIA})</span>${dibujoPlanta(b,i,col)}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm</li>`).join('')}</ul></div>`;
+  }).join('')+'<div class="boxcard nueva" data-caja="nueva"><span class="tag">Caja nueva</span><p>Suelta aquí un bulto para ponerlo en una caja aparte.</p></div></div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior. Puedes arrastrar un bulto del dibujo de frente a otra caja; si no cabe, te aviso y se queda donde estaba.</p>';
   ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas (${desg}), ${m3.toFixed(2)} m³\n`+lineasTxt.join('\n');
   el.innerHTML=html;
 }
@@ -91,8 +148,10 @@ function mover(de,k,a){
     }
   }
   if(dest){
-    avisoMov='';repartoManual=true;
-    B[de].items.splice(k,1);
+    avisoMov='';repartoManual=true;repartoGuardado=false;
+    // La caja de origen se recoloca con lo que le queda (si por lo que sea no saliera, se deja como estaba sin el bulto).
+    const queda=B[de].items.filter((_,i)=>i!==k),r=queda.length?packWith(B[de].model,queda.map(p=>p.it)):null;
+    if(r&&r.bins.length===1&&!r.unfit.length) B[de]=r.bins[0]; else B[de].items=queda;
     if(a==='nueva') B.push(dest); else B[a]=dest;
     if(!B[de].items.length) B.splice(de,1);
   }
@@ -103,23 +162,26 @@ function mover(de,k,a){
   let arr=null;
   const tarjeta=e=>{const t=document.elementFromPoint(e.clientX,e.clientY);return t&&t.closest('[data-caja]');};
   const marcar=c=>document.querySelectorAll('.boxcard.destino').forEach(x=>{if(x!==c)x.classList.remove('destino');});
+  const sitio=(f,e)=>{f.style.left=e.clientX-f.offsetWidth/2+'px';f.style.top=e.clientY-f.offsetHeight/2+'px';};
   $('resultado').addEventListener('pointerdown',e=>{
     const r=e.target.closest('rect.bulto');if(!r||e.button)return;
     e.preventDefault();
-    const it=reparto.bins[r.dataset.b].items[r.dataset.k].it,f=document.createElement('div');
-    f.className='fantasma';f.textContent=`${it.p.nombre} · ${it.L} mm`;document.body.appendChild(f);
-    arr={de:Number(r.dataset.b),k:Number(r.dataset.k),f};r.classList.add('cogido');
-    f.style.left=e.clientX+12+'px';f.style.top=e.clientY+12+'px';
+    // El bulto que se lleva el ratón: mismo tamaño y color que en el dibujo.
+    const it=reparto.bins[r.dataset.b].items[r.dataset.k].it,q=r.getBoundingClientRect(),f=document.createElement('div');
+    f.className='fantasma';f.textContent=it.p.ref||it.p.nombre;
+    f.style.width=Math.max(q.width,34)+'px';f.style.height=Math.max(q.height,22)+'px';f.style.background=getComputedStyle(r).fill;
+    document.body.appendChild(f);document.body.classList.add('arrastrando');
+    arr={de:Number(r.dataset.b),k:Number(r.dataset.k),f};r.classList.add('cogido');sitio(f,e);
   });
   document.addEventListener('pointermove',e=>{
     if(!arr)return;
-    arr.f.style.left=e.clientX+12+'px';arr.f.style.top=e.clientY+12+'px';
+    e.preventDefault();sitio(arr.f,e);
     const c=tarjeta(e);marcar(c);
     if(c&&c.dataset.caja!==String(arr.de))c.classList.add('destino');
   });
   const soltar=e=>{
     if(!arr)return;
-    const a=arr,c=e.type==='pointerup'?tarjeta(e):null;arr=null;a.f.remove();marcar(null);
+    const a=arr,c=e.type==='pointerup'?tarjeta(e):null;arr=null;a.f.remove();marcar(null);document.body.classList.remove('arrastrando');
     document.querySelectorAll('rect.cogido').forEach(x=>x.classList.remove('cogido'));
     if(c&&c.dataset.caja!==String(a.de)) mover(a.de,a.k,c.dataset.caja==='nueva'?'nueva':Number(c.dataset.caja));
   };
@@ -194,7 +256,7 @@ function renderCajas(){
 }
 function renderPerfiles(){
   $('p-guardar').textContent=editPerfil?'Guardar cambios':'Guardar perfil';
-  $('lista-perfiles').innerHTML=perfiles.length?`<table><thead><tr><th>Nombre</th><th>Ref.</th><th>Grupo</th><th class="n">Ancho</th><th class="n">Alto</th><th class="n">Piezas/bulto</th><th></th></tr></thead><tbody>${perfiles.map(p=>`<tr><td>${esc(p.nombre)}</td><td>${esc(p.ref)}</td><td>${GRUPOS[p.grupo]||''}</td><td class="n">${num(p.ancho)}</td><td class="n">${num(p.alto)}</td><td class="n">${num(p.uds)||1}</td><td class="act">${botones('perfil',p.id)}</td></tr>`).join('')}</tbody></table>`
+  $('lista-perfiles').innerHTML=perfiles.length?`<table><thead><tr><th>Nombre</th><th>Ref.</th><th>Grupo</th><th class="n">Ancho</th><th class="n">Alto</th><th class="n">Piezas/bulto</th><th class="n">Ancho en medio</th><th class="n">Protección</th><th></th></tr></thead><tbody>${perfiles.map(p=>`<tr><td>${esc(p.nombre)}</td><td>${esc(p.ref)}</td><td>${GRUPOS[p.grupo]||''}</td><td class="n">${num(p.ancho)}</td><td class="n">${num(p.alto)}</td><td class="n">${num(p.uds)||1}</td><td class="n">${num(p.anchoMedio)||''}</td><td class="n">${num(p.capL)||''}</td><td class="act">${botones('perfil',p.id)}</td></tr>`).join('')}</tbody></table>`
     :'<div class="empty">Aún no hay perfiles. Guarda aquí la sección de cada perfil ya envuelto.</div>';
 }
 function renderTodo(){renderPedido();renderCajas();renderPerfiles();renderCatalogo();}
@@ -270,6 +332,8 @@ $('f-caja').addEventListener('submit',e=>{
 $('f-perfil').addEventListener('submit',e=>{
   e.preventDefault();
   const d={nombre:$('p-nombre').value.trim(),ref:$('p-ref').value.trim(),grupo:$('p-grupo').value,ancho:num($('p-ancho').value),alto:num($('p-alto').value),uds:Math.max(1,num($('p-uds').value))};
+  if(num($('p-medio').value)) d.anchoMedio=num($('p-medio').value);
+  if(num($('p-capl').value)) d.capL=num($('p-capl').value);
   if(!base){estado('No se puede guardar: catálogo no disponible.');return;}
   poner(perfiles,editPerfil,d);editPerfil=null;e.target.reset();guardarCatalogo();
 });
@@ -285,6 +349,7 @@ document.addEventListener('click',async e=>{
   else if(a==='cancelar'){confirmar=null;renderCajas();renderPerfiles();renderCatalogo();}
   else if(a==='exportar'){exportar();}
   else if(a==='auto'){renderResultado(true);}
+  else if(a==='guardar-reparto'){guardarReparto();}
   else if(a==='pedir-descartar'){confirmar='descartar';renderCatalogo();}
   else if(a==='descartar'){confirmar=null;try{localStorage.removeItem(CLAVE_CAT);}catch(err){}montar({});renderTodo();estado('Has vuelto al catálogo común.');}
   else if(a==='pedir-caja'){confirmar='caja'+id;renderCajas();}
@@ -298,7 +363,7 @@ document.addEventListener('click',async e=>{
   }
   else if(a==='editar-perfil'){
     const p=perfiles.find(x=>x.id===id);if(!p)return;editPerfil=id;
-    $('p-nombre').value=p.nombre;$('p-ref').value=p.ref||'';$('p-grupo').value=p.grupo||'';$('p-ancho').value=p.ancho;$('p-alto').value=p.alto;$('p-uds').value=p.uds||1;
+    $('p-nombre').value=p.nombre;$('p-ref').value=p.ref||'';$('p-grupo').value=p.grupo||'';$('p-ancho').value=p.ancho;$('p-alto').value=p.alto;$('p-uds').value=p.uds||1;$('p-medio').value=p.anchoMedio||'';$('p-capl').value=p.capL||'';
     renderPerfiles();$('p-nombre').focus();
   }
 });

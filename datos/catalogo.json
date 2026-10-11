@@ -1,8 +1,8 @@
 {
   "perfiles": [
     {"id": "33017", "ref": "33017", "grupo": "estructura", "nombre": "Viga", "ancho": 231, "alto": 133, "uds": 1},
-    {"id": "33000", "ref": "33000", "grupo": "lamas", "nombre": "Lamas (bulto de 2)", "ancho": 277, "alto": 270, "uds": 2},
-    {"id": "33020", "ref": "33020", "grupo": "lamas", "nombre": "Lamas LED (bulto de 2)", "ancho": 277, "alto": 270, "uds": 2},
+    {"id": "33000", "ref": "33000", "grupo": "lamas", "nombre": "Lamas (bulto de 2)", "ancho": 277, "alto": 270, "uds": 2, "capL": 300},
+    {"id": "33020", "ref": "33020", "grupo": "lamas", "nombre": "Lamas LED (bulto de 2)", "ancho": 277, "alto": 270, "uds": 2, "capL": 300},
     {"id": "33007", "ref": "33007", "grupo": "estructura", "nombre": "Viga grande", "ancho": 208, "alto": 228, "uds": 1},
     {"id": "33006", "ref": "33006", "grupo": "estructura", "nombre": "Canalón (bulto de 2)", "ancho": 142, "alto": 152, "uds": 2},
     {"id": "33004", "ref": "33004", "grupo": "estructura", "nombre": "Pilar", "ancho": 175, "alto": 175, "uds": 1}

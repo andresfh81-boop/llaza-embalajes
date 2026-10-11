@@ -17,7 +17,7 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45}
-.wrap{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:flex;flex-direction:column;gap:18px}
+.wrap{max-width:1500px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:flex;flex-direction:column;gap:18px}
 header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between}
 h1{font-family:var(--display);font-weight:700;font-size:30px;line-height:1.05;margin:0;letter-spacing:.01em}
 h2{font-family:var(--display);font-weight:600;font-size:20px;margin:0}
@@ -54,7 +54,7 @@ td.act{text-align:right;white-space:nowrap}
 .totals b{font:700 34px/1 var(--display);font-variant-numeric:tabular-nums}
 .totals span{color:var(--muted)}
 .totals .btn{margin-left:auto}
-.boxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.boxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
 .boxcard{border:1px solid var(--line);border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
 .boxcard .meta{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
 .boxcard svg{width:100%;height:auto;max-height:230px;display:block}
@@ -87,3 +87,11 @@ rect.bulto.cogido{opacity:.45}
 .boxcard.nueva p{margin:0}
 .fantasma{position:fixed;z-index:10;pointer-events:none;padding:4px 9px;border-radius:4px;background:var(--accent);color:var(--accent-fg);font:600 14px var(--display);white-space:nowrap}
 .manual{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;color:var(--muted)}
+text.cota{fill:var(--fg)}
+text.cota.libre,b.libre{fill:var(--warn);color:var(--warn);font-weight:600}
+line.cota{stroke:var(--muted);stroke-width:1}
+rect.prot{fill:none;stroke:var(--muted);stroke-width:1;stroke-dasharray:4 3;pointer-events:none}
+.fantasma{display:flex;align-items:center;justify-content:center;padding:0;color:var(--pfg);border:2px solid var(--accent);opacity:.9;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+body.arrastrando{user-select:none;cursor:grabbing}
+body.arrastrando rect.bulto{cursor:grabbing}
+.boxcard svg{max-height:none}
