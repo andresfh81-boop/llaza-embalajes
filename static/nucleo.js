@@ -15,7 +15,7 @@ function newBin(model){return {model, free:[{x:0,y:0,w:model.intA,h:model.intH}]
 function tryPlace(bin,it){
   if(it.L>bin.model.intL) return false;
   let b=null;
-  for(const f of bin.free) for(const o of it.fila?[[it.w,it.h]]:[[it.w,it.h],[it.h,it.w]]){
+  for(const f of bin.free) for(const o of it.fila||it.cap?[[it.w,it.h]]:[[it.w,it.h],[it.h,it.w]]){ // los bultos con protección en los extremos no se giran
     const w=o[0],h=o[1];
     if(w<=f.w&&h<=f.h){
       const s=Math.min(f.w-w,f.h-h);
