@@ -13,6 +13,7 @@ function estado(t){$('estado').textContent=t||'';}
 function renderPedido(){
   $('tipo-'+pedido.tipo).checked=true;
   if(document.activeElement!==$('holgura')) $('holgura').value=pedido.holgura;
+  if(document.activeElement!==$('ref-pedido')) $('ref-pedido').value=pedido.ref||'';
   const sel=$('l-perfil'),prev=sel.value;
   sel.innerHTML=perfiles.length?perfiles.map(p=>`<option value="${esc(p.id)}">${esc(p.nombre)}${p.ref?' · '+esc(p.ref):''}</option>`).join(''):'<option value="">Sin perfiles en el catálogo</option>';
   if(perfiles.some(p=>p.id===prev)) sel.value=prev;
@@ -171,7 +172,7 @@ function renderResultado(recalcular){
   const m3=volBins(r.bins)/1e9;
   const porModelo={};r.bins.forEach(b=>porModelo[b.model.nombre]=(porModelo[b.model.nombre]||0)+1);
   const desg=Object.entries(porModelo).map(([n,c])=>`${c} × ${n}`).join(', ');
-  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length}</b> <span>bultos en total <small>(${nb} de perfil + ${r.bins.length} ${r.bins.length===1?'caja':'cajas'})</small></span></div><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></div><div class="sub">${esc(desg)}</div>`;
+  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length}</b> <span>bultos en total <small>(${nb} de perfil + ${r.bins.length} ${r.bins.length===1?'caja':'cajas'})</small></span></div><span class="acciones"><button class="btn" type="button" data-act="imprimir">Imprimir lista de embalaje</button><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></span></div><div class="sub">${esc(desg)}</div>`;
   // Cuánto se aprovecha: sección ocupada de media y el mínimo de cajas que saldría solo por superficie (cota inferior, no siempre alcanzable).
   const todos=r.bins.flatMap(b=>b.items),secB=todos.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)+r.unfit.reduce((s,it)=>s+it.w*it.h,0),secC=r.bins.reduce((s,b)=>s+b.model.intA*b.model.intH,0),minC=Math.max(1,Math.ceil(secB/Math.max(...modelos.map(m=>m.intA*m.intH))));
   if(secC) html+=`<div class="sub">Sección aprovechada: <b>${Math.round(secB/secC*100)} %</b>. ${r.bins.length<=minC?'Con estas cajas no se puede hacer con menos.':`Solo por superficie cabría en ${minC} ${minC===1?'caja':'cajas'}, pero las piezas no se pueden partir ni encajar sin huecos: es un mínimo teórico, no un fallo.`}</div>`;
@@ -196,6 +197,30 @@ function renderResultado(recalcular){
   el.innerHTML=html;
   // cada dibujo ampliado vuelve a donde estaba desplazado
   el.querySelectorAll('.visor').forEach(v=>{const s=zoom[v.dataset.v];if(s&&s.z>1){v.scrollLeft=s.sl||0;v.scrollTop=s.st||0;}});
+}
+
+// Lista de embalaje para imprimir: una hoja de resumen y una hoja por caja, con su contenido y sus dos dibujos.
+function imprimirLista(){
+  const r=reparto;if(!r||!r.bins.length)return;
+  const col=new Map(perfiles.map((p,ci)=>[p.id,ci%6])),hol=num(pedido.holgura),n=r.bins.length,hoy=new Date().toLocaleDateString('es-ES');
+  const cab=t=>`<header><h1>${t}</h1><p>${pedido.ref?`Pedido: <b>${esc(pedido.ref)}</b> · `:''}${hoy}</p></header>`;
+  // contenido de una caja agrupado por perfil y largo
+  const grupos=b=>{const g={};b.items.forEach(p=>{const k=p.it.p.id+'|'+p.it.L;const c=(g[k]=g[k]||{p:p.it.p,L:p.it.L,n:0,ms:[]});c.n++;if(p.it.m)c.ms.push(p.it.m);});return Object.values(g);};
+  const nb=r.bins.reduce((s,b)=>s+b.items.length,0);
+  let html=`<section class="hoja">${cab('Lista de embalaje')}
+    <p class="tot"><b>${n}</b> ${n===1?'caja':'cajas'} · <b>${(volBins(r.bins)/1e9).toFixed(2)}</b> m³ de transporte · <b>${nb+n}</b> bultos en total (${nb} de perfil + ${n} ${n===1?'caja':'cajas'})</p>
+    <table><thead><tr><th>Caja</th><th>Modelo</th><th>Tipo</th><th>Exterior L×A×H (mm)</th><th class="n">Bultos</th><th>Contenido</th></tr></thead><tbody>${r.bins.map((b,i)=>`<tr><td>${i+1}</td><td>${esc(b.model.nombre)}</td><td>${TIPOS[b.model.tipo]||''}</td><td>${b.model.extL}×${b.model.extA}×${b.model.extH}</td><td class="n">${b.items.length}</td><td>${grupos(b).map(c=>`${c.n} × ${esc(c.p.nombre)} ${c.L} mm${c.ms.length?' ['+esc(c.ms.join(', '))+']':''}`).join('<br>')}</td></tr>`).join('')}</tbody></table>
+    ${r.unfit.length?`<p class="ojo">Sin caja: ${r.unfit.map(it=>esc(it.p.nombre+' '+it.L+' mm')).join(', ')}.</p>`:''}</section>`;
+  html+=r.bins.map((b,i)=>{
+    const M=b.model,flot=b.items.filter(p=>!apoyado(p,b));
+    return `<section class="hoja">${cab(`Caja ${i+1} de ${n} · ${esc(M.nombre)}`)}
+      <p class="tot">${TIPOS[M.tipo]||''} · exterior <b>${M.extL}×${M.extA}×${M.extH}</b> mm · interior ${M.intL}×${M.intA}×${M.intH} mm · <b>${b.items.length}</b> ${b.items.length===1?'bulto':'bultos'}</p>
+      <table><thead><tr><th class="n">Bultos</th><th>Perfil</th><th>Ref.</th><th class="n">Largo (mm)</th><th class="n">Piezas por bulto</th><th>Marcaje</th><th>Hecho</th></tr></thead><tbody>${grupos(b).map(c=>`<tr><td class="n">${c.n}</td><td>${esc(c.p.nombre)}</td><td>${esc(c.p.ref||'')}</td><td class="n">${c.L}</td><td class="n">${num(c.p.uds)||1}</td><td>${esc(c.ms.join(', '))}</td><td class="casilla"></td></tr>`).join('')}</tbody></table>
+      ${flot.length?`<p class="ojo">Ojo, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</p>`:''}
+      <div class="dib"><div><span class="tag">De frente · ancho × alto</span>${dibujoSeccion(b,i,col,hol)}</div><div><span class="tag">Desde arriba · largo × ancho (ancho ×${AMPLIA})</span>${dibujoPlanta(b,i,col)}</div></div></section>`;
+  }).join('');
+  $('imprimir').innerHTML=html;
+  window.print();
 }
 
 // Mover a mano: el bulto se queda donde se suelta, con un pequeño imán a las paredes y a los otros bultos.
@@ -385,6 +410,7 @@ async function leerPDF(file){
     if(e.target.id==='leidas-ok'){
       const ok=leidas.filter(l=>l.pid&&l.largo&&l.cant);
       ok.forEach(l=>pedido.lineas.push({pid:l.pid,largo:l.largo,cant:l.cant,marcas:l.marcas||[]}));
+      if(!pedido.ref&&ok.length) pedido.ref=hojaNombre.replace(/\.pdf$/i,'');
       const fuera=leidas.length-ok.length;leidas=[];renderLeidas();guardarPedido();renderPedido();
       estado(`${ok.length} líneas añadidas al pedido`+(fuera?`, ${fuera} sin bulto propio.`:'.'));
     }
@@ -461,6 +487,7 @@ document.querySelector('.tabs').addEventListener('click',e=>{
   $('cat-bar').hidden=b.dataset.tab==='pedido';
 });
 $('tipos').addEventListener('change',e=>{pedido.tipo=e.target.value;guardarPedido();renderResultado();});
+$('ref-pedido').addEventListener('input',e=>{pedido.ref=e.target.value.trim();guardarPedido();});
 $('holgura').addEventListener('input',e=>{pedido.holgura=num(e.target.value);guardarPedido();renderResultado();});
 $('f-linea').addEventListener('submit',e=>{
   e.preventDefault();
@@ -468,7 +495,7 @@ $('f-linea').addEventListener('submit',e=>{
   if(!pid||!largo||!cant)return;
   pedido.lineas.push({pid,largo,cant,marcas:$('l-marcas').value.split(',').map(x=>x.trim()).filter(Boolean)});$('l-marcas').value='';guardarPedido();renderPedido();
 });
-$('vaciar').addEventListener('click',()=>{pedido.lineas=[];guardarPedido();renderPedido();});
+$('vaciar').addEventListener('click',()=>{pedido.lineas=[];pedido.ref='';guardarPedido();renderPedido();});
 $('f-caja').addEventListener('submit',e=>{
   e.preventDefault();
   const d={nombre:$('c-nombre').value.trim(),tipo:$('c-tipo').value,intL:num($('c-il').value),intA:num($('c-ia').value),intH:num($('c-ih').value),extL:num($('c-el').value),extA:num($('c-ea').value),extH:num($('c-eh').value)};
@@ -513,6 +540,7 @@ document.addEventListener('click',async e=>{
   else if(a==='caja-vacia'){const m=cajas.find(c=>c.id===modeloNuevo);if(m){reparto.bins.push({model:m,free:[],items:[]});hecho();renderResultado();}}
   else if(a==='quitar-caja'){const n=Number(b.dataset.i);if(reparto.bins[n]&&!reparto.bins[n].items.length){reparto.bins.splice(n,1);hecho();renderResultado();}}
   else if(a==='zoom'){cambiarZoom(b.dataset.v,Number(b.dataset.d));}
+  else if(a==='imprimir'){imprimirLista();}
   else if(a==='guardar-reparto'){guardarReparto();}
   else if(a==='pedir-descartar'){confirmar='descartar';renderCatalogo();}
   else if(a==='descartar'){confirmar=null;try{localStorage.removeItem(CLAVE_CAT);}catch(err){}montar({});renderTodo();estado('Has vuelto al catálogo común.');}

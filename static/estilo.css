@@ -126,3 +126,28 @@ svg.seccion,svg.planta{cursor:default}
 .visor{overflow:auto;max-height:78vh}
 .visor>div{min-width:100%}
 .visor.pan{cursor:grabbing}
+.totals .acciones{margin-left:auto}
+.totals .acciones .btn{margin-left:0}
+#imprimir{display:none}
+@media print{
+  :root:root:root{--bg:#fff;--panel:#fff;--fg:#000;--muted:#444;--line:#999;--accent:#000;--accent-fg:#fff;--warn:#a4460a;--warn-bg:#fff;--box:#fff;--p0:#b9d6ea;--p1:#f0d49c;--p2:#bfdfc6;--p3:#e8c4cc;--p4:#cfcbea;--p5:#e0dcb4;--pfg:#000;color-scheme:light}
+  @page{size:A4;margin:12mm}
+  body{background:#fff;color:#000}
+  .wrap{display:none!important}
+  #imprimir{display:block;font-size:11pt}
+  #imprimir .hoja{break-after:page}
+  #imprimir .hoja:last-child{break-after:auto}
+  #imprimir header{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #000;padding-bottom:4px;margin-bottom:8px}
+  #imprimir h1{font-size:20pt}
+  #imprimir header p{margin:0}
+  #imprimir .tot{margin:6px 0 10px}
+  #imprimir table{margin-bottom:10px}
+  #imprimir th,#imprimir td{border:1px solid #999;padding:5px 7px;color:#000;white-space:normal}
+  #imprimir td.casilla{width:16mm}
+  #imprimir .ojo{font-weight:600;color:#a4460a}
+  #imprimir .dib{display:flex;flex-direction:column;gap:8px}
+  #imprimir .dib svg{display:block;width:100%;height:auto}
+  #imprimir .dib svg.seccion{max-width:120mm;max-height:120mm}
+  #imprimir .dib svg.planta{max-width:180mm}
+  #imprimir text.cota.hueco{stroke:#fff}
+}
