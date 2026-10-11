@@ -49,14 +49,14 @@ function cambiarZoom(id,d){
 }
 // Modelo elegido en «Añadir caja» (de cualquier tipo de embalaje).
 let modeloNuevo='';
-function bulto(p,L,m){
-  const hol=num(pedido.holgura),it={p,g:p.grupo||'',m:m||'',L,w:num(p.ancho)+hol,h:num(p.alto)+hol};
+function bulto(p,L,m,n){
+  const hol=num(pedido.holgura),it={p,g:p.grupo||'',m:m||'',n:n||Math.max(1,num(p.uds)),L,w:num(p.ancho)+hol,h:num(p.alto)+hol};
   if(num(p.capL)&&num(p.anchoMedio)&&num(p.anchoMedio)<num(p.ancho)) it.cap={l:num(p.capL),w:num(p.anchoMedio)+hol};
   return it;
 }
 function guardarReparto(){
-  const par=it=>[it.p.id,it.L,it.m||''];
-  const sitio=p=>[p.it.p.id,p.it.L,p.x,p.y,p.w,p.h,p.off||0,p.it.m||''];
+  const par=it=>[it.p.id,it.L,it.m||'',it.n];
+  const sitio=p=>[p.it.p.id,p.it.L,p.x,p.y,p.w,p.h,p.off||0,p.it.m||'',p.it.n];
   try{
     localStorage.setItem(CLAVE_REP,JSON.stringify({clave:repartoClave,bins:reparto.bins.map(b=>({m:b.model.id,its:b.items.map(sitio)})),sin:reparto.unfit.map(par)}));
     repartoGuardado=true;estado('Reparto guardado en este navegador.');
@@ -67,12 +67,12 @@ function cargarReparto(clave,modelos){
   try{
     const g=JSON.parse(localStorage.getItem(CLAVE_REP)||'null');
     if(!g||g.clave!==clave) return null;
-    const it=([pid,L,m])=>bulto(perfiles.find(x=>x.id===pid),L,m),bins=[];
+    const it=([pid,L,m,n])=>bulto(perfiles.find(x=>x.id===pid),L,m,n),bins=[];
     for(const b of g.bins){
       const bin={model:cajas.find(m=>m.id===b.m),free:[],items:[]};
       if(!bin.model) return null;
-      for(const [pid,L,x,y,w,h,off,m] of b.its){
-        const i=it([pid,L,m]),p={it:i,x,y,w,h,off};
+      for(const [pid,L,x,y,w,h,off,m,n] of b.its){
+        const i=it([pid,L,m,n]),p={it:i,x,y,w,h,off};
         if(i.cap&&w===i.w) p.medio=i.cap.w; else if(i.cap&&w===i.h) p.medioH=i.cap.w;
         if(!libre(p,bin)) return null;
         bin.items.push(p);
@@ -127,8 +127,8 @@ function dibujoSeccion(b,i,col,hol){
     // P es el bulto entero (con protección); p, lo que se pinta relleno: en una lama girada, el cuerpo, que es más bajo.
     const p=P.medioH?Object.assign({},P,{y:P.y+(P.h-P.medioH)/2,h:P.medioH}):P;
     // Lo que va más al fondo se pinta primero. Un bulto alternado se dibuja con su ancho en el medio; la protección del extremo, en línea de puntos.
-    const y=M.intH-p.y-p.h,rw=p.medio||p.w,rx=p.x+(p.w-rw)/2,t=corto(p.it.p),fm=Math.min(fc*.9,rw/5,p.h/5),lin=[[t,1],...(p.it.m?[[p.it.m,2]]:[]),[`${P.w-hol}×${P.h-hol}`,0],[`×${p.it.L}`,0]],f=Math.min(fs,(p.h-fm*1.4)/(lin.length+.2),(rw-fm*1.8)/(Math.max(...lin.map(l=>String(l[0]).length))*.6)),tx=rx+rw/2+fm*.5,ty=y+(p.h-fm*1.4)/2,aire=!apoyado(P,b);
-    return (P.medio||P.medioH?`<rect class="prot" x="${P.x}" y="${M.intH-P.y-P.h}" width="${P.w}" height="${P.h}" vector-effect="non-scaling-stroke"/>`:'')+`<rect class="bulto${aire?' aire':''}${sel&&sel.b===i&&sel.k===k?' sel':''}" data-b="${i}" data-k="${k}" x="${rx}" y="${y}" width="${rw}" height="${p.h}" fill="var(--p${col.get(p.it.p.id)})" stroke="var(--panel)" stroke-width="1.5" vector-effect="non-scaling-stroke"><title>${esc(p.it.p.nombre)} · ${p.it.L} mm${p.it.m?' · marcaje '+esc(p.it.m):''}${aire?' · en el aire, sin apoyo':''}</title></rect>${lin.map((l,j)=>`<text${l[1]===2?' class="marca"':''} x="${tx}" y="${ty+(j-(lin.length-1)/2)*f}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)"${l[1]?' font-family="var(--display)" font-weight="700"':''}>${esc(l[0])}</text>`).join('')}<text x="${rx+rw/2}" y="${y+p.h-fm*.7}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${rw-hol}</text><text transform="translate(${rx+fm*.75} ${y+p.h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.h-hol}</text>`;}).join('')}${huecos(b,fc)}${cota(M.intA,ocA,1,M.intH,mg,fc,false)}${cota(M.intH,ocH,1,M.intH,mg,fc,true)}</svg>`;
+    const y=M.intH-p.y-p.h,rw=p.medio||p.w,rx=p.x+(p.w-rw)/2,t=corto(p.it.p),fm=Math.min(fc*.9,rw/5,p.h/5),lin=[[t,1],...(varias(p.it)?[[piezas(p.it),1]]:[]),...(p.it.m?[[p.it.m,2]]:[]),[`${P.w-hol}×${P.h-hol}`,0],[`×${p.it.L}`,0]],f=Math.min(fs,(p.h-fm*1.4)/(lin.length+.2),(rw-fm*1.8)/(Math.max(...lin.map(l=>String(l[0]).length))*.6)),tx=rx+rw/2+fm*.5,ty=y+(p.h-fm*1.4)/2,aire=!apoyado(P,b);
+    return (P.medio||P.medioH?`<rect class="prot" x="${P.x}" y="${M.intH-P.y-P.h}" width="${P.w}" height="${P.h}" vector-effect="non-scaling-stroke"/>`:'')+`<rect class="bulto${aire?' aire':''}${sel&&sel.b===i&&sel.k===k?' sel':''}" data-b="${i}" data-k="${k}" x="${rx}" y="${y}" width="${rw}" height="${p.h}" fill="var(--p${col.get(p.it.p.id)})" stroke="var(--panel)" stroke-width="1.5" vector-effect="non-scaling-stroke"><title>${esc(p.it.p.nombre)} · ${p.it.L} mm${varias(p.it)?' · '+piezas(p.it):''}${p.it.m?' · marcaje '+esc(p.it.m):''}${aire?' · en el aire, sin apoyo':''}</title></rect>${lin.map((l,j)=>`<text${l[1]===2?' class="marca"':''} x="${tx}" y="${ty+(j-(lin.length-1)/2)*f}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)"${l[1]?' font-family="var(--display)" font-weight="700"':''}>${esc(l[0])}</text>`).join('')}<text x="${rx+rw/2}" y="${y+p.h-fm*.7}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${rw-hol}</text><text transform="translate(${rx+fm*.75} ${y+p.h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.h-hol}</text>`;}).join('')}${huecos(b,fc)}${cota(M.intA,ocA,1,M.intH,mg,fc,false)}${cota(M.intH,ocH,1,M.intH,mg,fc,true)}</svg>`;
 }
 // Vista desde arriba: largo en horizontal y ancho en vertical (el ancho va ampliado para que se vea). Lo de más arriba tapa lo de debajo.
 const AMPLIA=2,PW=600;
@@ -140,7 +140,7 @@ function dibujoPlanta(b,i,col){
     let g;
     if(p.medio){const l=Math.min(p.it.cap.l,p.it.L/2)*k,hm=p.medio*ky;g=`<rect x="${x0}" y="${y0+(h-hm)/2}" width="${L}" height="${hm}" ${c}/><rect x="${x0}" y="${y0}" width="${l}" height="${h}" ${c}/><rect x="${x0+L-l}" y="${y0}" width="${l}" height="${h}" ${c}/>`;}
     else g=`<rect x="${x0}" y="${y0}" width="${L}" height="${h}" ${c}/>`;
-    return g+(h>=fc*1.1?`<text x="${x0+L/2}" y="${y0+h/2}" font-size="${Math.min(fc,h*.7)}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)}${p.it.m?' '+esc(p.it.m):''} · ${p.it.L}</text>`:'');
+    return g+(h>=fc*1.1?`<text x="${x0+L/2}" y="${y0+h/2}" font-size="${Math.min(fc,h*.7)}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)}${varias(p.it)?' · '+piezas(p.it):''}${p.it.m?' '+esc(p.it.m):''} · ${p.it.L}</text>`:'');
   };
   return `<svg class="planta" viewBox="${-mg} -2 ${W+mg+2} ${H+mg+2}" role="img" aria-label="Caja ${i+1} vista desde arriba"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,n)=>({p,n})).sort((u,v)=>u.p.y-v.p.y).map(({p,n})=>pieza(p,n)).join('')}${cota(M.intL,ocL,k,H,mg,fc,false)}<text class="cota" font-size="${fc}" text-anchor="middle" dominant-baseline="central" transform="translate(${-mg*.5} ${H/2}) rotate(-90)">${M.intA} mm</text></svg>`;
 }
@@ -162,7 +162,7 @@ function renderResultado(recalcular){
         const p=perfiles.find(x=>x.id===l.pid);if(!p)continue;
         // cada bulto se lleva el marcaje de las piezas que contiene, en el orden de la hoja
         const u=Math.max(1,num(p.uds)),n=Math.ceil(l.cant/u);
-        for(let i=0;i<n;i++) items.push(bulto(p,l.largo,(l.marcas||[]).slice(i*u,(i+1)*u).join(' ')));
+        for(let i=0;i<n;i++) items.push(bulto(p,l.largo,(l.marcas||[]).slice(i*u,(i+1)*u).join(' '),Math.min(u,l.cant-i*u)));
       }
       reparto=planGrupos(items,modelos);repartoManual=repartoGuardado=false;
       if(recalcular) try{localStorage.removeItem(CLAVE_REP);}catch(e){}
@@ -192,11 +192,11 @@ function renderResultado(recalcular){
   const lineasTxt=[];
   html+='<div class="boxes">'+r.bins.map((b,i)=>{
     const M=b.model,usado=b.items.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)/(M.intA*M.intH);
-    const g={};b.items.forEach(p=>{const k=p.it.p.id+'|'+p.it.L;const c=(g[k]=g[k]||{p:p.it.p,L:p.it.L,n:0,ms:[]});c.n++;if(p.it.m)c.ms.push(p.it.m);});
+    const g={};b.items.forEach(p=>{const k=p.it.p.id+'|'+p.it.L;const c=(g[k]=g[k]||{p:p.it.p,L:p.it.L,n:0,pz:0,ms:[]});c.n++;c.pz+=p.it.n||1;if(p.it.m)c.ms.push(p.it.m);});
     const cont=Object.values(g),gs=[...new Set(cont.map(c=>c.p.grupo||''))],gtxt=!cont.length?'Vacía':gs.length>1?'Mezcla':(GRUPOS[gs[0]]||'');
-    lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.p.nombre} ${c.L} mm${c.ms.length?' ['+c.ms.join(', ')+']':''}`).join(', '));
+    lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.p.nombre} ${c.L} mm${num(c.p.uds)>1?' ('+c.pz+' uds)':''}${c.ms.length?' ['+c.ms.join(', ')+']':''}`).join(', '));
     const flot=b.items.filter(p=>!apoyado(p,b));if(flot.length)lineasTxt.push(`  OJO, sin apoyo: ${flot.map(nombreB).join(', ')}`);
-    return `<div class="boxcard${completa===i?' ampliada':''}" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><button class="btn small ghost" type="button" data-act="completa" data-i="${i}">${completa===i?'Salir de pantalla completa':'Pantalla completa'}</button>${cont.length?'':`<button class="btn small danger" type="button" data-act="quitar-caja" data-i="${i}">Quitar caja</button>`}</div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}${visor(i,'f','De frente · ancho × alto',dibujoSeccion(b,i,col,hol))}${visor(i,'a',`Desde arriba · largo × ancho (ancho ×${AMPLIA})`,dibujoPlanta(b,i,col))}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm${c.ms.length?` · <b class="marca">${esc(c.ms.join(', '))}</b>`:''}</li>`).join('')}</ul></div>`;
+    return `<div class="boxcard${completa===i?' ampliada':''}" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><button class="btn small ghost" type="button" data-act="completa" data-i="${i}">${completa===i?'Salir de pantalla completa':'Pantalla completa'}</button>${cont.length?'':`<button class="btn small danger" type="button" data-act="quitar-caja" data-i="${i}">Quitar caja</button>`}</div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}${visor(i,'f','De frente · ancho × alto',dibujoSeccion(b,i,col,hol))}${visor(i,'a',`Desde arriba · largo × ancho (ancho ×${AMPLIA})`,dibujoPlanta(b,i,col))}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm${num(c.p.uds)>1?` · ${c.pz} uds`:''}${c.ms.length?` · <b class="marca">${esc(c.ms.join(', '))}</b>`:''}</li>`).join('')}</ul></div>`;
   }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Para pasar un bulto a una caja que no tienes a la vista, haz clic en él y elige la caja en la barra que sale abajo; también puedes arrastrarlo, y la página se desplaza sola al acercarte al borde. «Pantalla completa» abre una caja en grande. Con los botones − y + de cada dibujo lo reduces o amplías; ampliado, arrastra el fondo del dibujo para moverte por él. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, moverlo a lo largo y a lo ancho, también a otra caja. Si choca con otro o se sale, te aviso y se queda donde estaba. Para girar un bulto: clic derecho encima, o la tecla R mientras lo arrastras. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
   ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas (${desg}), ${m3.toFixed(2)} m³\nBultos en total: ${nb+r.bins.length} (${nb} de perfil + ${r.bins.length} cajas)\n`+lineasTxt.join('\n');
   // Barra del bulto seleccionado: siempre a la vista abajo, para pasarlo a cualquier caja sin tener que arrastrar.
@@ -215,17 +215,17 @@ function imprimirLista(){
   const col=new Map(perfiles.map((p,ci)=>[p.id,ci%6])),hol=num(pedido.holgura),n=r.bins.length,hoy=new Date().toLocaleDateString('es-ES');
   const cab=t=>`<header><h1>${t}</h1><p>${pedido.ref?`Pedido: <b>${esc(pedido.ref)}</b> · `:''}${hoy}</p></header>`;
   // contenido de una caja agrupado por perfil y largo
-  const grupos=b=>{const g={};b.items.forEach(p=>{const k=p.it.p.id+'|'+p.it.L;const c=(g[k]=g[k]||{p:p.it.p,L:p.it.L,n:0,ms:[]});c.n++;if(p.it.m)c.ms.push(p.it.m);});return Object.values(g);};
+  const grupos=b=>{const g={};b.items.forEach(p=>{const k=p.it.p.id+'|'+p.it.L;const c=(g[k]=g[k]||{p:p.it.p,L:p.it.L,n:0,pz:0,ms:[]});c.n++;c.pz+=p.it.n||1;if(p.it.m)c.ms.push(p.it.m);});return Object.values(g);};
   const nb=r.bins.reduce((s,b)=>s+b.items.length,0);
   let html=`<section class="hoja">${cab('Lista de embalaje')}
     <p class="tot"><b>${n}</b> ${n===1?'caja':'cajas'} · <b>${(volBins(r.bins)/1e9).toFixed(2)}</b> m³ de transporte · <b>${nb+n}</b> bultos en total (${nb} de perfil + ${n} ${n===1?'caja':'cajas'})</p>
-    <table><thead><tr><th>Caja</th><th>Modelo</th><th>Tipo</th><th>Exterior L×A×H (mm)</th><th class="n">Bultos</th><th>Contenido</th></tr></thead><tbody>${r.bins.map((b,i)=>`<tr><td>${i+1}</td><td>${esc(b.model.nombre)}</td><td>${TIPOS[b.model.tipo]||''}</td><td>${b.model.extL}×${b.model.extA}×${b.model.extH}</td><td class="n">${b.items.length}</td><td>${grupos(b).map(c=>`${c.n} × ${esc(c.p.nombre)} ${c.L} mm${c.ms.length?' ['+esc(c.ms.join(', '))+']':''}`).join('<br>')}</td></tr>`).join('')}</tbody></table>
+    <table><thead><tr><th>Caja</th><th>Modelo</th><th>Tipo</th><th>Exterior L×A×H (mm)</th><th class="n">Bultos</th><th>Contenido</th></tr></thead><tbody>${r.bins.map((b,i)=>`<tr><td>${i+1}</td><td>${esc(b.model.nombre)}</td><td>${TIPOS[b.model.tipo]||''}</td><td>${b.model.extL}×${b.model.extA}×${b.model.extH}</td><td class="n">${b.items.length}</td><td>${grupos(b).map(c=>`${c.n} × ${esc(c.p.nombre)} ${c.L} mm${num(c.p.uds)>1?' ('+c.pz+' uds)':''}${c.ms.length?' ['+esc(c.ms.join(', '))+']':''}`).join('<br>')}</td></tr>`).join('')}</tbody></table>
     ${r.unfit.length?`<p class="ojo">Sin caja: ${r.unfit.map(it=>esc(it.p.nombre+' '+it.L+' mm')).join(', ')}.</p>`:''}</section>`;
   html+=r.bins.map((b,i)=>{
     const M=b.model,flot=b.items.filter(p=>!apoyado(p,b));
     return `<section class="hoja">${cab(`Caja ${i+1} de ${n} · ${esc(M.nombre)}`)}
       <p class="tot">${TIPOS[M.tipo]||''} · exterior <b>${M.extL}×${M.extA}×${M.extH}</b> mm · interior ${M.intL}×${M.intA}×${M.intH} mm · <b>${b.items.length}</b> ${b.items.length===1?'bulto':'bultos'}</p>
-      <table><thead><tr><th class="n">Bultos</th><th>Perfil</th><th>Ref.</th><th class="n">Largo (mm)</th><th class="n">Piezas por bulto</th><th>Marcaje</th><th>Hecho</th></tr></thead><tbody>${grupos(b).map(c=>`<tr><td class="n">${c.n}</td><td>${esc(c.p.nombre)}</td><td>${esc(c.p.ref||'')}</td><td class="n">${c.L}</td><td class="n">${num(c.p.uds)||1}</td><td>${esc(c.ms.join(', '))}</td><td class="casilla"></td></tr>`).join('')}</tbody></table>
+      <table><thead><tr><th class="n">Bultos</th><th>Perfil</th><th>Ref.</th><th class="n">Largo (mm)</th><th class="n">Piezas por bulto</th><th class="n">Piezas</th><th>Marcaje</th><th>Hecho</th></tr></thead><tbody>${grupos(b).map(c=>`<tr><td class="n">${c.n}</td><td>${esc(c.p.nombre)}</td><td>${esc(c.p.ref||'')}</td><td class="n">${c.L}</td><td class="n">${num(c.p.uds)||1}</td><td class="n">${c.pz}</td><td>${esc(c.ms.join(', '))}</td><td class="casilla"></td></tr>`).join('')}</tbody></table>
       ${flot.length?`<p class="ojo">Ojo, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</p>`:''}
       <div class="dib"><div><span class="tag">De frente · ancho × alto</span>${dibujoSeccion(b,i,col,hol)}</div><div><span class="tag">Desde arriba · largo × ancho (ancho ×${AMPLIA})</span>${dibujoPlanta(b,i,col)}</div></div></section>`;
   }).join('');
@@ -236,6 +236,9 @@ function imprimirLista(){
 // Mover a mano: el bulto se queda donde se suelta, con un pequeño imán a las paredes y a los otros bultos.
 // Si choca con otro o se sale de la caja, avisa y no se mueve.
 function iman(v,cands,tol){let m=v,d=tol;for(const c of cands){const e=Math.abs(c-v);if(e<=d){d=e;m=c;}}return m;}
+// Piezas que lleva un bulto: se enseña en los perfiles que se envuelven de varias en varias (lamas, canalón).
+const varias=it=>num(it.p.uds)>1||it.n>1;
+const piezas=it=>`${it.n} ${it.n===1?'ud':'uds'}`;
 const corto=p=>String(p.nombre||p.ref||'').replace(/\s*\(.*?\)/g,'').trim();
 const nombreB=p=>`${p.it.p.nombre} de ${p.it.L} mm${p.it.m?' ('+p.it.m+')':''}`;
 const porNum=(u,v)=>u-v;
