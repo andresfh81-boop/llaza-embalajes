@@ -136,11 +136,12 @@ function plan(items,models){
 
 // Volúmenes que ocupa un bulto colocado: [x1,x2,y1,y2,z1,z2] con x=ancho, y=alto, z=largo (off = cuánto va adelantado).
 // Con protección en los extremos son tres: el cuerpo estrecho y las dos protecciones.
+// El cuerpo es más estrecho a lo ancho (medio) o, si el bulto está girado, más bajo (medioH).
 function cuerpos(p){
   const z=p.off||0,L=p.it.L;
-  if(!p.medio) return [[p.x,p.x+p.w,p.y,p.y+p.h,z,z+L]];
-  const bx=p.x+(p.w-p.medio)/2,l=Math.min(p.it.cap.l,L/2);
-  return [[bx,bx+p.medio,p.y,p.y+p.h,z,z+L],[p.x,p.x+p.w,p.y,p.y+p.h,z,z+l],[p.x,p.x+p.w,p.y,p.y+p.h,z+L-l,z+L]];
+  if(!p.medio&&!p.medioH) return [[p.x,p.x+p.w,p.y,p.y+p.h,z,z+L]];
+  const mw=p.medio||p.w,mh=p.medioH||p.h,bx=p.x+(p.w-mw)/2,by=p.y+(p.h-mh)/2,l=Math.min(p.it.cap.l,L/2);
+  return [[bx,bx+mw,by,by+mh,z,z+L],[p.x,p.x+p.w,p.y,p.y+p.h,z,z+l],[p.x,p.x+p.w,p.y,p.y+p.h,z+L-l,z+L]];
 }
 const HOLG=0.01;
 function chocan(a,b){return cuerpos(a).some(u=>cuerpos(b).some(v=>u[0]<v[1]-HOLG&&v[0]<u[1]-HOLG&&u[2]<v[3]-HOLG&&v[2]<u[3]-HOLG&&u[4]<v[5]-HOLG&&v[4]<u[5]-HOLG));}

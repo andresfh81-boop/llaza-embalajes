@@ -45,7 +45,7 @@ Para verla en local hace falta servirla (abierta como archivo suelto no carga el
 - Cada bulto es un rectángulo (ancho × alto envuelto + holgura, 5 mm por defecto) que ocupa todo el largo de la caja.
 - Encaje 2D en la sección interior de la caja (MaxRects, abajo-izquierda, con giro de 90°).
 - **No garantiza el óptimo**: es una colocación por reglas (heurística). `plan` prueba cada modelo de caja con cuatro órdenes de colocación (`ORDENES`: por sección, alto, ancho y lado mayor) y se queda con el mejor. En pantalla sale la sección aprovechada y el mínimo de cajas por superficie, que es una cota inferior y no siempre se puede alcanzar.
-- **Girar a mano**: clic derecho en un bulto del dibujo de frente lo gira 90° en el sitio (`girarBulto`); la tecla R mientras se arrastra gira lo que se lleva. Los bultos con protección en los extremos no se giran.
+- **Girar a mano**: clic derecho en un bulto del dibujo de frente lo gira 90° en el sitio (`girarBulto`); la tecla R mientras se arrastra gira lo que se lleva. Los bultos con protección en los extremos también se giran a mano: su parte estrecha pasa del ancho (`medio`) al alto (`medioH`). El reparto automático no los gira.
 - Prueba cada modelo de caja del tipo elegido, se queda con el reparto de menos volumen exterior y después intenta bajar cada caja a un modelo más pequeño.
 - **Por grupos** (`planGrupos`): cada perfil tiene `grupo` («estructura» o «lamas»). La estructura va junta en sus cajas y las lamas en las suyas (pedido por Andrés, 11/10/2026: «preferiblemente»). Solo se juntan dos cajas de grupos distintos cuando caben en una sola y así sobra una; esa caja sale marcada «Mezcla».
 - Los bultos con protección en los extremos no se giran (si no, en la vista desde arriba salían sin protección).

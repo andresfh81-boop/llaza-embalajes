@@ -48,6 +48,9 @@ assert.ok(!apoyado(Object.assign(pz(2000,0),{y:300}),cajaA));
 assert.ok(!apoyado(Object.assign(pz(2000,2500),{y:180}),cajaA));
 // Probar varios órdenes de colocación nunca empeora el resultado de usar solo el primero.
 {const varios=[...mk(3,300,500,3000),...mk(4,480,280,3000),...mk(5,150,150,3000)],uno=packWithSolo(C5,varios),mejor=plan(varios,[C5]);check(mejor);assert.ok(mejor.bins.length<=uno.bins.length);}
+// Lama girada: el cuerpo es más bajo; dos giradas, una adelantada, se pueden montar en alto encajando cuerpo con protección.
+{const lg=(y,off)=>({it:{L:3855,cap:{l:300,w:205}},x:0,y,w:275,h:282,medioH:205,off});
+ assert.ok(chocan(lg(0,0),lg(243.5,0)));assert.ok(!chocan(lg(0,0),lg(243.5,300)));}
 console.log('alternadas: ok');
 // Marcaje de la hoja: dos marcas por fila (encima y debajo), a veces troceadas; las casillas "1ª:" no cuentan.
 const fila=(y,ref,nom,largo,cant)=>[{s:ref,x:157,y},{s:nom,x:250,y},{s:largo+' mm',x:354,y},{s:'45º/45º',x:451,y},{s:String(cant),x:529,y}];
