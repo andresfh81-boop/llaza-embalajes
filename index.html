@@ -67,12 +67,13 @@
     <form id="f-perfil" class="row">
       <label>Nombre<input id="p-nombre" required></label>
       <label>Referencia<input id="p-ref"></label>
+      <label>Grupo<select id="p-grupo"><option value="">Sin grupo</option><option value="estructura">Estructura</option><option value="lamas">Lamas</option></select></label>
       <label>Ancho envuelto<input id="p-ancho" type="number" min="1" required></label>
       <label>Alto envuelto<input id="p-alto" type="number" min="1" required></label>
       <label>Piezas por bulto<input id="p-uds" type="number" min="1" value="1" required></label>
       <button class="btn" id="p-guardar" style="align-self:end">Guardar perfil</button>
     </form>
-    <p class="sub">Sección del bulto ya envuelto, en milímetros. Si se envuelven varias piezas juntas (por ejemplo 2 lamas), indica cuántas van en cada bulto.</p>
+    <p class="sub">Sección del bulto ya envuelto, en milímetros. Si se envuelven varias piezas juntas (por ejemplo 2 lamas), indica cuántas van en cada bulto. El grupo sirve para que la estructura vaya junta en unas cajas y las lamas en otras.</p>
     <div id="lista-perfiles" class="scroll"></div>
   </section>
 </div>

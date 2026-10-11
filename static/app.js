@@ -1,4 +1,5 @@
 const TIPOS={carton:'Cartón',cerrada:'Madera cerrada',abierta:'Madera abierta'};
+const GRUPOS={estructura:'Estructura',lamas:'Lamas'};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=v=>Math.max(0,Math.round(Number(v)||0));
@@ -36,9 +37,9 @@ function renderResultado(){
   for(const l of pedido.lineas){
     const p=perfiles.find(x=>x.id===l.pid);if(!p)continue;
     const uds=Math.max(1,num(p.uds)),n=Math.ceil(l.cant/uds);
-    for(let i=0;i<n;i++) items.push({p,L:l.largo,w:num(p.ancho)+h,h:num(p.alto)+h});
+    for(let i=0;i<n;i++) items.push({p,g:p.grupo||'',L:l.largo,w:num(p.ancho)+h,h:num(p.alto)+h});
   }
-  const r=plan(items,modelos);
+  const r=planGrupos(items,modelos);
   const m3=volBins(r.bins)/1e9;
   const porModelo={};r.bins.forEach(b=>porModelo[b.model.nombre]=(porModelo[b.model.nombre]||0)+1);
   const desg=Object.entries(porModelo).map(([n,c])=>`${c} × ${n}`).join(', ');
@@ -51,13 +52,13 @@ function renderResultado(){
   html+='<div class="boxes">'+r.bins.map((b,i)=>{
     const M=b.model,usado=b.items.reduce((s,p)=>s+p.w*p.h,0)/(M.intA*M.intH);
     const g={};b.items.forEach(p=>{const k=p.it.p.id+'|'+p.it.L;(g[k]=g[k]||{p:p.it.p,L:p.it.L,n:0}).n++;});
-    const cont=Object.values(g);
-    lineasTxt.push(`Caja ${i+1} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.p.nombre} ${c.L} mm`).join(', '));
+    const cont=Object.values(g),gs=[...new Set(cont.map(c=>c.p.grupo||''))],gtxt=gs.length>1?'Mezcla':(GRUPOS[gs[0]]||'');
+    lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.p.nombre} ${c.L} mm`).join(', '));
     const fs=Math.max(M.intA,M.intH)/14;
     const svg=`<svg viewBox="-2 -2 ${M.intA+4} ${M.intH+4}" role="img" aria-label="Sección de la caja ${i+1}"><rect x="0" y="0" width="${M.intA}" height="${M.intH}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map(p=>{
       const y=M.intH-p.y-p.h,t=p.it.p.ref||p.it.p.nombre,f=Math.min(fs,p.h*.5,p.w/(String(t).length*.62));
       return `<rect x="${p.x}" y="${y}" width="${p.w}" height="${p.h}" fill="var(--p${col.get(p.it.p.id)})" stroke="var(--panel)" stroke-width="1.5" vector-effect="non-scaling-stroke"/><text x="${p.x+p.w/2}" y="${y+p.h/2}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)}</text>`;}).join('')}</svg>`;
-    return `<div class="boxcard"><div><span class="tag">Caja ${i+1}</span><h3>${esc(M.nombre)}</h3></div>${svg}<div class="meta">Sección interior ${M.intA}×${M.intH} mm · largo ${M.intL} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm</li>`).join('')}</ul></div>`;
+    return `<div class="boxcard"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div>${svg}<div class="meta">Sección interior ${M.intA}×${M.intH} mm · largo ${M.intL} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm</li>`).join('')}</ul></div>`;
   }).join('')+'</div>';
   ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas (${desg}), ${m3.toFixed(2)} m³\n`+lineasTxt.join('\n');
   el.innerHTML=html;
@@ -131,7 +132,7 @@ function renderCajas(){
 }
 function renderPerfiles(){
   $('p-guardar').textContent=editPerfil?'Guardar cambios':'Guardar perfil';
-  $('lista-perfiles').innerHTML=perfiles.length?`<table><thead><tr><th>Nombre</th><th>Ref.</th><th class="n">Ancho</th><th class="n">Alto</th><th class="n">Piezas/bulto</th><th></th></tr></thead><tbody>${perfiles.map(p=>`<tr><td>${esc(p.nombre)}</td><td>${esc(p.ref)}</td><td class="n">${num(p.ancho)}</td><td class="n">${num(p.alto)}</td><td class="n">${num(p.uds)||1}</td><td class="act">${botones('perfil',p.id)}</td></tr>`).join('')}</tbody></table>`
+  $('lista-perfiles').innerHTML=perfiles.length?`<table><thead><tr><th>Nombre</th><th>Ref.</th><th>Grupo</th><th class="n">Ancho</th><th class="n">Alto</th><th class="n">Piezas/bulto</th><th></th></tr></thead><tbody>${perfiles.map(p=>`<tr><td>${esc(p.nombre)}</td><td>${esc(p.ref)}</td><td>${GRUPOS[p.grupo]||''}</td><td class="n">${num(p.ancho)}</td><td class="n">${num(p.alto)}</td><td class="n">${num(p.uds)||1}</td><td class="act">${botones('perfil',p.id)}</td></tr>`).join('')}</tbody></table>`
     :'<div class="empty">Aún no hay perfiles. Guarda aquí la sección de cada perfil ya envuelto.</div>';
 }
 function renderTodo(){renderPedido();renderCajas();renderPerfiles();renderCatalogo();}
@@ -206,7 +207,7 @@ $('f-caja').addEventListener('submit',e=>{
 });
 $('f-perfil').addEventListener('submit',e=>{
   e.preventDefault();
-  const d={nombre:$('p-nombre').value.trim(),ref:$('p-ref').value.trim(),ancho:num($('p-ancho').value),alto:num($('p-alto').value),uds:Math.max(1,num($('p-uds').value))};
+  const d={nombre:$('p-nombre').value.trim(),ref:$('p-ref').value.trim(),grupo:$('p-grupo').value,ancho:num($('p-ancho').value),alto:num($('p-alto').value),uds:Math.max(1,num($('p-uds').value))};
   if(!base){estado('No se puede guardar: catálogo no disponible.');return;}
   poner(perfiles,editPerfil,d);editPerfil=null;e.target.reset();guardarCatalogo();
 });
@@ -234,7 +235,7 @@ document.addEventListener('click',async e=>{
   }
   else if(a==='editar-perfil'){
     const p=perfiles.find(x=>x.id===id);if(!p)return;editPerfil=id;
-    $('p-nombre').value=p.nombre;$('p-ref').value=p.ref||'';$('p-ancho').value=p.ancho;$('p-alto').value=p.alto;$('p-uds').value=p.uds||1;
+    $('p-nombre').value=p.nombre;$('p-ref').value=p.ref||'';$('p-grupo').value=p.grupo||'';$('p-ancho').value=p.ancho;$('p-alto').value=p.alto;$('p-uds').value=p.uds||1;
     renderPerfiles();$('p-nombre').focus();
   }
 });

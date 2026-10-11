@@ -2,7 +2,7 @@
 const fs=require('fs'),path=require('path');
 const raiz=path.join(__dirname,'..');
 const pdfjsLib=require(path.join(raiz,'vendor','pdfjs','pdf.min.js'));
-const {parseHoja,plan,volBins}=require(path.join(raiz,'static','nucleo.js'));
+const {parseHoja,planGrupos,volBins}=require(path.join(raiz,'static','nucleo.js'));
 const cat=JSON.parse(fs.readFileSync(path.join(raiz,'datos','catalogo.json'),'utf8'));
 (async()=>{
   pdfjsLib.GlobalWorkerOptions.workerSrc=path.join(raiz,'vendor','pdfjs','pdf.worker.min.js');
@@ -24,9 +24,9 @@ const cat=JSON.parse(fs.readFileSync(path.join(raiz,'datos','catalogo.json'),'ut
     const m=(cat.montados||[]).find(x=>String(x.ref)===l.ref);
     console.log(l.ref,'|',l.desc,'|',l.largo,'mm |',l.cant,'uds |',p?p.nombre:m?'va montado en '+m.en:'SIN PERFIL',l.dudosa?'| cantidad dudosa':'');
     if(!p) continue;
-    for(let i=0;i<Math.ceil(l.cant/(p.uds||1));i++) items.push({p,L:l.largo,w:p.ancho+5,h:p.alto+5});
+    for(let i=0;i<Math.ceil(l.cant/(p.uds||1));i++) items.push({p,g:p.grupo||'',L:l.largo,w:p.ancho+5,h:p.alto+5});
   }
-  const r=plan(items,cat.cajas.filter(c=>c.tipo===tipo));
+  const r=planGrupos(items,cat.cajas.filter(c=>c.tipo===tipo));
   console.log('--- reparto ('+tipo+') ---');
   console.log(r.bins.length,'cajas,',(volBins(r.bins)/1e9).toFixed(2),'m³,',items.length,'bultos, sin caja:',r.unfit.length);
   r.bins.forEach((b,i)=>{const g={};b.items.forEach(x=>{const k=x.it.p.nombre+' '+x.it.L+' mm';g[k]=(g[k]||0)+1;});console.log('Caja',i+1,b.model.nombre+':',Object.entries(g).map(([k,n])=>n+' × '+k).join(', '));});

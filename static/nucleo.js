@@ -83,6 +83,29 @@ function plan(items,models){
   return {bins:best.bins,unfit:best.unfit};
 }
 
+// Reparto por grupos (estructura, lamas…): cada grupo va en sus propias cajas.
+// Solo se juntan dos cajas de grupos distintos si caben en una sola y así sobra una.
+function planGrupos(items,models){
+  const gs=[...new Set(items.map(it=>it.g||''))].sort();
+  if(gs.length<2) return plan(items,models);
+  let bins=[],unfit=[];
+  for(const g of gs){const r=plan(items.filter(it=>(it.g||'')===g),models);bins=bins.concat(r.bins);unfit=unfit.concat(r.unfit);}
+  const asc=models.slice().sort((a,b)=>vol(a)-vol(b)),de=b=>[...new Set(b.items.map(p=>p.it.g||''))].sort().join();
+  for(let seguir=true;seguir;){
+    seguir=false;
+    for(let i=0;i<bins.length&&!seguir;i++) for(let j=i+1;j<bins.length&&!seguir;j++){
+      if(de(bins[i])===de(bins[j])) continue;
+      const its=bins[i].items.concat(bins[j].items).map(p=>p.it);
+      for(const m of asc){
+        if(vol(m)>=vol(bins[i].model)+vol(bins[j].model)) break;
+        const r=packWith(m,its);
+        if(r.bins.length===1&&!r.unfit.length){bins[i]=r.bins[0];bins.splice(j,1);seguir=true;break;}
+      }
+    }
+  }
+  return {bins,unfit};
+}
+
 // Catálogo: lo común (datos/catalogo.json) más los cambios de este navegador.
 // En los cambios cada clave es el id; null quiere decir "borrado aquí".
 function aplicar(base,cambios){
@@ -94,4 +117,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={parseHoja,packWith,plan,vol,volBins,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={parseHoja,packWith,plan,planGrupos,vol,volBins,aplicar,diferencia};

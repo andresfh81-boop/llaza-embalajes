@@ -1,6 +1,6 @@
 // node pruebas/probar.js  — comprueba el encaje, la lectura de filas de la hoja de corte y la mezcla del catálogo
 const assert=require('assert'),path=require('path');
-const {plan,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
+const {plan,planGrupos,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
 const G={nombre:'G',intL:6000,intA:600,intH:400,extL:6100,extA:660,extH:460};
 const S={nombre:'S',intL:4000,intA:300,intH:300,extL:4080,extA:350,extH:350};
 const mk=(n,w,h,L)=>Array.from({length:n},()=>({p:{nombre:w+'x'+h},w,h,L}));
@@ -14,6 +14,18 @@ console.log('cajas:',r.bins.map(b=>b.model.nombre+':'+b.items.length).join(' '),
 const h=parseHoja(['33000 LAMA 3854,5 mm 90º/90º 26','33000 MEDIA LAMA 3830,5 mm 90º/90º 1+1','33017 VIGA 5450 mm 45º/45º 2 V8-10','DIMENSIONES: 3020 x 5450 mm']);
 assert.deepStrictEqual(h.map(l=>[l.ref,l.desc,l.largo,l.cant]),[['33000','LAMA',3855,26],['33000','MEDIA LAMA',3831,2],['33017','VIGA',5450,2]]);
 console.log('hoja de corte:',h.length,'líneas');
+
+// Por grupos: módulo 4060×6000 con las cajas de cartón reales. Estructura y lamas no se mezclan.
+const C5={nombre:'C-5000',intL:5000,intA:790,intH:790,extL:5100,extA:850,extH:850},C7={nombre:'C-7000',intL:6990,intA:790,intH:790,extL:7000,extA:850,extH:850};
+const gr=(g,n,w,h,L)=>mk(n,w,h,L).map(it=>Object.assign(it,{g}));
+const mod=[...gr('estructura',2,236,138,6000),...gr('estructura',2,236,138,4060),...gr('estructura',2,180,180,2652),...gr('estructura',1,147,157,5866),...gr('estructura',1,147,157,3922),...gr('lamas',16,282,275,3855)];
+r=planGrupos(mod,[C5,C7]);check(r);
+const mezcla=b=>new Set(b.items.map(p=>p.it.g)).size>1;
+assert.strictEqual(r.unfit.length,0);assert.strictEqual(r.bins.length,5);assert.ok(!r.bins.some(mezcla));
+console.log('por grupos:',r.bins.map(b=>b.model.nombre+':'+b.items[0].it.g+':'+b.items.length).join(' '));
+// Si los restos de dos grupos caben en una caja, se juntan para ahorrar una.
+r=planGrupos([...gr('estructura',1,180,180,2652),...gr('lamas',1,282,275,3855)],[C5,C7]);check(r);
+assert.strictEqual(r.bins.length,1);assert.ok(mezcla(r.bins[0]));
 
 const base=[{id:'a',nombre:'A',ancho:1},{id:'b',nombre:'B',ancho:2},{id:'c',nombre:'C',ancho:3}];
 const mio=[{ancho:1,nombre:'A',id:'a'},{id:'b',nombre:'B',ancho:20},{id:'n1',nombre:'Nueva',ancho:9}];
