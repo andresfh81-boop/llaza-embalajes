@@ -52,7 +52,8 @@ Para verla en local hace falta servirla (abierta como archivo suelto no carga el
 ## Limitaciones conocidas
 
 - Solo hay dos cajas en el catálogo común, las dos de cartón: C-5000 y C-7000 (alta de Andrés, 11/10/2026). Faltan las de madera cerrada y abierta.
-- **La lectura del PDF no está validada con una hoja de corte real**, solo con filas de ejemplo y un PDF sintético. Falta un PDF de muestra en `ejemplos/`.
+- La lectura del PDF está comprobada con una hoja de corte real (módulo 4060×6000, 11/10/2026): leyó bien las 19 líneas. Para repetirlo sin navegador: `node pruebas/leer-pdf.js "hoja.pdf"`. Las hojas reales no se suben al repo (es público).
+- **Faltan perfiles en el catálogo**: en esa hoja quedaron sin embalar 33016 tapa luz, 33019 tapa lateral viga, 33018 tapa superior viga, 33009 soporte medio lama, 33005 tapa pilar, 33008 transmisión, 33010 LED perimetral y 33020 lama LED. Hay que medir cómo se envuelven.
 - No coloca dos perfiles cortos uno detrás de otro dentro de la misma caja.
 - No tiene en cuenta peso ni peso máximo por caja.
 - "MEDIA LAMA" lleva la misma referencia que la lama (33000) y se asigna al bulto de 2 lamas.
@@ -62,6 +63,6 @@ Para verla en local hace falta servirla (abierta como archivo suelto no carga el
 ## Siguiente paso
 
 1. Dar de alta las cajas reales y subirlas al catálogo común.
-2. Probar `parseHoja` con hojas de corte reales y ajustar columnas.
+2. Medir y dar de alta los perfiles que faltan (tapas, LED, transmisión, lama LED).
 
 Ideas para después: colocar piezas cortas en fila, límite de peso, imprimir la lista de embalaje por caja, etiquetas por caja.
