@@ -6,5 +6,8 @@
     {"id": "33006", "ref": "33006", "nombre": "Canalón (bulto de 2)", "ancho": 142, "alto": 152, "uds": 2},
     {"id": "33004", "ref": "33004", "nombre": "Pilar", "ancho": 175, "alto": 175, "uds": 1}
   ],
-  "cajas": []
+  "cajas": [
+    {"id": "nmv4b8ogkaqjc", "nombre": "C-5000", "tipo": "carton", "intL": 5000, "intA": 790, "intH": 790, "extL": 5100, "extA": 850, "extH": 850},
+    {"id": "nmv4ba963nmdc", "nombre": "C-7000", "tipo": "carton", "intL": 6990, "intA": 790, "intH": 790, "extL": 7000, "extA": 850, "extH": 850}
+  ]
 }

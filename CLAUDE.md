@@ -51,7 +51,7 @@ Para verla en local hace falta servirla (abierta como archivo suelto no carga el
 
 ## Limitaciones conocidas
 
-- **No hay ninguna caja dada de alta**: falta medir las cajas reales (interior y exterior). Sin cajas no hay reparto.
+- Solo hay dos cajas en el catálogo común, las dos de cartón: C-5000 y C-7000 (alta de Andrés, 11/10/2026). Faltan las de madera cerrada y abierta.
 - **La lectura del PDF no está validada con una hoja de corte real**, solo con filas de ejemplo y un PDF sintético. Falta un PDF de muestra en `ejemplos/`.
 - No coloca dos perfiles cortos uno detrás de otro dentro de la misma caja.
 - No tiene en cuenta peso ni peso máximo por caja.
