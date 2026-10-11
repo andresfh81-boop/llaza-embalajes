@@ -178,7 +178,7 @@ function renderResultado(recalcular){
   const m3=volBins(r.bins)/1e9;
   const porModelo={};r.bins.forEach(b=>porModelo[b.model.nombre]=(porModelo[b.model.nombre]||0)+1);
   const desg=Object.entries(porModelo).map(([n,c])=>`${c} × ${n}`).join(', ');
-  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length}</b> <span>bultos en total <small>(${nb} de perfil + ${r.bins.length} ${r.bins.length===1?'caja':'cajas'})</small></span></div><span class="acciones"><button class="btn" type="button" data-act="imprimir">Imprimir lista de embalaje</button><button class="btn" type="button" data-act="etiquetas">Imprimir etiquetas</button><select id="etq-copias" aria-label="Etiquetas por caja">${[1,2,4].map(n=>`<option value="${n}"${n===etqCopias?' selected':''}>${n} por caja</option>`).join('')}</select><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></span></div><div class="sub">${esc(desg)}</div>`;
+  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length}</b> <span>bultos en total <small>(${nb} de perfil + ${r.bins.length} ${r.bins.length===1?'caja':'cajas'})</small></span></div><span class="acciones"><button class="btn" type="button" data-act="imprimir">Imprimir lista de embalaje</button><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></span></div><div class="sub">${esc(desg)}</div>`;
   // Cuánto se aprovecha: sección ocupada de media y el mínimo de cajas que saldría solo por superficie (cota inferior, no siempre alcanzable).
   const todos=r.bins.flatMap(b=>b.items),secB=todos.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)+r.unfit.reduce((s,it)=>s+it.w*it.h,0),secC=r.bins.reduce((s,b)=>s+b.model.intA*b.model.intH,0),minC=Math.max(1,Math.ceil(secB/Math.max(...modelos.map(m=>m.intA*m.intH))));
   if(secC) html+=`<div class="sub">Sección aprovechada: <b>${Math.round(secB/secC*100)} %</b>. ${r.bins.length<=minC?'Con estas cajas no se puede hacer con menos.':`Solo por superficie cabría en ${minC} ${minC===1?'caja':'cajas'}, pero las piezas no se pueden partir ni encajar sin huecos: es un mínimo teórico, no un fallo.`}</div>`;
@@ -209,29 +209,6 @@ function renderResultado(recalcular){
   el.innerHTML=html;
   // cada dibujo ampliado vuelve a donde estaba desplazado
   el.querySelectorAll('.visor').forEach(v=>{const s=zoom[v.dataset.v];if(s&&s.z>1){v.scrollLeft=s.sl||0;v.scrollTop=s.st||0;}});
-}
-
-// Etiquetas para pegar en las cajas: hojas A4 con 4 etiquetas (105 × 148,5 mm cada una, A6), tantas por caja como se elija.
-let etqCopias=1;
-function imprimirEtiquetas(){
-  const r=reparto;if(!r||!r.bins.length)return;
-  const n=r.bins.length,hoy=new Date().toLocaleDateString('es-ES'),etqs=[];
-  r.bins.forEach((b,i)=>{
-    const M=b.model,g={};
-    b.items.forEach(p=>{const k=p.it.p.id+'|'+p.it.L;const c=(g[k]=g[k]||{p:p.it.p,L:p.it.L,n:0,pz:0,ms:[]});c.n++;c.pz+=p.it.n||1;if(p.it.m)c.ms.push(p.it.m);});
-    const cont=Object.values(g),gs=[...new Set(cont.map(c=>c.p.grupo||''))],gtxt=!cont.length?'Vacía':gs.length>1?'Mezcla':(GRUPOS[gs[0]]||'');
-    const e=`<div class="etq"><div class="e-cab"><span>${pedido.ref?esc(pedido.ref):''}</span><span>${hoy}</span></div>
-      <div class="e-caja">CAJA <b>${i+1}</b> de ${n}</div>
-      <div class="e-mod">${esc(M.nombre)} · ${TIPOS[M.tipo]||''}${gtxt?' · '+gtxt:''}</div>
-      <div class="e-med">${M.extL} × ${M.extA} × ${M.extH} mm</div>
-      <ul>${cont.map(c=>`<li><b>${c.n} ×</b> ${esc(corto(c.p))} ${c.L} mm${num(c.p.uds)>1?` (${c.pz} uds)`:''}${c.ms.length?` <b class="marca">${esc(c.ms.join(', '))}</b>`:''}</li>`).join('')}</ul>
-      <div class="e-pie">${b.items.length} ${b.items.length===1?'bulto':'bultos'}</div></div>`;
-    for(let c=0;c<etqCopias;c++) etqs.push(e);
-  });
-  let html='';
-  for(let i=0;i<etqs.length;i+=4) html+=`<section class="hoja etqs">${etqs.slice(i,i+4).join('')}</section>`;
-  $('imprimir').innerHTML=html;
-  window.print();
 }
 
 // Lista de embalaje para imprimir: una hoja de resumen y una hoja por caja, con su contenido y sus dos dibujos.
@@ -585,7 +562,6 @@ document.addEventListener('click',async e=>{
   else if(a==='quitar-caja'){const n=Number(b.dataset.i);if(reparto.bins[n]&&!reparto.bins[n].items.length){reparto.bins.splice(n,1);hecho();renderResultado();}}
   else if(a==='zoom'){cambiarZoom(b.dataset.v,Number(b.dataset.d));}
   else if(a==='imprimir'){imprimirLista();}
-  else if(a==='etiquetas'){imprimirEtiquetas();}
   else if(a==='completa'){completa=completa?null:new Set([Number(b.dataset.i)]);renderResultado();}
   else if(a==='ver-marcadas'){completa=new Set(marcadas);renderResultado();}
   else if(a==='desmarcar'){marcadas=new Set();renderResultado();}
@@ -612,7 +588,6 @@ document.addEventListener('click',async e=>{
 });
 
 document.addEventListener('change',e=>{if(e.target.id==='cat-file'){importar(e.target.files[0]);e.target.value='';}if(e.target.id==='modelo-nuevo')modeloNuevo=e.target.value;
-  if(e.target.id==='etq-copias')etqCopias=Number(e.target.value)||1;
   if(e.target.dataset&&e.target.dataset.marcar!==undefined){const n=Number(e.target.dataset.marcar);if(e.target.checked)marcadas.add(n);else marcadas.delete(n);renderResultado();}});
 
 renderTodo();

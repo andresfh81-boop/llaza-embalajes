@@ -167,16 +167,3 @@ rect.bulto.sel,rect.plano.sel{stroke:var(--accent);stroke-width:4}
 .boxes.completa .visor{max-height:none}
 .boxes.completa .visor>div{min-width:0}
 @media (max-width:900px){.boxes.completa{grid-template-columns:minmax(0,1fr)}}
-.totals select{width:auto;padding:8px 6px}
-@media print{
-  @page etiquetas{size:A4;margin:0}
-  #imprimir .hoja.etqs{page:etiquetas;display:grid;grid-template-columns:105mm 105mm;grid-auto-rows:148.5mm;width:210mm}
-  #imprimir .etq{box-sizing:border-box;padding:9mm 8mm;display:flex;flex-direction:column;gap:3mm;overflow:hidden;border:.2mm dashed #bbb}
-  #imprimir .e-cab{display:flex;justify-content:space-between;font-size:10pt;border-bottom:.4mm solid #000;padding-bottom:1.5mm}
-  #imprimir .e-caja{font:700 30pt/1 var(--display)}
-  #imprimir .e-caja b{font-size:54pt}
-  #imprimir .e-mod{font:600 15pt var(--display)}
-  #imprimir .e-med{font-size:13pt}
-  #imprimir .etq ul{margin:1mm 0 0;padding:0;list-style:none;font-size:11pt;display:flex;flex-direction:column;gap:1.2mm;flex:1}
-  #imprimir .e-pie{font:600 13pt var(--display);border-top:.4mm solid #000;padding-top:1.5mm}
-}
