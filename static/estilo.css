@@ -151,3 +151,11 @@ svg.seccion,svg.planta{cursor:default}
   #imprimir .dib svg.planta{max-width:180mm}
   #imprimir text.cota.hueco{stroke:#fff}
 }
+.boxcard.ampliada svg.seccion,.boxcard.ampliada svg.planta{max-height:none;max-width:none;cursor:default}
+.boxcard.ampliada .visor{max-height:none;overflow-x:auto;overflow-y:visible}
+.boxcard.ampliada .visor>div{min-width:0}
+rect.bulto.sel,rect.plano.sel{stroke:var(--accent);stroke-width:4}
+.barra-sel{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--panel);border-top:3px solid var(--accent);box-shadow:0 -4px 16px rgba(0,0,0,.25);padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;justify-content:space-between}
+.barra-sel .acciones{align-items:center}
+.barra-sel .ojo{color:var(--warn);font-weight:600}
+@media print{.barra-sel{display:none}}
