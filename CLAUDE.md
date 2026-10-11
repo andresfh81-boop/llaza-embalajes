@@ -19,6 +19,8 @@ La versión anterior sigue publicada como artifact (https://claude.ai/artifact/J
 - `pruebas/probar.js` — `node pruebas/probar.js`.
 - `ejemplos/` — todavía no existe; aquí irán las hojas de corte reales de muestra (ojo: el repo es público, sin datos de clientes).
 
+**Al cambiar `static/estilo.css`, `nucleo.js` o `app.js`, subir el número `?v=N` de `index.html`**: si no, los navegadores siguen con la copia vieja en caché (pasó el 11/10/2026).
+
 Para verla en local hace falta servirla (abierta como archivo suelto no carga el catálogo): `python -m http.server 8765` y abrir http://localhost:8765.
 
 ## Catálogo: común + cambios del navegador
