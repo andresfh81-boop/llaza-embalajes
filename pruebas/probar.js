@@ -1,6 +1,6 @@
 // node pruebas/probar.js  — comprueba el encaje, la lectura de filas de la hoja de corte y la mezcla del catálogo
 const assert=require('assert'),path=require('path');
-const {leerPagina,plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
+const {packWith:packWithSolo,leerPagina,plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
 const G={nombre:'G',intL:6000,intA:600,intH:400,extL:6100,extA:660,extH:460};
 const S={nombre:'S',intL:4000,intA:300,intH:300,extL:4080,extA:350,extH:350};
 const mk=(n,w,h,L)=>Array.from({length:n},()=>({p:{nombre:w+'x'+h},w,h,L}));
@@ -46,6 +46,8 @@ assert.ok(apoyado(suelo,cajaA));
 assert.ok(apoyado(Object.assign(pz(2000,0),{y:180}),cajaA));
 assert.ok(!apoyado(Object.assign(pz(2000,0),{y:300}),cajaA));
 assert.ok(!apoyado(Object.assign(pz(2000,2500),{y:180}),cajaA));
+// Probar varios órdenes de colocación nunca empeora el resultado de usar solo el primero.
+{const varios=[...mk(3,300,500,3000),...mk(4,480,280,3000),...mk(5,150,150,3000)],uno=packWithSolo(C5,varios),mejor=plan(varios,[C5]);check(mejor);assert.ok(mejor.bins.length<=uno.bins.length);}
 console.log('alternadas: ok');
 // Marcaje de la hoja: dos marcas por fila (encima y debajo), a veces troceadas; las casillas "1ª:" no cuentan.
 const fila=(y,ref,nom,largo,cant)=>[{s:ref,x:157,y},{s:nom,x:250,y},{s:largo+' mm',x:354,y},{s:'45º/45º',x:451,y},{s:String(cant),x:529,y}];

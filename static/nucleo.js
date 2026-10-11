@@ -62,7 +62,9 @@ function tryPlace(bin,it){
   bin.items.push({it,x:b.x,y:b.y,w:b.w,h:b.h});
   return true;
 }
-function orden(items){return items.slice().sort((a,b)=>b.w*b.h-a.w*a.h||b.L-a.L);}
+// Órdenes en que se van colocando los bultos: por sección, por alto, por ancho y por lado mayor. El reparto prueba todos.
+const ORDENES=[(a,b)=>b.w*b.h-a.w*a.h||b.L-a.L,(a,b)=>b.h-a.h||b.w-a.w||b.L-a.L,(a,b)=>b.w-a.w||b.h-a.h||b.L-a.L,(a,b)=>Math.max(b.w,b.h)-Math.max(a.w,a.h)||b.L-a.L];
+function orden(items,cmp){return items.slice().sort(cmp||ORDENES[0]);}
 // Bultos con protección en los extremos (porexpan): it.cap={l,w} = largo de cada protección y ancho del bulto en el medio (con holgura).
 // Poniéndolos en fila, uno adelantado y el siguiente atrasado, las protecciones no coinciden y caben más a lo ancho.
 // Cada bulto va recto y con la protección centrada: n en fila ocupan (n-1)·(ancho+medio)/2 + ancho, y la fila mide L + protección de largo.
@@ -83,9 +85,9 @@ function filas(model,items){
   }
   return out;
 }
-function packWith(model,items){
+function packWith(model,items,cmp){
   const bins=[],unfit=[];
-  for(const it of orden(filas(model,items))){
+  for(const it of orden(filas(model,items),cmp)){
     if(bins.some(b=>tryPlace(b,it))) continue;
     const nb=newBin(model);
     if(tryPlace(nb,it)) bins.push(nb); else unfit.push(...(it.fila||[it]));
@@ -111,8 +113,8 @@ function resto(items,models){
 function plan(items,models){
   if(!models.length) return {bins:[],unfit:items};
   let best=null;
-  for(const m of models){
-    const r=packWith(m,items);
+  for(const m of models) for(const cmp of ORDENES){
+    const r=packWith(m,items,cmp);
     if(!r.bins.length) continue;
     const sub=resto(r.unfit,models.filter(x=>x!==m));
     const bins=r.bins.concat(sub.bins);

@@ -158,6 +158,9 @@ function renderResultado(recalcular){
   const porModelo={};r.bins.forEach(b=>porModelo[b.model.nombre]=(porModelo[b.model.nombre]||0)+1);
   const desg=Object.entries(porModelo).map(([n,c])=>`${c} × ${n}`).join(', ');
   let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length}</b> <span>bultos en total <small>(${nb} de perfil + ${r.bins.length} ${r.bins.length===1?'caja':'cajas'})</small></span></div><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></div><div class="sub">${esc(desg)}</div>`;
+  // Cuánto se aprovecha: sección ocupada de media y el mínimo de cajas que saldría solo por superficie (cota inferior, no siempre alcanzable).
+  const todos=r.bins.flatMap(b=>b.items),secB=todos.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)+r.unfit.reduce((s,it)=>s+it.w*it.h,0),secC=r.bins.reduce((s,b)=>s+b.model.intA*b.model.intH,0),minC=Math.max(1,Math.ceil(secB/Math.max(...modelos.map(m=>m.intA*m.intH))));
+  if(secC) html+=`<div class="sub">Sección aprovechada: <b>${Math.round(secB/secC*100)} %</b>. ${r.bins.length<=minC?'Con estas cajas no se puede hacer con menos.':`Solo por superficie cabría en ${minC} ${minC===1?'caja':'cajas'}, pero las piezas no se pueden partir ni encajar sin huecos: es un mínimo teórico, no un fallo.`}</div>`;
   if(avisoMov) html+=`<div class="note" role="alert">${esc(avisoMov)}</div>`;
   if(repartoManual) html+=`<div class="manual">${repartoGuardado?'Reparto a mano guardado en este navegador.':'Has movido bultos a mano. <button class="btn small" type="button" data-act="guardar-reparto">Guardar reparto</button>'} <button class="btn small ghost" type="button" data-act="auto">Volver al reparto automático</button></div>`;
   if(r.unfit.length){
@@ -174,7 +177,7 @@ function renderResultado(recalcular){
     lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.p.nombre} ${c.L} mm${c.ms.length?' ['+c.ms.join(', ')+']':''}`).join(', '));
     const flot=b.items.filter(p=>!apoyado(p,b));if(flot.length)lineasTxt.push(`  OJO, sin apoyo: ${flot.map(nombreB).join(', ')}`);
     return `<div class="boxcard${ampliada===i?' ampliada':''}" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><button class="btn small ghost" type="button" data-act="ampliar" data-i="${i}">${ampliada===i?'Cerrar ampliación':'Ampliar'}</button>${cont.length?'':`<button class="btn small danger" type="button" data-act="quitar-caja" data-i="${i}">Quitar caja</button>`}</div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}<span class="tag">De frente · ancho × alto</span>${dibujoSeccion(b,i,col,hol)}<span class="tag">Desde arriba · largo × ancho (ancho ampliado ×${AMPLIA})</span>${dibujoPlanta(b,i,col)}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm${c.ms.length?` · <b class="marca">${esc(c.ms.join(', '))}</b>`:''}</li>`).join('')}</ul></div>`;
-  }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Pulsa en un dibujo (el ratón sale como lupa) o en «Ampliar» para verlo en grande; Esc o volver a pulsar lo cierra. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, moverlo a lo largo y a lo ancho, también a otra caja. Si choca con otro o se sale, te aviso y se queda donde estaba. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
+  }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Pulsa en un dibujo (el ratón sale como lupa) o en «Ampliar» para verlo en grande; Esc o volver a pulsar lo cierra. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, moverlo a lo largo y a lo ancho, también a otra caja. Si choca con otro o se sale, te aviso y se queda donde estaba. Para girar un bulto: clic derecho encima, o la tecla R mientras lo arrastras. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
   ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas (${desg}), ${m3.toFixed(2)} m³\nBultos en total: ${nb+r.bins.length} (${nb} de perfil + ${r.bins.length} cajas)\n`+lineasTxt.join('\n');
   el.innerHTML=html;
 }
@@ -188,8 +191,20 @@ const porNum=(u,v)=>u-v;
 function hecho(){avisoMov='';repartoManual=true;repartoGuardado=false;}
 function quitarBulto(de,k){const B=reparto.bins;B[de].items.splice(k,1);if(!B[de].items.length)B.splice(de,1);}
 // Soltado en el dibujo de frente de la caja a, con la esquina inferior izquierda en (x,y).
-function soltarSeccion(de,k,a,x,y){
-  const B=reparto.bins,src=B[de].items[k],bin=B[a],M=bin.model,otros=bin.items.filter(o=>o!==src),tol=Math.max(M.intA,M.intH)*.03;
+// Girar un bulto 90° en la sección (cambia ancho por alto). Los que llevan protección en los extremos no se giran.
+function girado(p,rot){return rot?Object.assign({},p,{w:p.h,h:p.w}):p;}
+function noGira(p){if(!p.it.cap)return false;avisoMov='Los bultos con protección en los extremos (porexpan) no se giran.';renderResultado();return true;}
+function girarBulto(b,k){
+  const bin=reparto.bins[b],orig=bin.items[k],M=bin.model;
+  if(noGira(orig))return;
+  const p=girado(orig,true);p.x=Math.max(0,Math.min(p.x,M.intA-p.w));p.y=Math.max(0,Math.min(p.y,M.intH-p.h));
+  if(libre(p,bin,orig)){hecho();bin.items[k]=p;}
+  else{const o=bin.items.find(o=>o!==orig&&chocan(p,o));avisoMov=o?`Girado no cabe ahí: choca con ${nombreB(o)}.`:`Girado no cabe ahí: ${nombreB(orig)} se sale de la caja ${b+1}.`;}
+  renderResultado();
+}
+function soltarSeccion(de,k,a,x,y,rot){
+  if(rot&&noGira(reparto.bins[de].items[k]))return;
+  const B=reparto.bins,orig=B[de].items[k],src=girado(orig,rot),bin=B[a],M=bin.model,otros=bin.items.filter(o=>o!==orig),tol=Math.max(M.intA,M.intH)*.03;
   if(src.it.L>M.intL){avisoMov=`No cabe: ${nombreB(src)} es más largo que la caja ${a+1} (${M.nombre}, ${M.intL} mm de largo interior).`;return renderResultado();}
   const cx=[0,M.intA-src.w],cy=[0,M.intH-src.h];
   for(const o of otros){
@@ -201,7 +216,7 @@ function soltarSeccion(de,k,a,x,y){
   // A lo largo: primero donde estaba; si ahí choca, pegado al fondo, detrás de otro bulto o adelantado lo que mide una protección.
   const offs=(a===de?[src.off||0]:[]).concat([0,...otros.map(o=>(o.off||0)+o.it.L),...(src.medio?otros.filter(o=>o.medio).map(o=>(o.off||0)+o.it.cap.l):[])].sort(porNum));
   let ok=false;
-  for(const off of offs){p.off=off;if(libre(p,bin,src)){ok=true;break;}}
+  for(const off of offs){p.off=off;if(libre(p,bin,orig)){ok=true;break;}}
   if(!ok){
     p.off=offs[0];const c=otros.find(o=>chocan(p,o));
     avisoMov=c?`Ahí no cabe: choca con ${nombreB(c)}.`:`Ahí no cabe: ${nombreB(src)} se sale de la caja ${a+1}.`;
@@ -229,8 +244,9 @@ function soltarAuto(de,k,a){
 }
 // Soltado en la vista desde arriba de la caja a: off = cuánto va adelantado a lo largo, x = posición a lo ancho.
 // El alto no se ve desde arriba: se queda a su altura si puede y, si no, en el hueco más bajo que haya en ese sitio.
-function soltarPlanta(de,k,a,off,x){
-  const B=reparto.bins,src=B[de].items[k],bin=B[a],M=bin.model,L=src.it.L,otros=bin.items.filter(o=>o!==src);
+function soltarPlanta(de,k,a,off,x,rot){
+  if(rot&&noGira(reparto.bins[de].items[k]))return;
+  const B=reparto.bins,orig=B[de].items[k],src=girado(orig,rot),bin=B[a],M=bin.model,L=src.it.L,otros=bin.items.filter(o=>o!==orig);
   if(L>M.intL){avisoMov=`No cabe: ${nombreB(src)} es más largo que la caja ${a+1} (${M.nombre}, ${M.intL} mm de largo interior).`;return renderResultado();}
   const cz=[0,M.intL-L],cx=[0,M.intA-src.w];
   for(const o of otros){
@@ -240,7 +256,7 @@ function soltarPlanta(de,k,a,off,x){
   const p=Object.assign({},src,{off:Math.round(iman(Math.min(Math.max(off,0),M.intL-L),cz,M.intL*.015)),x:iman(Math.round(Math.min(Math.max(x,0),M.intA-src.w)),cx,M.intA*.03)});
   const ys=(a===de?[src.y]:[]).concat([0,...otros.map(o=>o.y+o.h)].sort(porNum));
   let ok=false;
-  for(const y of ys){p.y=y;if(libre(p,bin,src)){ok=true;break;}}
+  for(const y of ys){p.y=y;if(libre(p,bin,orig)){ok=true;break;}}
   if(!ok){
     p.y=ys[0];const o=otros.find(o=>chocan(p,o));
     avisoMov=o?`Ahí no cabe: choca con ${nombreB(o)}.`:`Ahí no cabe: ${nombreB(src)} se sale de la caja ${a+1}.`;
@@ -265,13 +281,22 @@ function soltarPlanta(de,k,a,off,x){
     // El fantasma es el bulto entero a su tamaño; se recuerda, en milímetros, de dónde se ha cogido.
     if(arr.modo==='seccion'){
       arr.gx=pt.x-p.x;arr.gy=pt.y-(M.intH-p.y-p.h);
-      f.style.width=p.w*esc_+'px';f.style.height=p.h*esc_+'px';arr.px=arr.gx*esc_;arr.py=arr.gy*esc_;
+      f.style.width=p.w*esc_+'px';f.style.height=p.h*esc_+'px';arr.px=arr.gx*esc_;arr.py=arr.gy*esc_;arr.alt=[p.h*esc_,p.w*esc_];
     }else{
       const kx=PW/M.intL,ky=kx*AMPLIA;
       arr.gl=pt.x/kx-(p.off||0);arr.ga=pt.y/ky-p.x;
-      f.style.width=p.it.L*kx*esc_+'px';f.style.height=p.w*ky*esc_+'px';arr.px=arr.gl*kx*esc_;arr.py=arr.ga*ky*esc_;
+      f.style.width=p.it.L*kx*esc_+'px';f.style.height=p.w*ky*esc_+'px';arr.px=arr.gl*kx*esc_;arr.py=arr.ga*ky*esc_;arr.alt=[p.it.L*kx*esc_,p.h*ky*esc_];
     }
     document.body.appendChild(f);document.body.classList.add('arrastrando');r.classList.add('cogido');sitio(e);
+  });
+  document.addEventListener('keydown',e=>{
+    if(!arr||(e.key!=='r'&&e.key!=='R'))return;
+    e.preventDefault();if(arr.p.it.cap)return;
+    arr.rot=!arr.rot;const f=arr.f,w=f.offsetWidth,h=f.offsetHeight;f.style.width=arr.alt[0]+'px';f.style.height=arr.alt[1]+'px';arr.alt=[w,h];
+  });
+  $('resultado').addEventListener('contextmenu',e=>{
+    const r=e.target.closest('rect.bulto');if(!r)return;
+    e.preventDefault();girarBulto(Number(r.dataset.b),Number(r.dataset.k));
   });
   document.addEventListener('pointermove',e=>{
     if(!arr)return;
@@ -289,10 +314,11 @@ function soltarPlanta(de,k,a,off,x){
     if(c.dataset.caja==='nueva')return soltarAuto(a.de,a.k,'nueva');
     // Vale soltar en cualquiera de los dos dibujos de cualquier caja; cada uno fija lo que se ve en él.
     const n=Number(c.dataset.caja),M=reparto.bins[n].model,fr=t.closest('svg.seccion'),ar=t.closest('svg.planta');
-    if(fr&&a.modo==='seccion'){const pt=enSvg(fr,e);soltarSeccion(a.de,a.k,n,pt.x-a.gx,M.intH-(pt.y-a.gy)-a.p.h);}
-    else if(ar&&a.modo==='planta'){const pt=enSvg(ar,e),kx=PW/M.intL;soltarPlanta(a.de,a.k,n,pt.x/kx-a.gl,pt.y/(kx*AMPLIA)-a.ga);}
-    else if(fr){const pt=enSvg(fr,e);soltarSeccion(a.de,a.k,n,pt.x-a.p.w/2,M.intH-pt.y-a.p.h/2);}
-    else if(ar){const pt=enSvg(ar,e),kx=PW/M.intL;soltarPlanta(a.de,a.k,n,pt.x/kx-a.p.it.L/2,pt.y/(kx*AMPLIA)-a.p.w/2);}
+    const w=a.rot?a.p.h:a.p.w,h=a.rot?a.p.w:a.p.h; // medidas del bulto tal como se suelta (girado o no)
+    if(fr&&a.modo==='seccion'){const pt=enSvg(fr,e);soltarSeccion(a.de,a.k,n,pt.x-Math.min(a.gx,w),M.intH-(pt.y-Math.min(a.gy,h))-h,a.rot);}
+    else if(ar&&a.modo==='planta'){const pt=enSvg(ar,e),kx=PW/M.intL;soltarPlanta(a.de,a.k,n,pt.x/kx-a.gl,pt.y/(kx*AMPLIA)-Math.min(a.ga,w),a.rot);}
+    else if(fr){const pt=enSvg(fr,e);soltarSeccion(a.de,a.k,n,pt.x-w/2,M.intH-pt.y-h/2,a.rot);}
+    else if(ar){const pt=enSvg(ar,e),kx=PW/M.intL;soltarPlanta(a.de,a.k,n,pt.x/kx-a.p.it.L/2,pt.y/(kx*AMPLIA)-w/2,a.rot);}
     else if(n!==a.de) soltarAuto(a.de,a.k,n);
   };
   document.addEventListener('pointerup',soltar);document.addEventListener('pointercancel',soltar);
