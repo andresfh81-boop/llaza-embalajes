@@ -117,3 +117,12 @@ text.marca{text-decoration:underline}
 .marca{font-family:var(--display);font-weight:700;letter-spacing:.02em}
 small.marca{color:var(--accent)}
 #leidas input.ancho{width:104px}
+svg.seccion,svg.planta{cursor:default}
+.vcab{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.zbot{display:inline-flex;align-items:center;gap:4px}
+.zbot b{min-width:50px;text-align:center;font:600 13px var(--display);color:var(--muted)}
+.zbot .btn{min-width:30px;font-size:15px;line-height:1.1}
+.zbot .btn:disabled{opacity:.35;cursor:default}
+.visor{overflow:auto;max-height:78vh}
+.visor>div{min-width:100%}
+.visor.pan{cursor:grabbing}

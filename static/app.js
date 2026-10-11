@@ -28,8 +28,22 @@ function renderPedido(){
 // Mientras no cambien pedido, tipo, holgura ni catálogo, los retoques a mano se conservan; con «Guardar reparto» también al recargar.
 const CLAVE_REP='reparto-embalaje';
 let reparto=null,repartoClave='',repartoManual=false,repartoGuardado=false,avisoMov='',modelosAct=[];
-// Caja ampliada a pantalla completa (lupa) y si el último gesto fue un arrastre, para no confundirlo con un clic.
-let ampliada=null,arrastrado=false;
+// Ampliación de cada dibujo con sus botones + y −: zoom[caja+vista]={z, sl, st} (aumento y hasta dónde está desplazado).
+const PASOS=[1,1.5,2,3,4];
+let zoom={},arrastrado=false;
+function visor(i,vista,titulo,svg){
+  const id=i+vista,z=(zoom[id]||{}).z||1;
+  return `<div class="vcab"><span class="tag">${titulo}</span><span class="zbot"><button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="-1" aria-label="Reducir"${z<=1?' disabled':''}>−</button><b>${Math.round(z*100)} %</b><button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="1" aria-label="Ampliar"${z>=PASOS[PASOS.length-1]?' disabled':''}>+</button>${z>1?`<button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="0">Normal</button>`:''}</span></div><div class="visor" data-v="${id}"><div style="width:${z*100}%">${svg}</div></div>`;
+}
+// Cambia el aumento de un dibujo manteniendo a la vista el mismo punto central.
+function cambiarZoom(id,d){
+  const s=zoom[id]=zoom[id]||{z:1},v=document.querySelector(`.visor[data-v="${id}"]`);
+  const fx=v?(v.scrollLeft+v.clientWidth/2)/v.scrollWidth:.5,fy=v?(v.scrollTop+v.clientHeight/2)/v.scrollHeight:.5,k=PASOS.indexOf(s.z);
+  s.z=d?PASOS[Math.max(0,Math.min(PASOS.length-1,(k<0?0:k)+d))]:1;s.sl=s.st=0;
+  renderResultado();
+  const n=document.querySelector(`.visor[data-v="${id}"]`);
+  if(n&&s.z>1){n.scrollLeft=s.sl=Math.max(0,fx*n.scrollWidth-n.clientWidth/2);n.scrollTop=s.st=Math.max(0,fy*n.scrollHeight-n.clientHeight/2);}
+}
 // Modelo elegido en «Añadir caja» (de cualquier tipo de embalaje).
 let modeloNuevo='';
 function bulto(p,L,m){
@@ -152,8 +166,6 @@ function renderResultado(recalcular){
     }
     repartoClave=clave;avisoMov='';
   }
-  if(ampliada!==null&&!reparto.bins[ampliada]) ampliada=null;
-  document.body.classList.toggle('con-lupa',ampliada!==null);
   const r=reparto,col=new Map(perfiles.map((p,ci)=>[p.id,ci%6]));
   const nb=r.bins.reduce((s,b)=>s+b.items.length,0)+r.unfit.length;
   const m3=volBins(r.bins)/1e9;
@@ -178,10 +190,12 @@ function renderResultado(recalcular){
     const cont=Object.values(g),gs=[...new Set(cont.map(c=>c.p.grupo||''))],gtxt=!cont.length?'Vacía':gs.length>1?'Mezcla':(GRUPOS[gs[0]]||'');
     lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.p.nombre} ${c.L} mm${c.ms.length?' ['+c.ms.join(', ')+']':''}`).join(', '));
     const flot=b.items.filter(p=>!apoyado(p,b));if(flot.length)lineasTxt.push(`  OJO, sin apoyo: ${flot.map(nombreB).join(', ')}`);
-    return `<div class="boxcard${ampliada===i?' ampliada':''}" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><button class="btn small ghost" type="button" data-act="ampliar" data-i="${i}">${ampliada===i?'Cerrar ampliación':'Ampliar'}</button>${cont.length?'':`<button class="btn small danger" type="button" data-act="quitar-caja" data-i="${i}">Quitar caja</button>`}</div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}<span class="tag">De frente · ancho × alto</span>${dibujoSeccion(b,i,col,hol)}<span class="tag">Desde arriba · largo × ancho (ancho ampliado ×${AMPLIA})</span>${dibujoPlanta(b,i,col)}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm${c.ms.length?` · <b class="marca">${esc(c.ms.join(', '))}</b>`:''}</li>`).join('')}</ul></div>`;
-  }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Pulsa en un dibujo (el ratón sale como lupa) o en «Ampliar» para verlo en grande; Esc o volver a pulsar lo cierra. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, moverlo a lo largo y a lo ancho, también a otra caja. Si choca con otro o se sale, te aviso y se queda donde estaba. Para girar un bulto: clic derecho encima, o la tecla R mientras lo arrastras. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
+    return `<div class="boxcard" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div>${cont.length?'':`<button class="btn small danger" type="button" data-act="quitar-caja" data-i="${i}">Quitar caja</button>`}</div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}${visor(i,'f','De frente · ancho × alto',dibujoSeccion(b,i,col,hol))}${visor(i,'a',`Desde arriba · largo × ancho (ancho ×${AMPLIA})`,dibujoPlanta(b,i,col))}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm${c.ms.length?` · <b class="marca">${esc(c.ms.join(', '))}</b>`:''}</li>`).join('')}</ul></div>`;
+  }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Con los botones − y + de cada dibujo lo reduces o amplías; ampliado, arrastra el fondo del dibujo para moverte por él. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, moverlo a lo largo y a lo ancho, también a otra caja. Si choca con otro o se sale, te aviso y se queda donde estaba. Para girar un bulto: clic derecho encima, o la tecla R mientras lo arrastras. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
   ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas (${desg}), ${m3.toFixed(2)} m³\nBultos en total: ${nb+r.bins.length} (${nb} de perfil + ${r.bins.length} cajas)\n`+lineasTxt.join('\n');
   el.innerHTML=html;
+  // cada dibujo ampliado vuelve a donde estaba desplazado
+  el.querySelectorAll('.visor').forEach(v=>{const s=zoom[v.dataset.v];if(s&&s.z>1){v.scrollLeft=s.sl||0;v.scrollTop=s.st||0;}});
 }
 
 // Mover a mano: el bulto se queda donde se suelta, con un pequeño imán a las paredes y a los otros bultos.
@@ -471,11 +485,20 @@ $('f-perfil').addEventListener('submit',e=>{
   poner(perfiles,editPerfil,d);editPerfil=null;e.target.reset();guardarCatalogo();
 });
 document.addEventListener('pointerdown',()=>{arrastrado=false;},true);
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ampliada!==null){ampliada=null;renderResultado();}});
+// Dibujo ampliado: se recuerda hasta dónde está desplazado y se puede mover arrastrando el fondo.
+$('resultado').addEventListener('scroll',e=>{const v=e.target;if(v.classList&&v.classList.contains('visor')){const s=zoom[v.dataset.v]=zoom[v.dataset.v]||{z:1};s.sl=v.scrollLeft;s.st=v.scrollTop;}},true);
+(function(){
+  let pan=null;
+  $('resultado').addEventListener('pointerdown',e=>{
+    const v=e.target.closest('.visor');
+    if(!v||e.button||e.target.closest('rect.bulto, rect.plano')||(v.scrollWidth<=v.clientWidth+1&&v.scrollHeight<=v.clientHeight+1))return;
+    e.preventDefault();pan={v,x:e.clientX,y:e.clientY,sl:v.scrollLeft,st:v.scrollTop};v.classList.add('pan');
+  });
+  document.addEventListener('pointermove',e=>{if(pan){pan.v.scrollLeft=pan.sl-(e.clientX-pan.x);pan.v.scrollTop=pan.st-(e.clientY-pan.y);}});
+  const fin=()=>{if(pan){pan.v.classList.remove('pan');pan=null;}};
+  document.addEventListener('pointerup',fin);document.addEventListener('pointercancel',fin);
+})();
 document.addEventListener('click',async e=>{
-  // Clic en un dibujo (sin arrastrar): amplía esa caja, o la devuelve a su tamaño.
-  const dib=e.target.closest('svg.seccion, svg.planta'),tarj=dib&&dib.closest('[data-caja]');
-  if(tarj&&!arrastrado){const n=Number(tarj.dataset.caja);ampliada=ampliada===n?null:n;renderResultado();return;}
   const b=e.target.closest('[data-act]');
   if(e.target.id==='copiar'){
     try{await navigator.clipboard.writeText(ultimoResumen);estado('Resumen copiado.');}catch(err){estado(ultimoResumen);}
@@ -489,7 +512,7 @@ document.addEventListener('click',async e=>{
   else if(a==='auto'){renderResultado(true);}
   else if(a==='caja-vacia'){const m=cajas.find(c=>c.id===modeloNuevo);if(m){reparto.bins.push({model:m,free:[],items:[]});hecho();renderResultado();}}
   else if(a==='quitar-caja'){const n=Number(b.dataset.i);if(reparto.bins[n]&&!reparto.bins[n].items.length){reparto.bins.splice(n,1);hecho();renderResultado();}}
-  else if(a==='ampliar'){const n=Number(b.dataset.i);ampliada=ampliada===n?null:n;renderResultado();}
+  else if(a==='zoom'){cambiarZoom(b.dataset.v,Number(b.dataset.d));}
   else if(a==='guardar-reparto'){guardarReparto();}
   else if(a==='pedir-descartar'){confirmar='descartar';renderCatalogo();}
   else if(a==='descartar'){confirmar=null;try{localStorage.removeItem(CLAVE_CAT);}catch(err){}montar({});renderTodo();estado('Has vuelto al catálogo común.');}
