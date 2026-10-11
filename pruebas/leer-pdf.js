@@ -2,27 +2,23 @@
 const fs=require('fs'),path=require('path');
 const raiz=path.join(__dirname,'..');
 const pdfjsLib=require(path.join(raiz,'vendor','pdfjs','pdf.min.js'));
-const {parseHoja,planGrupos,volBins}=require(path.join(raiz,'static','nucleo.js'));
+const {leerPagina,planGrupos,volBins}=require(path.join(raiz,'static','nucleo.js'));
 const cat=JSON.parse(fs.readFileSync(path.join(raiz,'datos','catalogo.json'),'utf8'));
 (async()=>{
   pdfjsLib.GlobalWorkerOptions.workerSrc=path.join(raiz,'vendor','pdfjs','pdf.worker.min.js');
   const pdf=await pdfjsLib.getDocument({data:new Uint8Array(fs.readFileSync(process.argv[2]))}).promise;
-  const lineas=[];
+  const leidas=[];
   for(let n=1;n<=pdf.numPages;n++){
     const page=await pdf.getPage(n),vp=page.getViewport({scale:1}),c=await page.getTextContent();
-    const its=c.items.filter(i=>i.str&&i.str.trim()).map(i=>{const p=vp.convertToViewportPoint(i.transform[4],i.transform[5]);return {s:i.str.trim(),x:p[0],y:p[1]};}).sort((a,b)=>a.y-b.y||a.x-b.x);
-    const filas=[];
-    for(const it of its){let f=filas.find(r=>Math.abs(r.y-it.y)<=2.2);if(!f){f={y:it.y,its:[]};filas.push(f);}f.its.push(it);}
-    for(const f of filas) lineas.push(f.its.sort((a,b)=>a.x-b.x).map(i=>i.s).join(' '));
+    const its=c.items.filter(i=>i.str&&i.str.trim()).map(i=>{const p=vp.convertToViewportPoint(i.transform[4],i.transform[5]);return {s:i.str.trim(),x:p[0],y:p[1]};});
+    leidas.push(...leerPagina(its).filas);
   }
-  console.log('--- texto por filas ---');lineas.forEach(l=>console.log(l));
-  const leidas=parseHoja(lineas);
   console.log('--- líneas de perfil ---');
   const tipo=process.argv[3]||'carton',items=[];
   for(const l of leidas){
     const p=cat.perfiles.find(x=>String(x.ref)===l.ref);
     const m=(cat.montados||[]).find(x=>String(x.ref)===l.ref);
-    console.log(l.ref,'|',l.desc,'|',l.largo,'mm |',l.cant,'uds |',p?p.nombre:m?'va montado en '+m.en:'SIN PERFIL',l.dudosa?'| cantidad dudosa':'');
+    console.log(l.ref,'|',l.desc,'|',l.largo,'mm |',l.cant,'uds |',p?p.nombre:m?'va montado en '+m.en:'SIN PERFIL',l.marcas.length?'| marcaje '+l.marcas.join(', '):'',l.dudosa?'| cantidad dudosa':'');
     if(!p) continue;
     for(let i=0;i<Math.ceil(l.cant/(p.uds||1));i++) {const it={p,g:p.grupo||'',L:l.largo,w:p.ancho+5,h:p.alto+5};if(p.capL&&p.anchoMedio)it.cap={l:p.capL,w:p.anchoMedio+5};items.push(it);}
   }

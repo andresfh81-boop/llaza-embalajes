@@ -19,7 +19,7 @@ function renderPedido(){
   const L=pedido.lineas;
   $('lineas').innerHTML=L.length?`<div class="scroll"><table><thead><tr><th>Perfil</th><th class="n">Largo</th><th class="n">Uds</th><th></th></tr></thead><tbody>${L.map((l,i)=>{
     const p=perfiles.find(x=>x.id===l.pid);
-    return `<tr><td>${p?esc(p.nombre):'<span class="tag">perfil borrado</span>'}</td><td class="n">${l.largo}</td><td class="n">${l.cant}</td><td class="act"><button class="btn small danger" data-act="quitar" data-i="${i}" type="button" aria-label="Quitar línea">Quitar</button></td></tr>`;}).join('')}</tbody></table></div>`
+    return `<tr><td>${p?esc(p.nombre):'<span class="tag">perfil borrado</span>'}${l.marcas&&l.marcas.length?` <small class="marca">${esc(l.marcas.join(', '))}</small>`:''}</td><td class="n">${l.largo}</td><td class="n">${l.cant}</td><td class="act"><button class="btn small danger" data-act="quitar" data-i="${i}" type="button" aria-label="Quitar línea">Quitar</button></td></tr>`;}).join('')}</tbody></table></div>`
     :'<div class="empty">Añade aquí los perfiles de la hoja de corte: tipo, largo y cantidad.</div>';
   renderResultado();
 }
@@ -32,14 +32,14 @@ let reparto=null,repartoClave='',repartoManual=false,repartoGuardado=false,aviso
 let ampliada=null,arrastrado=false;
 // Modelo elegido en «Añadir caja» (de cualquier tipo de embalaje).
 let modeloNuevo='';
-function bulto(p,L){
-  const hol=num(pedido.holgura),it={p,g:p.grupo||'',L,w:num(p.ancho)+hol,h:num(p.alto)+hol};
+function bulto(p,L,m){
+  const hol=num(pedido.holgura),it={p,g:p.grupo||'',m:m||'',L,w:num(p.ancho)+hol,h:num(p.alto)+hol};
   if(num(p.capL)&&num(p.anchoMedio)&&num(p.anchoMedio)<num(p.ancho)) it.cap={l:num(p.capL),w:num(p.anchoMedio)+hol};
   return it;
 }
 function guardarReparto(){
-  const par=it=>[it.p.id,it.L];
-  const sitio=p=>[p.it.p.id,p.it.L,p.x,p.y,p.w,p.h,p.off||0];
+  const par=it=>[it.p.id,it.L,it.m||''];
+  const sitio=p=>[p.it.p.id,p.it.L,p.x,p.y,p.w,p.h,p.off||0,p.it.m||''];
   try{
     localStorage.setItem(CLAVE_REP,JSON.stringify({clave:repartoClave,bins:reparto.bins.map(b=>({m:b.model.id,its:b.items.map(sitio)})),sin:reparto.unfit.map(par)}));
     repartoGuardado=true;estado('Reparto guardado en este navegador.');
@@ -50,12 +50,12 @@ function cargarReparto(clave,modelos){
   try{
     const g=JSON.parse(localStorage.getItem(CLAVE_REP)||'null');
     if(!g||g.clave!==clave) return null;
-    const it=([pid,L])=>bulto(perfiles.find(x=>x.id===pid),L),bins=[];
+    const it=([pid,L,m])=>bulto(perfiles.find(x=>x.id===pid),L,m),bins=[];
     for(const b of g.bins){
       const bin={model:cajas.find(m=>m.id===b.m),free:[],items:[]};
       if(!bin.model) return null;
-      for(const [pid,L,x,y,w,h,off] of b.its){
-        const i=it([pid,L]),p={it:i,x,y,w,h,off};
+      for(const [pid,L,x,y,w,h,off,m] of b.its){
+        const i=it([pid,L,m]),p={it:i,x,y,w,h,off};
         if(i.cap&&w===i.w) p.medio=i.cap.w;
         if(!libre(p,bin)) return null;
         bin.items.push(p);
@@ -108,8 +108,8 @@ function dibujoSeccion(b,i,col,hol){
   const ocA=Math.max(0,...b.items.map(p=>p.x+p.w)),ocH=Math.max(0,...b.items.map(p=>p.y+p.h));
   return `<svg class="seccion" viewBox="${-mg} -2 ${M.intA+mg+2} ${M.intH+mg+2}" role="img" aria-label="Sección de la caja ${i+1}"><rect x="0" y="0" width="${M.intA}" height="${M.intH}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,k)=>({p,k})).sort((u,v)=>(v.p.off||0)-(u.p.off||0)).map(({p,k})=>{
     // Lo que va más al fondo se pinta primero. Un bulto alternado se dibuja con su ancho en el medio; la protección del extremo, en línea de puntos.
-    const y=M.intH-p.y-p.h,rw=p.medio||p.w,rx=p.x+(p.w-rw)/2,t=corto(p.it.p),fm=Math.min(fc*.9,rw/5,p.h/5),med=[`${p.w-hol}×${p.h-hol}`,`×${p.it.L}`],f=Math.min(fs,(p.h-fm*1.4)/3.2,(rw-fm*1.8)/(Math.max(String(t).length,med[0].length,med[1].length)*.6)),tx=rx+rw/2+fm*.5,ty=y+(p.h-fm*1.4)/2,aire=!apoyado(p,b);
-    return (p.medio?`<rect class="prot" x="${p.x}" y="${y}" width="${p.w}" height="${p.h}" vector-effect="non-scaling-stroke"/>`:'')+`<rect class="bulto${aire?' aire':''}" data-b="${i}" data-k="${k}" x="${rx}" y="${y}" width="${rw}" height="${p.h}" fill="var(--p${col.get(p.it.p.id)})" stroke="var(--panel)" stroke-width="1.5" vector-effect="non-scaling-stroke"><title>${esc(p.it.p.nombre)} · ${p.it.L} mm${aire?' · en el aire, sin apoyo':''}</title></rect><text x="${tx}" y="${ty-f}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)}</text><text x="${tx}" y="${ty}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${med[0]}</text><text x="${tx}" y="${ty+f}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${med[1]}</text><text x="${rx+rw/2}" y="${y+p.h-fm*.7}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${rw-hol}</text><text transform="translate(${rx+fm*.75} ${y+p.h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.h-hol}</text>`;}).join('')}${huecos(b,fc)}${cota(M.intA,ocA,1,M.intH,mg,fc,false)}${cota(M.intH,ocH,1,M.intH,mg,fc,true)}</svg>`;
+    const y=M.intH-p.y-p.h,rw=p.medio||p.w,rx=p.x+(p.w-rw)/2,t=corto(p.it.p),fm=Math.min(fc*.9,rw/5,p.h/5),lin=[[t,1],...(p.it.m?[[p.it.m,2]]:[]),[`${p.w-hol}×${p.h-hol}`,0],[`×${p.it.L}`,0]],f=Math.min(fs,(p.h-fm*1.4)/(lin.length+.2),(rw-fm*1.8)/(Math.max(...lin.map(l=>String(l[0]).length))*.6)),tx=rx+rw/2+fm*.5,ty=y+(p.h-fm*1.4)/2,aire=!apoyado(p,b);
+    return (p.medio?`<rect class="prot" x="${p.x}" y="${y}" width="${p.w}" height="${p.h}" vector-effect="non-scaling-stroke"/>`:'')+`<rect class="bulto${aire?' aire':''}" data-b="${i}" data-k="${k}" x="${rx}" y="${y}" width="${rw}" height="${p.h}" fill="var(--p${col.get(p.it.p.id)})" stroke="var(--panel)" stroke-width="1.5" vector-effect="non-scaling-stroke"><title>${esc(p.it.p.nombre)} · ${p.it.L} mm${p.it.m?' · marcaje '+esc(p.it.m):''}${aire?' · en el aire, sin apoyo':''}</title></rect>${lin.map((l,j)=>`<text${l[1]===2?' class="marca"':''} x="${tx}" y="${ty+(j-(lin.length-1)/2)*f}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)"${l[1]?' font-family="var(--display)" font-weight="700"':''}>${esc(l[0])}</text>`).join('')}<text x="${rx+rw/2}" y="${y+p.h-fm*.7}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${rw-hol}</text><text transform="translate(${rx+fm*.75} ${y+p.h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.h-hol}</text>`;}).join('')}${huecos(b,fc)}${cota(M.intA,ocA,1,M.intH,mg,fc,false)}${cota(M.intH,ocH,1,M.intH,mg,fc,true)}</svg>`;
 }
 // Vista desde arriba: largo en horizontal y ancho en vertical (el ancho va ampliado para que se vea). Lo de más arriba tapa lo de debajo.
 const AMPLIA=2,PW=600;
@@ -121,7 +121,7 @@ function dibujoPlanta(b,i,col){
     let g;
     if(p.medio){const l=Math.min(p.it.cap.l,p.it.L/2)*k,hm=p.medio*ky;g=`<rect x="${x0}" y="${y0+(h-hm)/2}" width="${L}" height="${hm}" ${c}/><rect x="${x0}" y="${y0}" width="${l}" height="${h}" ${c}/><rect x="${x0+L-l}" y="${y0}" width="${l}" height="${h}" ${c}/>`;}
     else g=`<rect x="${x0}" y="${y0}" width="${L}" height="${h}" ${c}/>`;
-    return g+(h>=fc*1.1?`<text x="${x0+L/2}" y="${y0+h/2}" font-size="${Math.min(fc,h*.7)}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)} · ${p.it.L}</text>`:'');
+    return g+(h>=fc*1.1?`<text x="${x0+L/2}" y="${y0+h/2}" font-size="${Math.min(fc,h*.7)}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)}${p.it.m?' '+esc(p.it.m):''} · ${p.it.L}</text>`:'');
   };
   return `<svg class="planta" viewBox="${-mg} -2 ${W+mg+2} ${H+mg+2}" role="img" aria-label="Caja ${i+1} vista desde arriba"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,n)=>({p,n})).sort((u,v)=>u.p.y-v.p.y).map(({p,n})=>pieza(p,n)).join('')}${cota(M.intL,ocL,k,H,mg,fc,false)}<text class="cota" font-size="${fc}" text-anchor="middle" dominant-baseline="central" transform="translate(${-mg*.5} ${H/2}) rotate(-90)">${M.intA} mm</text></svg>`;
 }
@@ -141,8 +141,9 @@ function renderResultado(recalcular){
       const items=[];
       for(const l of pedido.lineas){
         const p=perfiles.find(x=>x.id===l.pid);if(!p)continue;
-        const n=Math.ceil(l.cant/Math.max(1,num(p.uds)));
-        for(let i=0;i<n;i++) items.push(bulto(p,l.largo));
+        // cada bulto se lleva el marcaje de las piezas que contiene, en el orden de la hoja
+        const u=Math.max(1,num(p.uds)),n=Math.ceil(l.cant/u);
+        for(let i=0;i<n;i++) items.push(bulto(p,l.largo,(l.marcas||[]).slice(i*u,(i+1)*u).join(' ')));
       }
       reparto=planGrupos(items,modelos);repartoManual=repartoGuardado=false;
       if(recalcular) try{localStorage.removeItem(CLAVE_REP);}catch(e){}
@@ -168,11 +169,11 @@ function renderResultado(recalcular){
   const lineasTxt=[];
   html+='<div class="boxes">'+r.bins.map((b,i)=>{
     const M=b.model,usado=b.items.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)/(M.intA*M.intH);
-    const g={};b.items.forEach(p=>{const k=p.it.p.id+'|'+p.it.L;(g[k]=g[k]||{p:p.it.p,L:p.it.L,n:0}).n++;});
+    const g={};b.items.forEach(p=>{const k=p.it.p.id+'|'+p.it.L;const c=(g[k]=g[k]||{p:p.it.p,L:p.it.L,n:0,ms:[]});c.n++;if(p.it.m)c.ms.push(p.it.m);});
     const cont=Object.values(g),gs=[...new Set(cont.map(c=>c.p.grupo||''))],gtxt=!cont.length?'Vacía':gs.length>1?'Mezcla':(GRUPOS[gs[0]]||'');
-    lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.p.nombre} ${c.L} mm`).join(', '));
+    lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.p.nombre} ${c.L} mm${c.ms.length?' ['+c.ms.join(', ')+']':''}`).join(', '));
     const flot=b.items.filter(p=>!apoyado(p,b));if(flot.length)lineasTxt.push(`  OJO, sin apoyo: ${flot.map(nombreB).join(', ')}`);
-    return `<div class="boxcard${ampliada===i?' ampliada':''}" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><button class="btn small ghost" type="button" data-act="ampliar" data-i="${i}">${ampliada===i?'Cerrar ampliación':'Ampliar'}</button>${cont.length?'':`<button class="btn small danger" type="button" data-act="quitar-caja" data-i="${i}">Quitar caja</button>`}</div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}<span class="tag">De frente · ancho × alto</span>${dibujoSeccion(b,i,col,hol)}<span class="tag">Desde arriba · largo × ancho (ancho ampliado ×${AMPLIA})</span>${dibujoPlanta(b,i,col)}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm</li>`).join('')}</ul></div>`;
+    return `<div class="boxcard${ampliada===i?' ampliada':''}" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><button class="btn small ghost" type="button" data-act="ampliar" data-i="${i}">${ampliada===i?'Cerrar ampliación':'Ampliar'}</button>${cont.length?'':`<button class="btn small danger" type="button" data-act="quitar-caja" data-i="${i}">Quitar caja</button>`}</div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}<span class="tag">De frente · ancho × alto</span>${dibujoSeccion(b,i,col,hol)}<span class="tag">Desde arriba · largo × ancho (ancho ampliado ×${AMPLIA})</span>${dibujoPlanta(b,i,col)}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm${c.ms.length?` · <b class="marca">${esc(c.ms.join(', '))}</b>`:''}</li>`).join('')}</ul></div>`;
   }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Pulsa en un dibujo (el ratón sale como lupa) o en «Ampliar» para verlo en grande; Esc o volver a pulsar lo cierra. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, moverlo a lo largo y a lo ancho, también a otra caja. Si choca con otro o se sale, te aviso y se queda donde estaba. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
   ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas (${desg}), ${m3.toFixed(2)} m³\nBultos en total: ${nb+r.bins.length} (${nb} de perfil + ${r.bins.length} cajas)\n`+lineasTxt.join('\n');
   el.innerHTML=html;
@@ -182,7 +183,7 @@ function renderResultado(recalcular){
 // Si choca con otro o se sale de la caja, avisa y no se mueve.
 function iman(v,cands,tol){let m=v,d=tol;for(const c of cands){const e=Math.abs(c-v);if(e<=d){d=e;m=c;}}return m;}
 const corto=p=>String(p.nombre||p.ref||'').replace(/\s*\(.*?\)/g,'').trim();
-const nombreB=p=>`${p.it.p.nombre} de ${p.it.L} mm`;
+const nombreB=p=>`${p.it.p.nombre} de ${p.it.L} mm${p.it.m?' ('+p.it.m+')':''}`;
 const porNum=(u,v)=>u-v;
 function hecho(){avisoMov='';repartoManual=true;repartoGuardado=false;}
 function quitarBulto(de,k){const B=reparto.bins;B[de].items.splice(k,1);if(!B[de].items.length)B.splice(de,1);}
@@ -260,7 +261,7 @@ function soltarPlanta(de,k,a,off,x){
     e.preventDefault();
     const de=Number(r.dataset.b),k=Number(r.dataset.k),bin=reparto.bins[de],M=bin.model,p=bin.items[k],svg=r.ownerSVGElement,pt=enSvg(svg,e),esc_=svg.getScreenCTM().a,f=document.createElement('div');
     arr={de,k,p,f,x0:e.clientX,y0:e.clientY,modo:r.classList.contains('plano')?'planta':'seccion'};
-    f.className='fantasma';f.textContent=corto(p.it.p);f.style.background=getComputedStyle(r).fill;
+    f.className='fantasma';f.textContent=corto(p.it.p)+(p.it.m?' '+p.it.m:'');f.style.background=getComputedStyle(r).fill;
     // El fantasma es el bulto entero a su tamaño; se recuerda, en milímetros, de dónde se ha cogido.
     if(arr.modo==='seccion'){
       arr.gx=pt.x-p.x;arr.gy=pt.y-(M.intH-p.y-p.h);
@@ -305,7 +306,7 @@ function renderLeidas(){
   el.innerHTML=`<h3>Leído de ${esc(hojaNombre)}</h3>`+
     (sin?`<div class="note">${sin} ${sin===1?'línea no tiene':'líneas no tienen'} perfil asignado: su referencia no está en el catálogo. Elige el perfil o se quedará fuera.</div>`:'')+
     (mont?`<div class="sub">${mont} ${mont===1?'línea va montada':'líneas van montadas'} en otro perfil y no ${mont===1?'ocupa':'ocupan'} sitio aparte.</div>`:'')+
-    `<div class="scroll"><table><thead><tr><th>Ref.</th><th>Pieza</th><th>Largo</th><th>Uds</th><th>Perfil</th></tr></thead><tbody>${leidas.map((l,i)=>`<tr><td>${esc(l.ref)}</td><td>${esc(l.desc)}</td><td><input type="number" min="1" id="lh-l${i}" data-k="largo" data-i="${i}" value="${l.largo}" aria-label="Largo"></td><td><input type="number" min="1" id="lh-c${i}" data-k="cant" data-i="${i}" value="${l.cant}" aria-label="Cantidad"></td><td><select id="lh-p${i}" data-k="pid" data-i="${i}" aria-label="Perfil"><option value="">${l.montado?'Va montado en '+esc(l.montado.en):'No embalar'}</option>${perfiles.map(p=>`<option value="${esc(p.id)}"${p.id===l.pid?' selected':''}>${esc(p.nombre)}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div>
+    `<div class="scroll"><table><thead><tr><th>Ref.</th><th>Pieza</th><th>Largo</th><th>Uds</th><th>Marcaje</th><th>Perfil</th></tr></thead><tbody>${leidas.map((l,i)=>`<tr><td>${esc(l.ref)}</td><td>${esc(l.desc)}</td><td><input type="number" min="1" id="lh-l${i}" data-k="largo" data-i="${i}" value="${l.largo}" aria-label="Largo"></td><td><input type="number" min="1" id="lh-c${i}" data-k="cant" data-i="${i}" value="${l.cant}" aria-label="Cantidad"></td><td><input class="ancho" id="lh-m${i}" data-k="marcas" data-i="${i}" value="${esc((l.marcas||[]).join(', '))}" aria-label="Marcaje"></td><td><select id="lh-p${i}" data-k="pid" data-i="${i}" aria-label="Perfil"><option value="">${l.montado?'Va montado en '+esc(l.montado.en):'No embalar'}</option>${perfiles.map(p=>`<option value="${esc(p.id)}"${p.id===l.pid?' selected':''}>${esc(p.nombre)}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div>
     <div class="acciones"><button class="btn" type="button" id="leidas-ok">Añadir al pedido</button><button class="btn ghost" type="button" id="leidas-no">Descartar</button></div>`;
 }
 async function leerPDF(file){
@@ -315,15 +316,12 @@ async function leerPDF(file){
   try{
     window.pdfjsLib.GlobalWorkerOptions.workerSrc='vendor/pdfjs/pdf.worker.min.js';
     const pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
-    const lineas=[];let letras=0;
+    const filas=[];let letras=0;
     for(let n=1;n<=pdf.numPages;n++){
       const page=await pdf.getPage(n),vp=page.getViewport({scale:1}),c=await page.getTextContent();
-      const its=c.items.filter(i=>i.str&&i.str.trim()).map(i=>{const p=vp.convertToViewportPoint(i.transform[4],i.transform[5]);return {s:i.str.trim(),x:p[0],y:p[1]};}).sort((a,b)=>a.y-b.y||a.x-b.x);
-      const filas=[];
-      for(const it of its){let f=filas.find(r=>Math.abs(r.y-it.y)<=2.2);if(!f){f={y:it.y,its:[]};filas.push(f);}f.its.push(it);letras+=it.s.length;}
-      for(const f of filas) lineas.push(f.its.sort((a,b)=>a.x-b.x).map(i=>i.s).join(' '));
+      const its=c.items.filter(i=>i.str&&i.str.trim()).map(i=>{const p=vp.convertToViewportPoint(i.transform[4],i.transform[5]);return {s:i.str.trim(),x:p[0],y:p[1]};});
+      const r=leerPagina(its);filas.push(...r.filas);letras+=r.letras;
     }
-    const filas=parseHoja(lineas);
     if(!filas.length){estado(letras<40?'Este PDF es una imagen escaneada, no tiene texto que leer. Mete los perfiles a mano.':'No he encontrado líneas de perfiles en este PDF. Mete los perfiles a mano.');return;}
     leidas=filas.map(l=>{const p=perfiles.find(x=>String(x.ref).trim()===l.ref);return Object.assign(l,{pid:p?p.id:'',montado:p?null:base.montados.find(x=>String(x.ref).trim()===l.ref)||null});});
     hojaNombre=file.name;renderLeidas();
@@ -339,14 +337,14 @@ async function leerPDF(file){
   $('pdf').addEventListener('change',e=>{leerPDF(e.target.files[0]);e.target.value='';});
   $('leidas').addEventListener('change',e=>{
     const t=e.target,i=Number(t.dataset.i);if(!t.dataset.k||!leidas[i])return;
-    leidas[i][t.dataset.k]=t.dataset.k==='pid'?t.value:num(t.value);
+    leidas[i][t.dataset.k]=t.dataset.k==='pid'?t.value:t.dataset.k==='marcas'?t.value.split(',').map(x=>x.trim()).filter(Boolean):num(t.value);
     if(t.dataset.k==='pid')renderLeidas();
   });
   $('leidas').addEventListener('click',e=>{
     if(e.target.id==='leidas-no'){leidas=[];renderLeidas();estado('');}
     if(e.target.id==='leidas-ok'){
       const ok=leidas.filter(l=>l.pid&&l.largo&&l.cant);
-      ok.forEach(l=>pedido.lineas.push({pid:l.pid,largo:l.largo,cant:l.cant}));
+      ok.forEach(l=>pedido.lineas.push({pid:l.pid,largo:l.largo,cant:l.cant,marcas:l.marcas||[]}));
       const fuera=leidas.length-ok.length;leidas=[];renderLeidas();guardarPedido();renderPedido();
       estado(`${ok.length} líneas añadidas al pedido`+(fuera?`, ${fuera} sin bulto propio.`:'.'));
     }
@@ -428,7 +426,7 @@ $('f-linea').addEventListener('submit',e=>{
   e.preventDefault();
   const pid=$('l-perfil').value,largo=num($('l-largo').value),cant=num($('l-cant').value);
   if(!pid||!largo||!cant)return;
-  pedido.lineas.push({pid,largo,cant});guardarPedido();renderPedido();
+  pedido.lineas.push({pid,largo,cant,marcas:$('l-marcas').value.split(',').map(x=>x.trim()).filter(Boolean)});$('l-marcas').value='';guardarPedido();renderPedido();
 });
 $('vaciar').addEventListener('click',()=>{pedido.lineas=[];guardarPedido();renderPedido();});
 $('f-caja').addEventListener('submit',e=>{

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Embalaje de perfiles</title>
-  <link rel="stylesheet" href="static/estilo.css?v=14">
+  <link rel="stylesheet" href="static/estilo.css?v=15">
 </head>
 <body>
 <div class="wrap">
@@ -30,12 +30,13 @@
         <label><input type="radio" name="tipo" id="tipo-cerrada" value="cerrada">Madera cerrada <small>marítimo</small></label>
         <label><input type="radio" name="tipo" id="tipo-abierta" value="abierta">Madera abierta <small>terrestre</small></label>
       </div>
-      <label class="drop" id="drop"><input type="file" id="pdf" accept="application/pdf,.pdf">Arrastra aquí la hoja de corte<small>PDF, o pulsa para elegirla. Lee referencia, largo y cantidad de cada perfil.</small></label>
+      <label class="drop" id="drop"><input type="file" id="pdf" accept="application/pdf,.pdf">Arrastra aquí la hoja de corte<small>PDF, o pulsa para elegirla. Lee referencia, largo, cantidad y marcaje de cada perfil.</small></label>
       <div id="leidas"></div>
       <form id="f-linea" class="row">
         <label style="grid-column:1/-1">Perfil<select id="l-perfil" required></select></label>
         <label>Largo (mm)<input id="l-largo" type="number" min="1" step="1" required></label>
         <label>Cantidad<input id="l-cant" type="number" min="1" step="1" value="1" required></label>
+        <label style="grid-column:1/-1">Marcaje (opcional, separado por comas)<input id="l-marcas" placeholder="V1-2, V4-5"></label>
         <button class="btn" style="grid-column:1/-1">Añadir al pedido</button>
       </form>
       <div id="lineas"></div>
@@ -81,7 +82,7 @@
 </div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script src="static/nucleo.js?v=14"></script>
-<script src="static/app.js?v=14"></script>
+<script src="static/nucleo.js?v=15"></script>
+<script src="static/app.js?v=15"></script>
 </body>
 </html>

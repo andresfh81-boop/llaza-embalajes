@@ -113,3 +113,7 @@ body.con-lupa{overflow:hidden}
 .boxcard.nueva{justify-content:flex-start;align-items:stretch;color:var(--fg)}
 .boxcard.nueva p{color:var(--muted)}
 .boxcard .cab{flex-wrap:wrap}
+text.marca{text-decoration:underline}
+.marca{font-family:var(--display);font-weight:700;letter-spacing:.02em}
+small.marca{color:var(--accent)}
+#leidas input.ancho{width:104px}

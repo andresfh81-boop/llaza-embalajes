@@ -11,6 +11,33 @@ function parseHoja(lineas){
   }
   return out;
 }
+// Una página de la hoja de corte ya leída del PDF: its = [{s,x,y}] (texto y posición).
+// Devuelve las filas de perfil con su marcaje. El marcaje está en la columna MARCAJE, en una o dos líneas
+// justo encima y debajo de la fila (V1-2 / V4-5); a veces el PDF lo trae troceado ("V","4","-","5").
+function leerPagina(its){
+  const cab=its.find(i=>/^MARCAJE$/i.test(i.s)),chk=cab&&its.find(i=>/^CHECK$/i.test(i.s)&&Math.abs(i.y-cab.y)<5);
+  const esMarca=i=>!!cab&&i.y>cab.y+5&&i.x>=cab.x-25&&i.x<(chk?chk.x-5:cab.x+60);
+  const agrupa=l=>{
+    const f=[];
+    for(const it of l.slice().sort((a,b)=>a.y-b.y||a.x-b.x)){let r=f.find(r=>Math.abs(r.y-it.y)<=2.2);if(!r){r={y:it.y,its:[]};f.push(r);}r.its.push(it);}
+    f.forEach(r=>r.its.sort((a,b)=>a.x-b.x));
+    return f;
+  };
+  const filas=[];let letras=0;
+  for(const f of agrupa(its.filter(i=>!esMarca(i)))){
+    const t=f.its.map(i=>i.s).join(' ');letras+=t.length;
+    const p=parseHoja([t])[0];
+    if(p) filas.push(Object.assign(p,{y:f.y,marcas:[]}));
+  }
+  for(const m of agrupa(its.filter(esMarca))){
+    const t=m.its.map(i=>i.s).join('').replace(/ /g,'');
+    if(!t||t.slice(-1)===':') continue; // "1ª:", "n/2:"… son casillas para rellenar a mano
+    let fila=null;
+    for(const f of filas){const d=Math.abs(f.y-m.y);if(d<=14&&(!fila||d<Math.abs(fila.y-m.y)))fila=f;}
+    if(fila) fila.marcas.push(t);
+  }
+  return {filas,letras};
+}
 function newBin(model){return {model, free:[{x:0,y:0,w:model.intA,h:model.intH}], items:[]};}
 function tryPlace(bin,it){
   if(it.L>bin.model.intL) return false;
@@ -159,4 +186,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={parseHoja,packWith,plan,planGrupos,chocan,libre,apoyado,vol,volBins,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={parseHoja,leerPagina,packWith,plan,planGrupos,chocan,libre,apoyado,vol,volBins,aplicar,diferencia};

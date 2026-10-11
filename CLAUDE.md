@@ -59,6 +59,7 @@ Para verla en local hace falta servirla (abierta como archivo suelto no carga el
 
 - Con pdf.js en el navegador; agrupa el texto en filas por coordenada Y (misma técnica que `llaza-etiquetas-web/static/extractor.js`).
 - Fila esperada: `33000 LAMA 3854,5 mm 90º/90º 26` → referencia, pieza, largo, cantidad. "1+1" suma 2. El largo se redondea hacia arriba.
+- **Marcaje** (`leerPagina` en `nucleo.js`): se lee de la columna MARCAJE de la hoja, que trae una o dos marcas por fila, una línea por encima y otra por debajo (V1-2 / V4-5, P3 / P6, C1-2 / C4-5), a veces troceadas en varios textos. Las casillas «1ª:», «n/2:» de las lamas no son marcaje. Cada línea del pedido guarda sus `marcas` y cada bulto se lleva las de las piezas que contiene, en el orden de la hoja (un bulto de 2 lleva dos). Sale en los dos dibujos, en la lista de cada caja, en los avisos y en «Copiar resumen»; se puede corregir en la tabla de lo leído y escribir a mano al añadir una línea.
 - El perfil se asigna por referencia; lo que no está en el catálogo queda como "No embalar" hasta elegirlo.
 
 ## Limitaciones conocidas

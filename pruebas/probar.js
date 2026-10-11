@@ -1,6 +1,6 @@
 // node pruebas/probar.js  — comprueba el encaje, la lectura de filas de la hoja de corte y la mezcla del catálogo
 const assert=require('assert'),path=require('path');
-const {plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
+const {leerPagina,plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
 const G={nombre:'G',intL:6000,intA:600,intH:400,extL:6100,extA:660,extH:460};
 const S={nombre:'S',intL:4000,intA:300,intH:300,extL:4080,extA:350,extH:350};
 const mk=(n,w,h,L)=>Array.from({length:n},()=>({p:{nombre:w+'x'+h},w,h,L}));
@@ -47,6 +47,15 @@ assert.ok(apoyado(Object.assign(pz(2000,0),{y:180}),cajaA));
 assert.ok(!apoyado(Object.assign(pz(2000,0),{y:300}),cajaA));
 assert.ok(!apoyado(Object.assign(pz(2000,2500),{y:180}),cajaA));
 console.log('alternadas: ok');
+// Marcaje de la hoja: dos marcas por fila (encima y debajo), a veces troceadas; las casillas "1ª:" no cuentan.
+const fila=(y,ref,nom,largo,cant)=>[{s:ref,x:157,y},{s:nom,x:250,y},{s:largo+' mm',x:354,y},{s:'45º/45º',x:451,y},{s:String(cant),x:529,y}];
+const pag=leerPagina([{s:'MARCAJE',x:1055,y:116.9},{s:'CHECK',x:1123,y:116.9},
+  {s:'V1-2',x:1063,y:133.9},...fila(142.4,'33017','VIGA',6000,2),{s:'V',x:1063,y:151.9},{s:'4',x:1070,y:151.9},{s:'-',x:1077,y:151.9},{s:'5',x:1081,y:151.9},
+  ...fila(178.4,'33016','PERFIL TAPA LUZ',5863,2),
+  {s:'P3',x:1068,y:457.6},...fila(466.1,'33004','PILAR',2652,2),{s:'P6',x:1068,y:475.6},
+  {s:'1ª:',x:1060,y:500},...fila(508,'33000','LAMA',3855,26),{s:'2ª:',x:1060,y:516}]);
+assert.deepStrictEqual(pag.filas.map(f=>[f.ref,f.largo,f.cant,f.marcas.join('|')]),[['33017',6000,2,'V1-2|V4-5'],['33016',5863,2,''],['33004',2652,2,'P3|P6'],['33000',3855,26,'']]);
+console.log('marcaje: ok');
 
 const base=[{id:'a',nombre:'A',ancho:1},{id:'b',nombre:'B',ancho:2},{id:'c',nombre:'C',ancho:3}];
 const mio=[{ancho:1,nombre:'A',id:'a'},{id:'b',nombre:'B',ancho:20},{id:'n1',nombre:'Nueva',ancho:9}];
