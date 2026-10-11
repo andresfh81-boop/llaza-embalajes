@@ -67,17 +67,44 @@ function cota(total,occ,k,base,mg,fc,vert){
   const raya=pos=>vert?`<line class="cota" x1="${-mg*.5}" x2="0" y1="${base-pos*k}" y2="${base-pos*k}" vector-effect="non-scaling-stroke"/>`:`<line class="cota" x1="${pos*k}" x2="${pos*k}" y1="${base}" y2="${base+mg*.5}" vector-effect="non-scaling-stroke"/>`;
   return raya(0)+raya(o)+raya(total)+(o?txt(o/2,mg*.27,o):'')+(lib>0?txt((o+total)/2,mg*.27,lib,' libre'):'')+txt(total/2,mg*.76,Math.round(total)+' mm');
 }
+// Huecos libres en el dibujo de frente: encima de cada bulto (hasta el siguiente o la tapa) y a su derecha (hasta el siguiente o la pared).
+// Se mide con el ancho completo del bulto (con protección) y por tramos, así un bulto tapado solo en parte enseña el hueco del resto.
+function huecos(b,fc){
+  const M=b.model,R=b.items.map(p=>({x1:p.x,x2:p.x+p.w,y1:p.y,y2:p.y+p.h})),MIN=15,out=[];
+  // Parte [a,c] en tramos según lo que tienen delante: g = dónde empieza el primer obstáculo (o el límite de la caja).
+  const tramos=(a,c,obst,lim)=>{
+    const cortes=[...new Set([a,c,...obst.flatMap(o=>[o.d1,o.d2]).filter(v=>v>a&&v<c)])].sort((u,v)=>u-v),res=[];
+    for(let i=0;i<cortes.length-1;i++){
+      const t={s:cortes[i],e:cortes[i+1]},m=(t.s+t.e)/2,u=res[res.length-1];
+      t.g=Math.min(lim,...obst.filter(o=>o.d1<m&&m<o.d2).map(o=>o.pos));
+      if(u&&u.g===t.g) u.e=t.e; else res.push(t);
+    }
+    return res;
+  };
+  const num_=(x,y,n,ff)=>`<text class="cota libre hueco" x="${x}" y="${y}" font-size="${ff}" text-anchor="middle" dominant-baseline="central">${n}</text>`;
+  for(const r of R){
+    const arriba=R.filter(o=>o!==r&&o.y1>r.y1+.01).map(o=>({d1:o.x1,d2:o.x2,pos:Math.max(o.y1,r.y2)}));
+    for(const t of tramos(r.x1,r.x2,arriba,M.intH)){
+      const lib=Math.round(t.g-r.y2);if(lib<MIN||t.e-t.s<25)continue;
+      const cx=(t.s+t.e)/2,ya=M.intH-t.g,yb=M.intH-r.y2;
+      out.push(`<line class="cota hueco" x1="${cx}" x2="${cx}" y1="${ya}" y2="${yb}" vector-effect="non-scaling-stroke"/>`+num_(cx,(ya+yb)/2,lib,Math.min(fc,lib*.8,(t.e-t.s)/2.2)));
+    }
+    const derecha=R.filter(o=>o!==r&&o.x1>r.x1+.01).map(o=>({d1:o.y1,d2:o.y2,pos:Math.max(o.x1,r.x2)}));
+    for(const t of tramos(r.y1,r.y2,derecha,M.intA)){
+      const lib=Math.round(t.g-r.x2);if(lib<MIN||t.e-t.s<25)continue;
+      const cy=M.intH-(t.s+t.e)/2;
+      out.push(`<line class="cota hueco" x1="${r.x2}" x2="${t.g}" y1="${cy}" y2="${cy}" vector-effect="non-scaling-stroke"/>`+num_((r.x2+t.g)/2,cy,lib,Math.min(fc,lib/2.2,(t.e-t.s)*.8)));
+    }
+  }
+  return out.join('');
+}
 function dibujoSeccion(b,i,col,hol){
   const M=b.model,mx=Math.max(M.intA,M.intH),fs=mx/14,mg=mx*.17,fc=mx/21;
   const ocA=Math.max(0,...b.items.map(p=>p.x+p.w)),ocH=Math.max(0,...b.items.map(p=>p.y+p.h));
   return `<svg class="seccion" viewBox="${-mg} -2 ${M.intA+mg+2} ${M.intH+mg+2}" role="img" aria-label="Sección de la caja ${i+1}"><rect x="0" y="0" width="${M.intA}" height="${M.intH}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,k)=>({p,k})).sort((u,v)=>(v.p.off||0)-(u.p.off||0)).map(({p,k})=>{
     // Lo que va más al fondo se pinta primero. Un bulto alternado se dibuja con su ancho en el medio; la protección del extremo, en línea de puntos.
     const y=M.intH-p.y-p.h,rw=p.medio||p.w,rx=p.x+(p.w-rw)/2,t=corto(p.it.p),fm=Math.min(fc*.9,rw/5,p.h/5),f=Math.min(fs,p.h*.26,(rw-fm*2.6)/(String(t).length*.62)),med=`${p.w-hol}×${p.h-hol}×${p.it.L}`,f2=Math.min(f*.8,(rw-fm*2.6)/(med.length*.56)),aire=!apoyado(p,b);
-    return (p.medio?`<rect class="prot" x="${p.x}" y="${y}" width="${p.w}" height="${p.h}" vector-effect="non-scaling-stroke"/>`:'')+`<rect class="bulto${aire?' aire':''}" data-b="${i}" data-k="${k}" x="${rx}" y="${y}" width="${rw}" height="${p.h}" fill="var(--p${col.get(p.it.p.id)})" stroke="var(--panel)" stroke-width="1.5" vector-effect="non-scaling-stroke"><title>${esc(p.it.p.nombre)} · ${p.it.L} mm${aire?' · en el aire, sin apoyo':''}</title></rect><text x="${rx+rw/2}" y="${y+p.h/2-f*.45}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)}</text><text x="${rx+rw/2}" y="${y+p.h/2+f*.6}" font-size="${f2}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${med}</text><text x="${rx+rw/2}" y="${y+p.h-fm*.7}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${rw-hol}</text><text transform="translate(${rx+fm*.75} ${y+p.h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.h-hol}</text>`;}).join('')}${b.items.map(p=>{
-    const top=p.y+p.h,lib=Math.round(M.intH-top),rw=p.medio||p.w,cx=p.x+p.w/2;
-    if(lib<=0||b.items.some(o=>o!==p&&o.y>=top-.01&&o.x<p.x+p.w-.01&&p.x<o.x+o.w-.01)) return '';
-    const ff=Math.min(fc,rw/3.2,lib*.8),ym=(M.intH-top)/2;
-    return `<line class="cota hueco" x1="${cx}" x2="${cx}" y1="0" y2="${M.intH-top}" vector-effect="non-scaling-stroke"/><text class="cota libre hueco" x="${cx}" y="${ym}" font-size="${ff}" text-anchor="middle" dominant-baseline="central">${lib}</text>`;}).join('')}${cota(M.intA,ocA,1,M.intH,mg,fc,false)}${cota(M.intH,ocH,1,M.intH,mg,fc,true)}</svg>`;
+    return (p.medio?`<rect class="prot" x="${p.x}" y="${y}" width="${p.w}" height="${p.h}" vector-effect="non-scaling-stroke"/>`:'')+`<rect class="bulto${aire?' aire':''}" data-b="${i}" data-k="${k}" x="${rx}" y="${y}" width="${rw}" height="${p.h}" fill="var(--p${col.get(p.it.p.id)})" stroke="var(--panel)" stroke-width="1.5" vector-effect="non-scaling-stroke"><title>${esc(p.it.p.nombre)} · ${p.it.L} mm${aire?' · en el aire, sin apoyo':''}</title></rect><text x="${rx+rw/2}" y="${y+p.h/2-f*.45}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)}</text><text x="${rx+rw/2}" y="${y+p.h/2+f*.6}" font-size="${f2}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${med}</text><text x="${rx+rw/2}" y="${y+p.h-fm*.7}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${rw-hol}</text><text transform="translate(${rx+fm*.75} ${y+p.h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.h-hol}</text>`;}).join('')}${huecos(b,fc)}${cota(M.intA,ocA,1,M.intH,mg,fc,false)}${cota(M.intH,ocH,1,M.intH,mg,fc,true)}</svg>`;
 }
 // Vista desde arriba: largo en horizontal y ancho en vertical (el ancho va ampliado para que se vea). Lo de más arriba tapa lo de debajo.
 const AMPLIA=2,PW=600;
@@ -137,7 +164,7 @@ function renderResultado(recalcular){
     lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.p.nombre} ${c.L} mm`).join(', '));
     const flot=b.items.filter(p=>!apoyado(p,b));if(flot.length)lineasTxt.push(`  OJO, sin apoyo: ${flot.map(nombreB).join(', ')}`);
     return `<div class="boxcard" data-caja="${i}"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}<span class="tag">De frente · ancho × alto</span>${dibujoSeccion(b,i,col,hol)}<span class="tag">Desde arriba · largo × ancho (ancho ampliado ×${AMPLIA})</span>${dibujoPlanta(b,i,col)}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm</li>`).join('')}</ul></div>`;
-  }).join('')+'<div class="boxcard nueva" data-caja="nueva"><span class="tag">Caja nueva</span><p>Suelta aquí un bulto para ponerlo en una caja aparte.</p></div></div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; encima de cada bulto va el alto que le queda libre hasta la tapa. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, desplazarlo a lo largo. Si choca con otro o se sale, te aviso y se queda donde estaba. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
+  }).join('')+'<div class="boxcard nueva" data-caja="nueva"><span class="tag">Caja nueva</span><p>Suelta aquí un bulto para ponerlo en una caja aparte.</p></div></div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, desplazarlo a lo largo. Si choca con otro o se sale, te aviso y se queda donde estaba. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
   ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas (${desg}), ${m3.toFixed(2)} m³\n`+lineasTxt.join('\n');
   el.innerHTML=html;
 }
