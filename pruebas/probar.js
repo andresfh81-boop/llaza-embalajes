@@ -1,6 +1,6 @@
 // node pruebas/probar.js  — comprueba el encaje, la lectura de filas de la hoja de corte y la mezcla del catálogo
 const assert=require('assert'),path=require('path');
-const {plan,planGrupos,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
+const {plan,planGrupos,chocan,libre,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
 const G={nombre:'G',intL:6000,intA:600,intH:400,extL:6100,extA:660,extH:460};
 const S={nombre:'S',intL:4000,intA:300,intH:300,extL:4080,extA:350,extH:350};
 const mk=(n,w,h,L)=>Array.from({length:n},()=>({p:{nombre:w+'x'+h},w,h,L}));
@@ -34,6 +34,12 @@ assert.ok(r.bins[0].items.some(p=>p.off===300)&&r.bins[0].items.some(p=>p.off===
 // Si la caja no tiene largo para adelantar un bulto, no se alterna.
 r=planGrupos(conCap.map(it=>Object.assign({},it,{L:4900})),[C5]);check(r);
 assert.strictEqual(r.bins.length,4);assert.ok(!r.bins[0].items.some(p=>p.off));
+// El reparto automático no deja nada chocando ni fuera, tampoco con el criterio que usa el movimiento a mano.
+for(const b of planGrupos(conCap.concat(mod.filter(it=>it.g==='estructura')),[C5,C7]).bins) for(const p of b.items) assert.ok(libre(p,b,p));
+// Dos piezas cortas en el mismo sitio de la sección chocan, salvo que una vaya detrás de la otra.
+const pz=(L,off)=>({it:{L},x:0,y:0,w:180,h:180,off});
+assert.ok(chocan(pz(2000,0),pz(2000,0)));assert.ok(!chocan(pz(2000,0),pz(2000,2000)));
+assert.ok(!libre(pz(2000,3500),{model:C5,items:[]}));
 console.log('alternadas: ok');
 
 const base=[{id:'a',nombre:'A',ancho:1},{id:'b',nombre:'B',ancho:2},{id:'c',nombre:'C',ancho:3}];

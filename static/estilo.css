@@ -95,3 +95,7 @@ rect.prot{fill:none;stroke:var(--muted);stroke-width:1;stroke-dasharray:4 3;poin
 body.arrastrando{user-select:none;cursor:grabbing}
 body.arrastrando rect.bulto{cursor:grabbing}
 .boxcard svg{max-height:none}
+rect.plano{cursor:ew-resize;touch-action:none}
+rect.plano.cogido{opacity:.45}
+line.cota.hueco{stroke:var(--warn);stroke-dasharray:3 3;pointer-events:none}
+text.cota.hueco{paint-order:stroke;stroke:var(--box);stroke-width:4px;stroke-linejoin:round}

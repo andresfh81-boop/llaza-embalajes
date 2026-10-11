@@ -64,7 +64,7 @@ function packWith(model,items){
     if(tryPlace(nb,it)) bins.push(nb); else unfit.push(...(it.fila||[it]));
   }
   // Las filas se deshacen en sus bultos: cada uno con su sitio, su ancho en el medio y cuánto va adelantado (off).
-  for(const b of bins) b.items=b.items.flatMap(p=>!p.it.fila?[p]:p.it.fila.map((it,i)=>({it,x:p.x+i*(it.w+it.cap.w)/2,y:p.y,w:it.w,h:it.h,medio:it.cap.w,off:i%2?it.cap.l:0})));
+  for(const b of bins) b.items=b.items.flatMap(p=>!p.it.fila?[p.it.cap&&p.w===p.it.w?Object.assign(p,{medio:p.it.cap.w,off:0}):p]:p.it.fila.map((it,i)=>({it,x:p.x+i*(it.w+it.cap.w)/2,y:p.y,w:it.w,h:it.h,medio:it.cap.w,off:i%2?it.cap.l:0})));
   return {bins,unfit};
 }
 function vol(m){return m.extL*m.extA*m.extH;}
@@ -105,6 +105,20 @@ function plan(items,models){
   return {bins:best.bins,unfit:best.unfit};
 }
 
+// Volúmenes que ocupa un bulto colocado: [x1,x2,y1,y2,z1,z2] con x=ancho, y=alto, z=largo (off = cuánto va adelantado).
+// Con protección en los extremos son tres: el cuerpo estrecho y las dos protecciones.
+function cuerpos(p){
+  const z=p.off||0,L=p.it.L;
+  if(!p.medio) return [[p.x,p.x+p.w,p.y,p.y+p.h,z,z+L]];
+  const bx=p.x+(p.w-p.medio)/2,l=Math.min(p.it.cap.l,L/2);
+  return [[bx,bx+p.medio,p.y,p.y+p.h,z,z+L],[p.x,p.x+p.w,p.y,p.y+p.h,z,z+l],[p.x,p.x+p.w,p.y,p.y+p.h,z+L-l,z+L]];
+}
+const HOLG=0.01;
+function chocan(a,b){return cuerpos(a).some(u=>cuerpos(b).some(v=>u[0]<v[1]-HOLG&&v[0]<u[1]-HOLG&&u[2]<v[3]-HOLG&&v[2]<u[3]-HOLG&&u[4]<v[5]-HOLG&&v[4]<u[5]-HOLG));}
+function dentro(p,M){const z=p.off||0;return p.x>=-HOLG&&p.y>=-HOLG&&z>=-HOLG&&p.x+p.w<=M.intA+HOLG&&p.y+p.h<=M.intH+HOLG&&z+p.it.L<=M.intL+HOLG;}
+// ¿Puede estar el bulto p así colocado en la caja? (salvo = el propio bulto en su sitio anterior)
+function libre(p,bin,salvo){return dentro(p,bin.model)&&!bin.items.some(o=>o!==salvo&&chocan(p,o));}
+
 // Reparto por grupos (estructura, lamas…): cada grupo va en sus propias cajas.
 // Solo se juntan dos cajas de grupos distintos si caben en una sola y así sobra una.
 function planGrupos(items,models){
@@ -139,4 +153,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={parseHoja,packWith,plan,planGrupos,vol,volBins,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={parseHoja,packWith,plan,planGrupos,chocan,libre,vol,volBins,aplicar,diferencia};

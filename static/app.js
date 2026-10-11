@@ -35,8 +35,9 @@ function bulto(p,L){
 }
 function guardarReparto(){
   const par=it=>[it.p.id,it.L];
+  const sitio=p=>[p.it.p.id,p.it.L,p.x,p.y,p.w,p.h,p.off||0];
   try{
-    localStorage.setItem(CLAVE_REP,JSON.stringify({clave:repartoClave,bins:reparto.bins.map(b=>({m:b.model.id,its:b.items.map(p=>par(p.it))})),sin:reparto.unfit.map(par)}));
+    localStorage.setItem(CLAVE_REP,JSON.stringify({clave:repartoClave,bins:reparto.bins.map(b=>({m:b.model.id,its:b.items.map(sitio)})),sin:reparto.unfit.map(par)}));
     repartoGuardado=true;estado('Reparto guardado en este navegador.');
   }catch(e){estado('No se ha podido guardar el reparto en este navegador.');}
   renderResultado();
@@ -47,9 +48,14 @@ function cargarReparto(clave,modelos){
     if(!g||g.clave!==clave) return null;
     const it=([pid,L])=>bulto(perfiles.find(x=>x.id===pid),L),bins=[];
     for(const b of g.bins){
-      const r=packWith(modelos.find(m=>m.id===b.m),b.its.map(it));
-      if(r.bins.length!==1||r.unfit.length) return null;
-      bins.push(r.bins[0]);
+      const bin={model:modelos.find(m=>m.id===b.m),free:[],items:[]};
+      for(const [pid,L,x,y,w,h,off] of b.its){
+        const i=it([pid,L]),p={it:i,x,y,w,h,off};
+        if(i.cap&&w===i.w) p.medio=i.cap.w;
+        if(!libre(p,bin)) return null;
+        bin.items.push(p);
+      }
+      bins.push(bin);
     }
     return {bins,unfit:(g.sin||[]).map(it)};
   }catch(e){return null;}
@@ -64,24 +70,28 @@ function cota(total,occ,k,base,mg,fc,vert){
 function dibujoSeccion(b,i,col,hol){
   const M=b.model,mx=Math.max(M.intA,M.intH),fs=mx/14,mg=mx*.17,fc=mx/21;
   const ocA=Math.max(0,...b.items.map(p=>p.x+p.w)),ocH=Math.max(0,...b.items.map(p=>p.y+p.h));
-  return `<svg viewBox="${-mg} -2 ${M.intA+mg+2} ${M.intH+mg+2}" role="img" aria-label="Sección de la caja ${i+1}"><rect x="0" y="0" width="${M.intA}" height="${M.intH}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,k)=>{
-    // Un bulto alternado se dibuja con su ancho en el medio; la protección del extremo, en línea de puntos.
-    const y=M.intH-p.y-p.h,rw=p.medio||p.w,rx=p.x+(p.w-rw)/2,t=p.it.p.ref||p.it.p.nombre,fm=Math.min(fc*.9,rw/5,p.h/5),f=Math.min(fs,p.h*.3,(rw-fm*2.6)/(String(t).length*.62));
-    return (p.medio?`<rect class="prot" x="${p.x}" y="${y}" width="${p.w}" height="${p.h}" vector-effect="non-scaling-stroke"/>`:'')+`<rect class="bulto" data-b="${i}" data-k="${k}" x="${rx}" y="${y}" width="${rw}" height="${p.h}" fill="var(--p${col.get(p.it.p.id)})" stroke="var(--panel)" stroke-width="1.5" vector-effect="non-scaling-stroke"><title>${esc(p.it.p.nombre)} · ${p.it.L} mm</title></rect><text x="${rx+rw/2}" y="${y+p.h/2}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)}</text><text x="${rx+rw/2}" y="${y+p.h-fm*.7}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${rw-hol}</text><text transform="translate(${rx+fm*.75} ${y+p.h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.h-hol}</text>`;}).join('')}${cota(M.intA,ocA,1,M.intH,mg,fc,false)}${cota(M.intH,ocH,1,M.intH,mg,fc,true)}</svg>`;
+  return `<svg class="seccion" viewBox="${-mg} -2 ${M.intA+mg+2} ${M.intH+mg+2}" role="img" aria-label="Sección de la caja ${i+1}"><rect x="0" y="0" width="${M.intA}" height="${M.intH}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,k)=>({p,k})).sort((u,v)=>(v.p.off||0)-(u.p.off||0)).map(({p,k})=>{
+    // Lo que va más al fondo se pinta primero. Un bulto alternado se dibuja con su ancho en el medio; la protección del extremo, en línea de puntos.
+    const y=M.intH-p.y-p.h,rw=p.medio||p.w,rx=p.x+(p.w-rw)/2,t=corto(p.it.p),fm=Math.min(fc*.9,rw/5,p.h/5),f=Math.min(fs,p.h*.3,(rw-fm*2.6)/(String(t).length*.62));
+    return (p.medio?`<rect class="prot" x="${p.x}" y="${y}" width="${p.w}" height="${p.h}" vector-effect="non-scaling-stroke"/>`:'')+`<rect class="bulto" data-b="${i}" data-k="${k}" x="${rx}" y="${y}" width="${rw}" height="${p.h}" fill="var(--p${col.get(p.it.p.id)})" stroke="var(--panel)" stroke-width="1.5" vector-effect="non-scaling-stroke"><title>${esc(p.it.p.nombre)} · ${p.it.L} mm</title></rect><text x="${rx+rw/2}" y="${y+p.h/2}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)}</text><text x="${rx+rw/2}" y="${y+p.h-fm*.7}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${rw-hol}</text><text transform="translate(${rx+fm*.75} ${y+p.h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.h-hol}</text>`;}).join('')}${b.items.map(p=>{
+    const top=p.y+p.h,lib=Math.round(M.intH-top),rw=p.medio||p.w,cx=p.x+p.w/2;
+    if(lib<=0||b.items.some(o=>o!==p&&o.y>=top-.01&&o.x<p.x+p.w-.01&&p.x<o.x+o.w-.01)) return '';
+    const ff=Math.min(fc,rw/3.2,lib*.8),ym=(M.intH-top)/2;
+    return `<line class="cota hueco" x1="${cx}" x2="${cx}" y1="0" y2="${M.intH-top}" vector-effect="non-scaling-stroke"/><text class="cota libre hueco" x="${cx}" y="${ym}" font-size="${ff}" text-anchor="middle" dominant-baseline="central">${lib}</text>`;}).join('')}${cota(M.intA,ocA,1,M.intH,mg,fc,false)}${cota(M.intH,ocH,1,M.intH,mg,fc,true)}</svg>`;
 }
 // Vista desde arriba: largo en horizontal y ancho en vertical (el ancho va ampliado para que se vea). Lo de más arriba tapa lo de debajo.
-const AMPLIA=2;
+const AMPLIA=2,PW=600;
 function dibujoPlanta(b,i,col){
-  const M=b.model,W=600,k=W/M.intL,ky=k*AMPLIA,H=M.intA*ky,mg=42,fc=13;
+  const M=b.model,W=PW,k=W/M.intL,ky=k*AMPLIA,H=M.intA*ky,mg=42,fc=13;
   const ocL=Math.max(0,...b.items.map(p=>(p.off||0)+p.it.L));
   const pieza=(p,n)=>{
-    const c=`fill="var(--p${col.get(p.it.p.id)})" stroke="var(--panel)" stroke-width="1" vector-effect="non-scaling-stroke"`,x0=(p.off||0)*k,L=p.it.L*k,y0=p.x*ky,h=p.w*ky,t=p.it.p.ref||p.it.p.nombre;
+    const c=`class="plano" data-b="${i}" data-k="${n}" fill="var(--p${col.get(p.it.p.id)})" stroke="var(--panel)" stroke-width="1" vector-effect="non-scaling-stroke"`,x0=(p.off||0)*k,L=p.it.L*k,y0=p.x*ky,h=p.w*ky,t=corto(p.it.p);
     let g;
     if(p.medio){const l=Math.min(p.it.cap.l,p.it.L/2)*k,hm=p.medio*ky;g=`<rect x="${x0}" y="${y0+(h-hm)/2}" width="${L}" height="${hm}" ${c}/><rect x="${x0}" y="${y0}" width="${l}" height="${h}" ${c}/><rect x="${x0+L-l}" y="${y0}" width="${l}" height="${h}" ${c}/>`;}
     else g=`<rect x="${x0}" y="${y0}" width="${L}" height="${h}" ${c}/>`;
     return g+(h>=fc*1.1?`<text x="${x0+L/2}" y="${y0+h/2}" font-size="${Math.min(fc,h*.7)}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)} · ${p.it.L}</text>`:'');
   };
-  return `<svg viewBox="${-mg} -2 ${W+mg+2} ${H+mg+2}" role="img" aria-label="Caja ${i+1} vista desde arriba"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.slice().sort((p,q)=>p.y-q.y).map(pieza).join('')}${cota(M.intL,ocL,k,H,mg,fc,false)}<text class="cota" font-size="${fc}" text-anchor="middle" dominant-baseline="central" transform="translate(${-mg*.5} ${H/2}) rotate(-90)">${M.intA} mm</text></svg>`;
+  return `<svg viewBox="${-mg} -2 ${W+mg+2} ${H+mg+2}" role="img" aria-label="Caja ${i+1} vista desde arriba"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,n)=>({p,n})).sort((u,v)=>u.p.y-v.p.y).map(({p,n})=>pieza(p,n)).join('')}${cota(M.intL,ocL,k,H,mg,fc,false)}<text class="cota" font-size="${fc}" text-anchor="middle" dominant-baseline="central" transform="translate(${-mg*.5} ${H/2}) rotate(-90)">${M.intA} mm</text></svg>`;
 }
 function renderResultado(recalcular){
   const el=$('resultado');ultimoResumen='';
@@ -126,64 +136,112 @@ function renderResultado(recalcular){
     const cont=Object.values(g),gs=[...new Set(cont.map(c=>c.p.grupo||''))],gtxt=gs.length>1?'Mezcla':(GRUPOS[gs[0]]||'');
     lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.p.nombre} ${c.L} mm`).join(', '));
     return `<div class="boxcard" data-caja="${i}"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><span class="tag">De frente · ancho × alto</span>${dibujoSeccion(b,i,col,hol)}<span class="tag">Desde arriba · largo × ancho (ancho ampliado ×${AMPLIA})</span>${dibujoPlanta(b,i,col)}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm</li>`).join('')}</ul></div>`;
-  }).join('')+'<div class="boxcard nueva" data-caja="nueva"><span class="tag">Caja nueva</span><p>Suelta aquí un bulto para ponerlo en una caja aparte.</p></div></div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior. Puedes arrastrar un bulto del dibujo de frente a otra caja; si no cabe, te aviso y se queda donde estaba.</p>';
+  }).join('')+'<div class="boxcard nueva" data-caja="nueva"><span class="tag">Caja nueva</span><p>Suelta aquí un bulto para ponerlo en una caja aparte.</p></div></div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; encima de cada bulto va el alto que le queda libre hasta la tapa. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, desplazarlo a lo largo. Si choca con otro o se sale, te aviso y se queda donde estaba.</p>';
   ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas (${desg}), ${m3.toFixed(2)} m³\n`+lineasTxt.join('\n');
   el.innerHTML=html;
 }
 
-// Mover un bulto (caja de, posición k) a otra caja o a una nueva. Si no cabe, avisa y no cambia nada.
-function mover(de,k,a){
-  const B=reparto.bins,it=B[de].items[k].it,que=`${it.p.nombre} de ${it.L} mm`;
-  let dest=null;
-  if(a==='nueva'){
-    for(const m of modelosAct.slice().sort((x,y)=>vol(x)-vol(y))){const r=packWith(m,[it]);if(r.bins.length===1){dest=r.bins[0];break;}}
-    if(!dest) avisoMov=`No cabe: no hay ninguna caja de ${TIPOS[pedido.tipo]} donde entre ${que}.`;
-  }else{
-    const M=B[a].model,holg=num(pedido.holgura);
-    if(it.L>M.intL) avisoMov=`No cabe: ${que} es más largo que la caja ${a+1} (${M.nombre}, ${M.intL} mm de largo interior).`;
-    else{
-      const r=packWith(M,B[a].items.map(p=>p.it).concat(it));
-      if(r.bins.length===1&&!r.unfit.length) dest=r.bins[0];
-      else avisoMov=`No cabe: en la caja ${a+1} (${M.nombre}, sección ${M.intA}×${M.intH} mm) no queda sitio para ${que} (${it.w-holg}×${it.h-holg} mm).`;
-    }
+// Mover a mano: el bulto se queda donde se suelta, con un pequeño imán a las paredes y a los otros bultos.
+// Si choca con otro o se sale de la caja, avisa y no se mueve.
+function iman(v,cands,tol){let m=v,d=tol;for(const c of cands){const e=Math.abs(c-v);if(e<=d){d=e;m=c;}}return m;}
+const corto=p=>String(p.nombre||p.ref||'').replace(/\s*\(.*?\)/g,'').trim();
+const nombreB=p=>`${p.it.p.nombre} de ${p.it.L} mm`;
+const porNum=(u,v)=>u-v;
+function hecho(){avisoMov='';repartoManual=true;repartoGuardado=false;}
+function quitarBulto(de,k){const B=reparto.bins;B[de].items.splice(k,1);if(!B[de].items.length)B.splice(de,1);}
+// Soltado en el dibujo de frente de la caja a, con la esquina inferior izquierda en (x,y).
+function soltarSeccion(de,k,a,x,y){
+  const B=reparto.bins,src=B[de].items[k],bin=B[a],M=bin.model,otros=bin.items.filter(o=>o!==src),tol=Math.max(M.intA,M.intH)*.03;
+  if(src.it.L>M.intL){avisoMov=`No cabe: ${nombreB(src)} es más largo que la caja ${a+1} (${M.nombre}, ${M.intL} mm de largo interior).`;return renderResultado();}
+  const cx=[0,M.intA-src.w],cy=[0,M.intH-src.h];
+  for(const o of otros){
+    cx.push(o.x+o.w,o.x-src.w,o.x);cy.push(o.y+o.h,o.y-src.h,o.y);
+    // encajado contra otro bulto con protección: el cuerpo de uno pegado a la protección del otro
+    if(o.medio&&src.medio) cx.push(Math.max(o.x+o.w-(src.w-src.medio)/2,o.x+(o.w+o.medio)/2),Math.min(o.x-(src.w+src.medio)/2,o.x+(o.w-o.medio)/2-src.w));
   }
-  if(dest){
-    avisoMov='';repartoManual=true;repartoGuardado=false;
-    // La caja de origen se recoloca con lo que le queda (si por lo que sea no saliera, se deja como estaba sin el bulto).
-    const queda=B[de].items.filter((_,i)=>i!==k),r=queda.length?packWith(B[de].model,queda.map(p=>p.it)):null;
-    if(r&&r.bins.length===1&&!r.unfit.length) B[de]=r.bins[0]; else B[de].items=queda;
-    if(a==='nueva') B.push(dest); else B[a]=dest;
-    if(!B[de].items.length) B.splice(de,1);
+  const p=Object.assign({},src,{x:iman(Math.round(Math.min(Math.max(x,0),M.intA-src.w)),cx,tol),y:iman(Math.round(Math.min(Math.max(y,0),M.intH-src.h)),cy,tol)});
+  // A lo largo: primero donde estaba; si ahí choca, pegado al fondo, detrás de otro bulto o adelantado lo que mide una protección.
+  const offs=(a===de?[src.off||0]:[]).concat([0,...otros.map(o=>(o.off||0)+o.it.L),...(src.medio?otros.filter(o=>o.medio).map(o=>(o.off||0)+o.it.cap.l):[])].sort(porNum));
+  let ok=false;
+  for(const off of offs){p.off=off;if(libre(p,bin,src)){ok=true;break;}}
+  if(!ok){
+    p.off=offs[0];const c=otros.find(o=>chocan(p,o));
+    avisoMov=c?`Ahí no cabe: choca con ${nombreB(c)}.`:`Ahí no cabe: ${nombreB(src)} se sale de la caja ${a+1}.`;
+    return renderResultado();
   }
+  hecho();
+  if(a===de) bin.items[k]=p; else{bin.items.push(p);quitarBulto(de,k);}
   renderResultado();
-  if(!dest){const n=document.querySelector('#resultado .note');if(n)n.scrollIntoView({block:'nearest'});}
+}
+// Soltado sobre una caja pero fuera de su dibujo, o en «Caja nueva»: se busca el primer hueco libre.
+function soltarAuto(de,k,a){
+  const B=reparto.bins,src=B[de].items[k];
+  let bin=a==='nueva'?null:B[a];
+  if(!bin){
+    const m=modelosAct.slice().sort((x,y)=>vol(x)-vol(y)).find(m=>src.it.L<=m.intL&&src.w<=m.intA&&src.h<=m.intH);
+    if(!m){avisoMov=`No cabe: no hay ninguna caja de ${TIPOS[pedido.tipo]} donde entre ${nombreB(src)}.`;return renderResultado();}
+    bin={model:m,free:[],items:[]};
+  }
+  const xs=[0,...bin.items.map(o=>o.x+o.w)].sort(porNum),ys=[0,...bin.items.map(o=>o.y+o.h)].sort(porNum),zs=[0,...bin.items.map(o=>(o.off||0)+o.it.L)].sort(porNum);
+  let p=null;
+  busca: for(const off of zs) for(const y of ys) for(const x of xs){const c=Object.assign({},src,{x,y,off});if(libre(c,bin)){p=c;break busca;}}
+  if(!p){avisoMov=`No cabe: en la caja ${a+1} (${bin.model.nombre}) no queda sitio para ${nombreB(src)}.`;return renderResultado();}
+  hecho();bin.items.push(p);if(a==='nueva')B.push(bin);quitarBulto(de,k);
+  renderResultado();
+}
+// Desplazado a lo largo en la vista desde arriba.
+function soltarPlanta(b,k,off){
+  const bin=reparto.bins[b],src=bin.items[k],M=bin.model,L=src.it.L,otros=bin.items.filter(o=>o!==src),c=[0,M.intL-L];
+  for(const o of otros){const z=o.off||0;c.push(z+o.it.L,z-L,z,z+o.it.L-L);if(o.medio&&src.medio)c.push(z+o.it.cap.l,z-src.it.cap.l);}
+  const p=Object.assign({},src,{off:Math.round(iman(Math.min(Math.max(off,0),M.intL-L),c,M.intL*.015))});
+  if(libre(p,bin,src)){hecho();bin.items[k]=p;}
+  else{const o=otros.find(o=>chocan(p,o));avisoMov=o?`Ahí no cabe: choca con ${nombreB(o)}.`:`Ahí no cabe: ${nombreB(src)} se sale de la caja ${b+1} a lo largo.`;}
+  renderResultado();
 }
 (function(){
   let arr=null;
-  const tarjeta=e=>{const t=document.elementFromPoint(e.clientX,e.clientY);return t&&t.closest('[data-caja]');};
+  const bajo=e=>document.elementFromPoint(e.clientX,e.clientY);
+  const enSvg=(svg,e)=>new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse());
   const marcar=c=>document.querySelectorAll('.boxcard.destino').forEach(x=>{if(x!==c)x.classList.remove('destino');});
-  const sitio=(f,e)=>{f.style.left=e.clientX-f.offsetWidth/2+'px';f.style.top=e.clientY-f.offsetHeight/2+'px';};
+  const sitio=e=>{arr.f.style.left=e.clientX-arr.px+'px';if(arr.modo==='seccion')arr.f.style.top=e.clientY-arr.py+'px';};
   $('resultado').addEventListener('pointerdown',e=>{
-    const r=e.target.closest('rect.bulto');if(!r||e.button)return;
+    const r=e.target.closest('rect.bulto, rect.plano');if(!r||e.button)return;
     e.preventDefault();
-    // El bulto que se lleva el ratón: mismo tamaño y color que en el dibujo.
-    const it=reparto.bins[r.dataset.b].items[r.dataset.k].it,q=r.getBoundingClientRect(),f=document.createElement('div');
-    f.className='fantasma';f.textContent=it.p.ref||it.p.nombre;
-    f.style.width=Math.max(q.width,34)+'px';f.style.height=Math.max(q.height,22)+'px';f.style.background=getComputedStyle(r).fill;
-    document.body.appendChild(f);document.body.classList.add('arrastrando');
-    arr={de:Number(r.dataset.b),k:Number(r.dataset.k),f};r.classList.add('cogido');sitio(f,e);
+    const de=Number(r.dataset.b),k=Number(r.dataset.k),bin=reparto.bins[de],p=bin.items[k],svg=r.ownerSVGElement,pt=enSvg(svg,e),esc_=svg.getScreenCTM().a,f=document.createElement('div');
+    arr={de,k,p,svg,f,x0:e.clientX,y0:e.clientY,modo:r.classList.contains('plano')?'planta':'seccion'};
+    f.className='fantasma';f.textContent=corto(p.it.p);f.style.background=getComputedStyle(r).fill;
+    if(arr.modo==='seccion'){
+      // el fantasma es el bulto entero a su tamaño; se recuerda de dónde se ha cogido
+      arr.gx=pt.x-p.x;arr.gy=pt.y-(bin.model.intH-p.y-p.h);
+      f.style.width=p.w*esc_+'px';f.style.height=p.h*esc_+'px';arr.px=arr.gx*esc_;arr.py=arr.gy*esc_;
+    }else{
+      const q=r.getBoundingClientRect();
+      arr.ptx=pt.x;f.style.width=p.it.L*(PW/bin.model.intL)*esc_+'px';f.style.height=Math.max(q.height,16)+'px';
+      arr.px=(pt.x-(p.off||0)*(PW/bin.model.intL))*esc_;f.style.top=q.top+'px';
+    }
+    document.body.appendChild(f);document.body.classList.add('arrastrando');r.classList.add('cogido');sitio(e);
   });
   document.addEventListener('pointermove',e=>{
     if(!arr)return;
-    e.preventDefault();sitio(arr.f,e);
-    const c=tarjeta(e);marcar(c);
+    e.preventDefault();sitio(e);
+    if(arr.modo!=='seccion')return;
+    const t=bajo(e),c=t&&t.closest('[data-caja]');marcar(c);
     if(c&&c.dataset.caja!==String(arr.de))c.classList.add('destino');
   });
   const soltar=e=>{
     if(!arr)return;
-    const a=arr,c=e.type==='pointerup'?tarjeta(e):null;arr=null;a.f.remove();marcar(null);document.body.classList.remove('arrastrando');
+    const a=arr;arr=null;a.f.remove();marcar(null);document.body.classList.remove('arrastrando');
     document.querySelectorAll('rect.cogido').forEach(x=>x.classList.remove('cogido'));
-    if(c&&c.dataset.caja!==String(a.de)) mover(a.de,a.k,c.dataset.caja==='nueva'?'nueva':Number(c.dataset.caja));
+    if(e.type!=='pointerup'||Math.abs(e.clientX-a.x0)+Math.abs(e.clientY-a.y0)<3)return;
+    if(a.modo==='planta'){
+      const M=reparto.bins[a.de].model;
+      return soltarPlanta(a.de,a.k,(a.p.off||0)+(enSvg(a.svg,e).x-a.ptx)/(PW/M.intL));
+    }
+    const t=bajo(e),c=t&&t.closest('[data-caja]');if(!c)return;
+    if(c.dataset.caja==='nueva')return soltarAuto(a.de,a.k,'nueva');
+    const n=Number(c.dataset.caja),sv=t.closest('svg.seccion');
+    if(sv){const pt=enSvg(sv,e),M=reparto.bins[n].model;soltarSeccion(a.de,a.k,n,pt.x-a.gx,M.intH-(pt.y-a.gy)-a.p.h);}
+    else if(n!==a.de) soltarAuto(a.de,a.k,n);
   };
   document.addEventListener('pointerup',soltar);document.addEventListener('pointercancel',soltar);
 })();
