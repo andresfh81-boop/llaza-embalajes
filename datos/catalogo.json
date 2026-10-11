@@ -9,7 +9,11 @@
   ],
   "cajas": [
     {"id": "nmv4b8ogkaqjc", "nombre": "C-5000", "tipo": "carton", "intL": 5000, "intA": 790, "intH": 790, "extL": 5100, "extA": 850, "extH": 850},
-    {"id": "nmv4ba963nmdc", "nombre": "C-7000", "tipo": "carton", "intL": 6990, "intA": 790, "intH": 790, "extL": 7000, "extA": 850, "extH": 850}
+    {"id": "nmv4ba963nmdc", "nombre": "C-7000", "tipo": "carton", "intL": 6990, "intA": 790, "intH": 790, "extL": 7000, "extA": 850, "extH": 850},
+    {"id": "mc5000", "nombre": "MC-5000", "tipo": "cerrada", "intL": 5000, "intA": 790, "intH": 790, "extL": 5100, "extA": 850, "extH": 850},
+    {"id": "mc7000", "nombre": "MC-7000", "tipo": "cerrada", "intL": 6990, "intA": 790, "intH": 790, "extL": 7000, "extA": 850, "extH": 850},
+    {"id": "ma5000", "nombre": "MA-5000", "tipo": "abierta", "intL": 5000, "intA": 790, "intH": 790, "extL": 5100, "extA": 850, "extH": 850},
+    {"id": "ma7000", "nombre": "MA-7000", "tipo": "abierta", "intL": 6990, "intA": 790, "intH": 790, "extL": 7000, "extA": 850, "extH": 850}
   ],
   "montados": [
     {"ref": "33016", "nombre": "Perfil tapa luz", "en": "la viga"},

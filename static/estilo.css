@@ -110,3 +110,6 @@ svg.seccion,svg.planta{cursor:zoom-in}
 body.con-lupa{overflow:hidden}
 .fantasma{z-index:30}
 .boxcard.ampliada>*{flex-shrink:0}
+.boxcard.nueva{justify-content:flex-start;align-items:stretch;color:var(--fg)}
+.boxcard.nueva p{color:var(--muted)}
+.boxcard .cab{flex-wrap:wrap}
