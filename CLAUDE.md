@@ -47,6 +47,8 @@ Para verla en local hace falta servirla (abierta como archivo suelto no carga el
 - Prueba cada modelo de caja del tipo elegido, se queda con el reparto de menos volumen exterior y después intenta bajar cada caja a un modelo más pequeño.
 - **Por grupos** (`planGrupos`): cada perfil tiene `grupo` («estructura» o «lamas»). La estructura va junta en sus cajas y las lamas en las suyas (pedido por Andrés, 11/10/2026: «preferiblemente»). Solo se juntan dos cajas de grupos distintos cuando caben en una sola y así sobra una; esa caja sale marcada «Mezcla».
 - Los bultos que no caben en ninguna caja se avisan aparte.
+- **Retoque a mano**: en el dibujo se arrastra un bulto a otra caja o a «Caja nueva» (`mover` en `app.js`). Si no cabe por largo o por sección, sale un aviso y no se mueve. Los retoques se pierden al recargar la página o al cambiar pedido, tipo, holgura o catálogo; «Volver al reparto automático» los deshace.
+- El dibujo lleva la cota interior de la caja (abajo y a la izquierda) y el ancho y alto real de cada bulto, sin holgura.
 
 ### Lectura de la hoja de corte
 

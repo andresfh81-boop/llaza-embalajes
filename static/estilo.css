@@ -79,3 +79,11 @@ body{margin:0}
 #cat-bar b{color:var(--fg)}
 .btn.imp{display:inline-flex;flex-direction:row;text-transform:none;position:relative}
 .btn.imp input{position:absolute;opacity:0;width:1px;height:1px}
+.boxcard svg text{pointer-events:none;user-select:none}
+rect.bulto{cursor:grab;touch-action:none}
+rect.bulto.cogido{opacity:.45}
+.boxcard.destino{outline:3px solid var(--accent);outline-offset:1px}
+.boxcard.nueva{border-style:dashed;justify-content:center;color:var(--muted);min-height:120px}
+.boxcard.nueva p{margin:0}
+.fantasma{position:fixed;z-index:10;pointer-events:none;padding:4px 9px;border-radius:4px;background:var(--accent);color:var(--accent-fg);font:600 14px var(--display);white-space:nowrap}
+.manual{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;color:var(--muted)}

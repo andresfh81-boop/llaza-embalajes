@@ -24,26 +24,35 @@ function renderPedido(){
   renderResultado();
 }
 
-function renderResultado(){
+// Reparto en pantalla: sale del cálculo automático y se puede retocar arrastrando bultos entre cajas.
+// Mientras no cambien pedido, tipo, holgura ni catálogo, los retoques a mano se conservan.
+let reparto=null,repartoClave='',repartoManual=false,avisoMov='',modelosAct=[];
+function renderResultado(recalcular){
   const el=$('resultado');ultimoResumen='';
   const head='<h2>Cajas necesarias</h2>';
   if(sinDatos){el.innerHTML=head+'<div class="note">No se ha podido cargar el catálogo. Recarga la página; si la has abierto como archivo suelto, ábrela desde su dirección web.</div>';return;}
   if(!base){el.innerHTML=head+'<div class="empty">Cargando catálogo…</div>';return;}
-  const modelos=cajas.filter(c=>c.tipo===pedido.tipo);
+  const modelos=modelosAct=cajas.filter(c=>c.tipo===pedido.tipo);
   if(!modelos.length){el.innerHTML=head+`<div class="empty">Todavía no hay ninguna caja de tipo <b>${TIPOS[pedido.tipo]}</b>. Dala de alta en la pestaña Cajas con sus medidas interiores y exteriores y aquí aparecerá el reparto.</div>`;return;}
   if(!pedido.lineas.length){el.innerHTML=head+`<div class="empty">Hay ${modelos.length} ${modelos.length===1?'caja':'cajas'} de ${TIPOS[pedido.tipo]} en el catálogo. Añade perfiles al pedido para ver cuántas hacen falta.</div>`;return;}
-  const items=[],h=num(pedido.holgura);
-  const col=new Map(perfiles.map((p,ci)=>[p.id,ci%6]));
-  for(const l of pedido.lineas){
-    const p=perfiles.find(x=>x.id===l.pid);if(!p)continue;
-    const uds=Math.max(1,num(p.uds)),n=Math.ceil(l.cant/uds);
-    for(let i=0;i<n;i++) items.push({p,g:p.grupo||'',L:l.largo,w:num(p.ancho)+h,h:num(p.alto)+h});
+  const hol=num(pedido.holgura),clave=JSON.stringify([pedido,modelos,perfiles]);
+  if(recalcular||!reparto||clave!==repartoClave){
+    const items=[];
+    for(const l of pedido.lineas){
+      const p=perfiles.find(x=>x.id===l.pid);if(!p)continue;
+      const uds=Math.max(1,num(p.uds)),n=Math.ceil(l.cant/uds);
+      for(let i=0;i<n;i++) items.push({p,g:p.grupo||'',L:l.largo,w:num(p.ancho)+hol,h:num(p.alto)+hol});
+    }
+    reparto=planGrupos(items,modelos);repartoClave=clave;repartoManual=false;avisoMov='';
   }
-  const r=planGrupos(items,modelos);
+  const r=reparto,col=new Map(perfiles.map((p,ci)=>[p.id,ci%6]));
+  const nb=r.bins.reduce((s,b)=>s+b.items.length,0)+r.unfit.length;
   const m3=volBins(r.bins)/1e9;
   const porModelo={};r.bins.forEach(b=>porModelo[b.model.nombre]=(porModelo[b.model.nombre]||0)+1);
   const desg=Object.entries(porModelo).map(([n,c])=>`${c} × ${n}`).join(', ');
-  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${items.length}</b> <span>bultos</span></div><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></div><div class="sub">${esc(desg)}</div>`;
+  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb}</b> <span>bultos</span></div><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></div><div class="sub">${esc(desg)}</div>`;
+  if(avisoMov) html+=`<div class="note" role="alert">${esc(avisoMov)}</div>`;
+  if(repartoManual) html+='<div class="manual">Has movido bultos a mano. <button class="btn small ghost" type="button" data-act="auto">Volver al reparto automático</button></div>';
   if(r.unfit.length){
     const g={};r.unfit.forEach(it=>{const k=it.p.nombre+' de '+it.L+' mm';g[k]=(g[k]||0)+1;});
     html+=`<div class="note">No caben en ninguna caja de ${TIPOS[pedido.tipo]}: ${Object.entries(g).map(([k,c])=>esc(c+' × '+k)).join('; ')}. Hace falta una caja más larga o de más sección.</div>`;
@@ -54,15 +63,68 @@ function renderResultado(){
     const g={};b.items.forEach(p=>{const k=p.it.p.id+'|'+p.it.L;(g[k]=g[k]||{p:p.it.p,L:p.it.L,n:0}).n++;});
     const cont=Object.values(g),gs=[...new Set(cont.map(c=>c.p.grupo||''))],gtxt=gs.length>1?'Mezcla':(GRUPOS[gs[0]]||'');
     lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.p.nombre} ${c.L} mm`).join(', '));
-    const fs=Math.max(M.intA,M.intH)/14;
-    const svg=`<svg viewBox="-2 -2 ${M.intA+4} ${M.intH+4}" role="img" aria-label="Sección de la caja ${i+1}"><rect x="0" y="0" width="${M.intA}" height="${M.intH}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map(p=>{
-      const y=M.intH-p.y-p.h,t=p.it.p.ref||p.it.p.nombre,f=Math.min(fs,p.h*.5,p.w/(String(t).length*.62));
-      return `<rect x="${p.x}" y="${y}" width="${p.w}" height="${p.h}" fill="var(--p${col.get(p.it.p.id)})" stroke="var(--panel)" stroke-width="1.5" vector-effect="non-scaling-stroke"/><text x="${p.x+p.w/2}" y="${y+p.h/2}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)}</text>`;}).join('')}</svg>`;
-    return `<div class="boxcard"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div>${svg}<div class="meta">Sección interior ${M.intA}×${M.intH} mm · largo ${M.intL} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm</li>`).join('')}</ul></div>`;
-  }).join('')+'</div>';
+    // Dibujo: sección interior con su cota abajo y a la izquierda; cada bulto lleva su ancho y su alto reales (sin holgura).
+    const mx=Math.max(M.intA,M.intH),fs=mx/14,mg=mx*.1,fc=mx/20;
+    const svg=`<svg viewBox="${-mg} -2 ${M.intA+mg+2} ${M.intH+mg+2}" role="img" aria-label="Sección de la caja ${i+1}"><rect x="0" y="0" width="${M.intA}" height="${M.intH}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,k)=>{
+      const y=M.intH-p.y-p.h,t=p.it.p.ref||p.it.p.nombre,fm=Math.min(fc*.9,p.w/5,p.h/5),f=Math.min(fs,p.h*.3,(p.w-fm*2.6)/(String(t).length*.62));
+      return `<rect class="bulto" data-b="${i}" data-k="${k}" x="${p.x}" y="${y}" width="${p.w}" height="${p.h}" fill="var(--p${col.get(p.it.p.id)})" stroke="var(--panel)" stroke-width="1.5" vector-effect="non-scaling-stroke"><title>${esc(p.it.p.nombre)} · ${p.it.L} mm</title></rect><text x="${p.x+p.w/2}" y="${y+p.h/2}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(t)}</text><text x="${p.x+p.w/2}" y="${y+p.h-fm*.7}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.w-hol}</text><text transform="translate(${p.x+fm*.75} ${y+p.h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.h-hol}</text>`;}).join('')}<text x="${M.intA/2}" y="${M.intH+mg*.55}" font-size="${fc}" text-anchor="middle" dominant-baseline="central" fill="var(--fg)">${M.intA} mm</text><text transform="translate(${-mg*.5} ${M.intH/2}) rotate(-90)" font-size="${fc}" text-anchor="middle" dominant-baseline="central" fill="var(--fg)">${M.intH} mm</text></svg>`;
+    return `<div class="boxcard" data-caja="${i}"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div>${svg}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col.get(c.p.id)})"></span>${c.n} × ${esc(c.p.nombre)} · ${c.L} mm</li>`).join('')}</ul></div>`;
+  }).join('')+'<div class="boxcard nueva" data-caja="nueva"><span class="tag">Caja nueva</span><p>Suelta aquí un bulto para ponerlo en una caja aparte.</p></div></div><p class="sub">Puedes arrastrar un bulto del dibujo a otra caja; si no cabe, te aviso y se queda donde estaba.</p>';
   ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas (${desg}), ${m3.toFixed(2)} m³\n`+lineasTxt.join('\n');
   el.innerHTML=html;
 }
+
+// Mover un bulto (caja de, posición k) a otra caja o a una nueva. Si no cabe, avisa y no cambia nada.
+function mover(de,k,a){
+  const B=reparto.bins,it=B[de].items[k].it,que=`${it.p.nombre} de ${it.L} mm`;
+  let dest=null;
+  if(a==='nueva'){
+    for(const m of modelosAct.slice().sort((x,y)=>vol(x)-vol(y))){const r=packWith(m,[it]);if(r.bins.length===1){dest=r.bins[0];break;}}
+    if(!dest) avisoMov=`No cabe: no hay ninguna caja de ${TIPOS[pedido.tipo]} donde entre ${que}.`;
+  }else{
+    const M=B[a].model,holg=num(pedido.holgura);
+    if(it.L>M.intL) avisoMov=`No cabe: ${que} es más largo que la caja ${a+1} (${M.nombre}, ${M.intL} mm de largo interior).`;
+    else{
+      const r=packWith(M,B[a].items.map(p=>p.it).concat(it));
+      if(r.bins.length===1&&!r.unfit.length) dest=r.bins[0];
+      else avisoMov=`No cabe: en la caja ${a+1} (${M.nombre}, sección ${M.intA}×${M.intH} mm) no queda sitio para ${que} (${it.w-holg}×${it.h-holg} mm).`;
+    }
+  }
+  if(dest){
+    avisoMov='';repartoManual=true;
+    B[de].items.splice(k,1);
+    if(a==='nueva') B.push(dest); else B[a]=dest;
+    if(!B[de].items.length) B.splice(de,1);
+  }
+  renderResultado();
+  if(!dest){const n=document.querySelector('#resultado .note');if(n)n.scrollIntoView({block:'nearest'});}
+}
+(function(){
+  let arr=null;
+  const tarjeta=e=>{const t=document.elementFromPoint(e.clientX,e.clientY);return t&&t.closest('[data-caja]');};
+  const marcar=c=>document.querySelectorAll('.boxcard.destino').forEach(x=>{if(x!==c)x.classList.remove('destino');});
+  $('resultado').addEventListener('pointerdown',e=>{
+    const r=e.target.closest('rect.bulto');if(!r||e.button)return;
+    e.preventDefault();
+    const it=reparto.bins[r.dataset.b].items[r.dataset.k].it,f=document.createElement('div');
+    f.className='fantasma';f.textContent=`${it.p.nombre} · ${it.L} mm`;document.body.appendChild(f);
+    arr={de:Number(r.dataset.b),k:Number(r.dataset.k),f};r.classList.add('cogido');
+    f.style.left=e.clientX+12+'px';f.style.top=e.clientY+12+'px';
+  });
+  document.addEventListener('pointermove',e=>{
+    if(!arr)return;
+    arr.f.style.left=e.clientX+12+'px';arr.f.style.top=e.clientY+12+'px';
+    const c=tarjeta(e);marcar(c);
+    if(c&&c.dataset.caja!==String(arr.de))c.classList.add('destino');
+  });
+  const soltar=e=>{
+    if(!arr)return;
+    const a=arr,c=e.type==='pointerup'?tarjeta(e):null;arr=null;a.f.remove();marcar(null);
+    document.querySelectorAll('rect.cogido').forEach(x=>x.classList.remove('cogido'));
+    if(c&&c.dataset.caja!==String(a.de)) mover(a.de,a.k,c.dataset.caja==='nueva'?'nueva':Number(c.dataset.caja));
+  };
+  document.addEventListener('pointerup',soltar);document.addEventListener('pointercancel',soltar);
+})();
 
 let leidas=[],hojaNombre='';
 function renderLeidas(){
@@ -222,6 +284,7 @@ document.addEventListener('click',async e=>{
   if(a==='quitar'){pedido.lineas.splice(Number(b.dataset.i),1);guardarPedido();renderPedido();}
   else if(a==='cancelar'){confirmar=null;renderCajas();renderPerfiles();renderCatalogo();}
   else if(a==='exportar'){exportar();}
+  else if(a==='auto'){renderResultado(true);}
   else if(a==='pedir-descartar'){confirmar='descartar';renderCatalogo();}
   else if(a==='descartar'){confirmar=null;try{localStorage.removeItem(CLAVE_CAT);}catch(err){}montar({});renderTodo();estado('Has vuelto al catálogo común.');}
   else if(a==='pedir-caja'){confirmar='caja'+id;renderCajas();}
