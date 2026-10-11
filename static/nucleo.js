@@ -118,6 +118,12 @@ function chocan(a,b){return cuerpos(a).some(u=>cuerpos(b).some(v=>u[0]<v[1]-HOLG
 function dentro(p,M){const z=p.off||0;return p.x>=-HOLG&&p.y>=-HOLG&&z>=-HOLG&&p.x+p.w<=M.intA+HOLG&&p.y+p.h<=M.intH+HOLG&&z+p.it.L<=M.intL+HOLG;}
 // ¿Puede estar el bulto p así colocado en la caja? (salvo = el propio bulto en su sitio anterior)
 function libre(p,bin,salvo){return dentro(p,bin.model)&&!bin.items.some(o=>o!==salvo&&chocan(p,o));}
+// ¿Tiene apoyo? Está en el suelo de la caja o justo encima de otro bulto que le queda debajo (aunque sea en parte).
+function apoyado(p,bin){
+  if(p.y<=1) return true;
+  const z=p.off||0;
+  return bin.items.some(o=>o!==p&&Math.abs(o.y+o.h-p.y)<=1&&o.x<p.x+p.w-HOLG&&p.x<o.x+o.w-HOLG&&(o.off||0)<z+p.it.L-HOLG&&z<(o.off||0)+o.it.L-HOLG);
+}
 
 // Reparto por grupos (estructura, lamas…): cada grupo va en sus propias cajas.
 // Solo se juntan dos cajas de grupos distintos si caben en una sola y así sobra una.
@@ -153,4 +159,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={parseHoja,packWith,plan,planGrupos,chocan,libre,vol,volBins,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={parseHoja,packWith,plan,planGrupos,chocan,libre,apoyado,vol,volBins,aplicar,diferencia};

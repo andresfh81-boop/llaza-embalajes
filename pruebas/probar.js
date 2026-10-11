@@ -1,6 +1,6 @@
 // node pruebas/probar.js  — comprueba el encaje, la lectura de filas de la hoja de corte y la mezcla del catálogo
 const assert=require('assert'),path=require('path');
-const {plan,planGrupos,chocan,libre,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
+const {plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
 const G={nombre:'G',intL:6000,intA:600,intH:400,extL:6100,extA:660,extH:460};
 const S={nombre:'S',intL:4000,intA:300,intH:300,extL:4080,extA:350,extH:350};
 const mk=(n,w,h,L)=>Array.from({length:n},()=>({p:{nombre:w+'x'+h},w,h,L}));
@@ -40,6 +40,12 @@ for(const b of planGrupos(conCap.concat(mod.filter(it=>it.g==='estructura')),[C5
 const pz=(L,off)=>({it:{L},x:0,y:0,w:180,h:180,off});
 assert.ok(chocan(pz(2000,0),pz(2000,0)));assert.ok(!chocan(pz(2000,0),pz(2000,2000)));
 assert.ok(!libre(pz(2000,3500),{model:C5,items:[]}));
+// Apoyo: en el suelo o encima de otro sí; flotando, o encima de uno que está más atrás a lo largo, no.
+const suelo=pz(2000,0),cajaA={model:C5,items:[suelo]};
+assert.ok(apoyado(suelo,cajaA));
+assert.ok(apoyado(Object.assign(pz(2000,0),{y:180}),cajaA));
+assert.ok(!apoyado(Object.assign(pz(2000,0),{y:300}),cajaA));
+assert.ok(!apoyado(Object.assign(pz(2000,2500),{y:180}),cajaA));
 console.log('alternadas: ok');
 
 const base=[{id:'a',nombre:'A',ancho:1},{id:'b',nombre:'B',ancho:2},{id:'c',nombre:'C',ancho:3}];

@@ -99,3 +99,5 @@ rect.plano{cursor:ew-resize;touch-action:none}
 rect.plano.cogido{opacity:.45}
 line.cota.hueco{stroke:var(--warn);stroke-dasharray:3 3;pointer-events:none}
 text.cota.hueco{paint-order:stroke;stroke:var(--box);stroke-width:4px;stroke-linejoin:round}
+rect.bulto.aire{stroke:var(--warn);stroke-width:3;stroke-dasharray:6 4}
+.boxcard .note{font-size:14px;padding:8px 10px}
