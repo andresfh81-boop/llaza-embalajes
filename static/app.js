@@ -252,7 +252,7 @@ function renderResultado(recalcular){
   const m3=volBins(r.bins)/1e9;
   const porModelo={};r.bins.forEach(b=>porModelo[b.model.nombre]=(porModelo[b.model.nombre]||0)+1);
   const desg=Object.entries(porModelo).map(([n,c])=>`${c} × ${n}`).join(', ');
-  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length}</b> <span>bultos en total <small>(${nb} de perfil + ${r.bins.length} ${r.bins.length===1?'caja':'cajas'})</small></span></div>${r.bins.some(b=>pesoCaja(b).total)?`<div><b>${Math.round(r.bins.reduce((s,b)=>s+pesoCaja(b).total,0))}</b> <span>kg${r.bins.some(b=>pesoCaja(b).faltan||!pesoCaja(b).tara)?' <small>(faltan pesos)</small>':''}</span></div>`:''}<span class="acciones"><button class="btn" type="button" data-act="imprimir">Imprimir lista de embalaje</button><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></span></div><div class="sub">${esc(desg)}</div>${leyenda()}`;
+  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length}</b> <span>bultos en total <small>(${nb} de perfil + ${r.bins.length} ${r.bins.length===1?'caja':'cajas'})</small></span></div>${r.bins.some(b=>pesoCaja(b).total)?`<div><b>${Math.round(r.bins.reduce((s,b)=>s+pesoCaja(b).total,0))}</b> <span>kg${r.bins.some(b=>pesoCaja(b).faltan||!pesoCaja(b).tara)?' <small>(faltan pesos)</small>':''}</span></div>`:''}<span class="acciones"><button class="btn" type="button" data-act="solicitar">Solicitar cajas al almacén</button><button class="btn ghost" type="button" data-act="imprimir">Imprimir lista de embalaje</button><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></span></div><div class="sub">${esc(desg)}</div>${leyenda()}`;
   // Cuánto se aprovecha: sección ocupada de media y el mínimo de cajas que saldría solo por superficie (cota inferior, no siempre alcanzable).
   const todos=r.bins.flatMap(b=>b.items),secB=todos.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)+r.unfit.reduce((s,it)=>s+it.w*it.h,0),secC=r.bins.reduce((s,b)=>s+b.model.intA*b.model.intH,0),minC=Math.max(1,Math.ceil(secB/Math.max(...modelos.map(m=>m.intA*m.intH))));
   if(secC) html+=`<div class="sub">Sección aprovechada: <b>${Math.round(secB/secC*100)} %</b>. ${r.bins.length<=minC?'Con estas cajas no se puede hacer con menos.':`Solo por superficie cabría en ${minC} ${minC===1?'caja':'cajas'}, pero las piezas no se pueden partir ni encajar sin huecos: es un mínimo teórico, no un fallo.`}</div>`;
@@ -285,6 +285,36 @@ function renderResultado(recalcular){
   el.innerHTML=html;
   // cada dibujo ampliado vuelve a donde estaba desplazado
   el.querySelectorAll('.visor').forEach(v=>{const s=zoom[v.dataset.v];if(s&&s.z>1){v.scrollLeft=s.sl||0;v.scrollTop=s.st||0;}});
+}
+
+// Solicitud de cajas al almacén: la app sirve para pedir las cajas por anticipado, antes de fabricar la pérgola.
+// Prepara el correo (asunto y texto) y lo abre en el programa de correo del equipo; no envía nada por sí sola.
+const CLAVE_CORREO='correo-almacen';
+function solicitud(){
+  const r=reparto,n=r.bins.length,porModelo=new Map();
+  r.bins.forEach(b=>porModelo.set(b.model.id,{m:b.model,n:((porModelo.get(b.model.id)||{}).n||0)+1}));
+  const grupos=b=>{const g={};b.items.forEach(p=>{const md=modTxt(p.it),k=p.it.p.id+'|'+p.it.L+'|'+md;const c=(g[k]=g[k]||{p:p.it.p,L:p.it.L,mod:md,n:0});c.n++;});return Object.values(g);};
+  const datos=datosPedido().filter(d=>d[0]!=='Hoja de corte'&&d[0]!=='Pérgola').map(d=>d[0]+': '+d[1]),ms=modulos(),kg=r.bins.reduce((s,b)=>s+pesoCaja(b).total,0);
+  const L=[
+    'Hola:','',
+    `Para ${pedido.ref?'el pedido '+pedido.ref:'un pedido de pérgola'} vamos a necesitar las siguientes cajas:`,'',
+    ...[...porModelo.values()].map(x=>`- ${x.n} × ${x.m.nombre} (${TIPOS[x.m.tipo]||''}), exterior ${x.m.extL} × ${x.m.extA} × ${x.m.extH} mm, interior ${x.m.intL} × ${x.m.intA} × ${x.m.intH} mm`),'',
+    `Total: ${n} ${n===1?'caja':'cajas'}, ${(volBins(r.bins)/1e9).toFixed(2).replace('.',',')} m³ de transporte${kg?`, unos ${Math.round(kg)} kg`:''}.`,
+    ...(datos.length?['',datos.join(' · ')]:[]),
+    ...(ms.length?['Módulos: '+ms.map(m=>{const h=(pedido.hojas||[]).find(x=>x.mod===m);return m+(h&&h.dimsModulo?' '+h.dimsModulo:'');}).join(' · ')]:[]),
+    '','Contenido previsto de cada caja:',
+    ...r.bins.map((b,i)=>`Caja ${i+1} · ${b.model.nombre}: `+(grupos(b).map(c=>`${c.n} × ${c.mod?c.mod+' ':''}${corto(c.p)} ${c.L} mm`).join(', ')||'vacía')),
+    '','Gracias.'
+  ];
+  return {asunto:`Solicitud de cajas${pedido.ref?' · '+pedido.ref:''}`,cuerpo:L.join('\r\n')};
+}
+async function solicitarCajas(){
+  const r=reparto;if(!r||!r.bins.length)return;
+  if(r.aparcados.length||r.unfit.length){avisoMov=`Antes de pedir las cajas: hay ${r.aparcados.length+r.unfit.length} ${r.aparcados.length+r.unfit.length===1?'bulto':'bultos'} sin caja (aparcados o que no caben). Mételos en alguna caja para que la solicitud esté completa.`;sel=null;return renderResultado();}
+  const s=solicitud(),para=($('correo-almacen').value||'').trim();
+  try{await navigator.clipboard.writeText(s.cuerpo);}catch(e){}
+  location.href='mailto:'+encodeURIComponent(para)+'?subject='+encodeURIComponent(s.asunto)+'&body='+encodeURIComponent(s.cuerpo);
+  estado('Se ha abierto el correo con la solicitud ya escrita'+(para?'':' (falta poner el destinatario)')+'. El texto también está copiado, por si usas el correo en el navegador.');
 }
 
 // Lista de embalaje para imprimir: una hoja de resumen y una hoja por caja, con su contenido y sus dos dibujos.
@@ -658,6 +688,8 @@ document.querySelector('.tabs').addEventListener('click',e=>{
   $('cat-bar').hidden=b.dataset.tab==='pedido';
 });
 $('tipos').addEventListener('change',e=>{pedido.tipo=e.target.value;guardarPedido();renderResultado();});
+try{$('correo-almacen').value=localStorage.getItem(CLAVE_CORREO)||'';}catch(e){}
+$('correo-almacen').addEventListener('input',e=>{try{localStorage.setItem(CLAVE_CORREO,e.target.value.trim());}catch(err){}});
 $('ref-pedido').addEventListener('input',e=>{pedido.ref=e.target.value.trim();guardarPedido();});
 $('holgura').addEventListener('input',e=>{pedido.holgura=num(e.target.value);guardarPedido();renderResultado();});
 $('f-linea').addEventListener('submit',e=>{
@@ -718,6 +750,7 @@ document.addEventListener('click',async e=>{
   else if(a==='leidas-ok'){const x=document.querySelector('#leidas [data-l=ok]');if(x)x.click();}
   else if(a==='zoom'){cambiarZoom(b.dataset.v,Number(b.dataset.d));}
   else if(a==='imprimir'){imprimirLista();}
+  else if(a==='solicitar'){solicitarCajas();}
   else if(a==='auto-caja'){colocarCaja(Number(b.dataset.i));}
   else if(a==='imprimir-caja'){imprimirLista(Number(b.dataset.i));}
   else if(a==='completa'){completa=completa?null:new Set([Number(b.dataset.i)]);renderResultado();}

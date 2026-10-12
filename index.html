@@ -8,7 +8,7 @@
   <link rel="icon" href="static/favicon.ico">
   <link rel="apple-touch-icon" href="static/icon-180.png">
   <meta name="theme-color" content="#0b5c8a">
-  <link rel="stylesheet" href="static/estilo.css?v=37">
+  <link rel="stylesheet" href="static/estilo.css?v=38">
 </head>
 <body>
 <div class="wrap">
@@ -46,7 +46,8 @@
       </form>
       <div id="lineas"></div>
       <label>Holgura por bulto (mm)<input id="holgura" type="number" min="0" step="1"></label>
-      <label>Referencia del pedido (sale en la lista de embalaje)<input id="ref-pedido"></label>
+      <label>Referencia del pedido (sale en la lista y en la solicitud)<input id="ref-pedido"></label>
+      <label>Correo del almacén (para solicitar las cajas)<input id="correo-almacen" type="email" placeholder="almacen@…" autocomplete="email"></label>
       <button class="btn ghost" id="vaciar" type="button">Vaciar pedido</button>
     </div>
     <div class="panel" id="resultado"></div>
@@ -91,7 +92,7 @@
 <div id="imprimir"></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script src="static/nucleo.js?v=37"></script>
-<script src="static/app.js?v=37"></script>
+<script src="static/nucleo.js?v=38"></script>
+<script src="static/app.js?v=38"></script>
 </body>
 </html>
