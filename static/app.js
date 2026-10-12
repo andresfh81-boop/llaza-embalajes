@@ -309,7 +309,8 @@ function solicitud(){
   return {asunto:`Solicitud de cajas${pedido.ref?' · '+pedido.ref:''}`,cuerpo:L.join('\r\n')};
 }
 async function solicitarCajas(){
-  const r=reparto;if(!r||!r.bins.length)return;
+  const r=reparto;
+  if(!r||!r.bins.length||!pedido.lineas.length){estado('Todavía no hay cajas calculadas: arrastra las hojas de corte o añade perfiles al pedido y después solicita las cajas.');return;}
   if(r.aparcados.length||r.unfit.length){avisoMov=`Antes de pedir las cajas: hay ${r.aparcados.length+r.unfit.length} ${r.aparcados.length+r.unfit.length===1?'bulto':'bultos'} sin caja (aparcados o que no caben). Mételos en alguna caja para que la solicitud esté completa.`;sel=null;return renderResultado();}
   const s=solicitud(),para=($('correo-almacen').value||'').trim();
   try{await navigator.clipboard.writeText(s.cuerpo);}catch(e){}
