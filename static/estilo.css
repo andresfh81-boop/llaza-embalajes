@@ -197,3 +197,8 @@ input.modin{width:58px;padding:3px 5px;font:700 13px var(--display);display:inli
 .boxes.completa .boxcard.aparcados{display:flex}
 @media print{#imprimir h2{font-size:14pt;margin:10px 0 2px}#imprimir .hoja table{break-inside:auto}#imprimir .dib>div{break-inside:avoid}}
 .visor>div{min-width:0;margin:0 auto}
+fieldset.comp{border:1px solid var(--line);border-radius:4px;padding:8px 10px 10px;margin:0;min-width:0}
+fieldset.comp legend{font:600 12px var(--body);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:0 4px}
+fieldset.comp .row{grid-template-columns:repeat(4,minmax(0,1fr))}
+.boxcard.comp{border-style:dashed}
+.boxcard.comp p{margin:0;color:var(--muted);font-size:13px}

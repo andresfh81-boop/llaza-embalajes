@@ -8,7 +8,7 @@
   <link rel="icon" href="static/favicon.ico">
   <link rel="apple-touch-icon" href="static/icon-180.png">
   <meta name="theme-color" content="#0b5c8a">
-  <link rel="stylesheet" href="static/estilo.css?v=40">
+  <link rel="stylesheet" href="static/estilo.css?v=41">
 </head>
 <body>
 <div class="wrap">
@@ -46,6 +46,12 @@
       </form>
       <div id="lineas"></div>
       <label>Holgura por bulto (mm)<input id="holgura" type="number" min="0" step="1"></label>
+      <fieldset class="comp"><legend>Caja de componentes</legend><div class="row">
+        <label>Cantidad<input id="comp-n" type="number" min="0" step="1"></label>
+        <label>Largo (mm)<input id="comp-l" type="number" min="1" step="10"></label>
+        <label>Ancho (mm)<input id="comp-a" type="number" min="1" step="10"></label>
+        <label>Alto (mm)<input id="comp-h" type="number" min="1" step="10"></label>
+      </div></fieldset>
       <label>Referencia del pedido (sale en la lista y en la solicitud)<input id="ref-pedido"></label>
       <button class="btn" type="button" data-act="solicitar">Descargar solicitud de cajas (PDF)</button>
       <button class="btn ghost" id="vaciar" type="button">Vaciar pedido</button>
@@ -92,8 +98,8 @@
 <div id="imprimir"></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script src="static/nucleo.js?v=40"></script>
-<script src="static/pdf.js?v=40"></script>
-<script src="static/app.js?v=40"></script>
+<script src="static/nucleo.js?v=41"></script>
+<script src="static/pdf.js?v=41"></script>
+<script src="static/app.js?v=41"></script>
 </body>
 </html>
