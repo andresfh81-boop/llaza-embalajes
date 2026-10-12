@@ -8,7 +8,7 @@
   <link rel="icon" href="static/favicon.ico">
   <link rel="apple-touch-icon" href="static/icon-180.png">
   <meta name="theme-color" content="#0b5c8a">
-  <link rel="stylesheet" href="static/estilo.css?v=33">
+  <link rel="stylesheet" href="static/estilo.css?v=34">
 </head>
 <body>
 <div class="wrap">
@@ -80,16 +80,17 @@
       <label>Piezas por bulto<input id="p-uds" type="number" min="1" value="1" required></label>
       <label>Ancho en el medio<input id="p-medio" type="number" min="1"></label>
       <label>Largo protección<input id="p-capl" type="number" min="1"></label>
+      <label>Peso (kg/m por pieza)<input id="p-kgm" type="number" min="0" step="0.001"></label>
       <button class="btn" id="p-guardar" style="align-self:end">Guardar perfil</button>
     </form>
-    <p class="sub">Sección del bulto ya envuelto, en milímetros. Si se envuelven varias piezas juntas (por ejemplo 2 lamas), indica cuántas van en cada bulto. Si el bulto lleva protección solo en los extremos (porexpan), pon el largo de cada protección y el ancho del bulto en el medio: así la app los alterna y caben más por caja. El grupo sirve para que la estructura vaya junta en unas cajas y las lamas en otras.</p>
+    <p class="sub">Sección del bulto ya envuelto, en milímetros. Si se envuelven varias piezas juntas (por ejemplo 2 lamas), indica cuántas van en cada bulto. Si el bulto lleva protección solo en los extremos (porexpan), pon el largo de cada protección y el ancho del bulto en el medio: así la app los alterna y caben más por caja. El peso es el de un metro de una sola pieza, con lo que lleve montado; con él la app da el peso de cada caja y reparte la carga con el peso real. El grupo sirve para que la estructura vaya junta en unas cajas y las lamas en otras.</p>
     <div id="lista-perfiles" class="scroll"></div>
   </section>
 </div>
 <div id="imprimir"></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script src="static/nucleo.js?v=33"></script>
-<script src="static/app.js?v=33"></script>
+<script src="static/nucleo.js?v=34"></script>
+<script src="static/app.js?v=34"></script>
 </body>
 </html>

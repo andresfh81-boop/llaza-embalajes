@@ -196,7 +196,8 @@ function apoyado(p,bin){
 // el peso más centrado. Lo que va encima de otro bulto se queda siempre apoyado en él, y las filas de bultos
 // alternados (lamas con protección) se mueven en bloque para no deshacer el encaje.
 function repartir(bin){
-  const M=bin.model,grupos={},peso=p=>p.it.L*(p.medio||p.w)*p.h;
+  // Peso de cada bulto: el real (it.kg) si lo tienen todos los de la caja; si falta alguno, se estima por volumen.
+  const M=bin.model,grupos={},conKg=bin.items.every(p=>p.it.kg>0),peso=p=>conKg?p.it.kg:p.it.L*(p.medio||p.w)*p.h;
   bin.items.forEach((p,i)=>{const k=p.medio?['f',p.y,p.it.L,p.h].join():'u'+i;(grupos[k]=grupos[k]||[]).push(p);});
   const us=Object.values(grupos).map(its=>{
     const z0=Math.min(...its.map(p=>p.off||0));

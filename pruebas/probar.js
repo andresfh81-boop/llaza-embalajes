@@ -60,6 +60,10 @@ assert.ok(!apoyado(Object.assign(pz(2000,2500),{y:180}),cajaA));
  const peso=p=>p.it.L*p.w*p.h,cdg=b.items.reduce((s,p)=>s+peso(p)*(p.off+p.it.L/2),0)/b.items.reduce((s,p)=>s+peso(p),0);
  assert.ok(Math.abs(cdg-C7.intL/2)<C7.intL*.1,'centro de gravedad '+Math.round(cdg));
  console.log('repartida: '+izq+' a un lado, '+der+' al otro, centro de gravedad a '+Math.round(cdg)+' de '+C7.intL);}
+// Con peso real (kg): una pieza corta pero muy pesada manda en el equilibrio más que una larga y ligera.
+{const pes=[...mk(1,200,200,4000),...mk(1,200,200,1000),...mk(1,200,200,1000)];pes[0].kg=10;pes[1].kg=200;pes[2].kg=200;
+ const b=planGrupos(pes,[C7]).bins[0],cdg=b.items.reduce((s,p)=>s+p.it.kg*(p.off+p.it.L/2),0)/410;
+ assert.ok(Math.abs(cdg-C7.intL/2)<C7.intL*.12,'cdg con kg '+Math.round(cdg));assert.notStrictEqual(b.items.find(p=>p.it===pes[1]).off,b.items.find(p=>p.it===pes[2]).off);}
 // Un bulto solo en la caja va centrado.
 {const b=planGrupos(mk(1,180,180,2000),[C5]).bins[0];assert.strictEqual(b.items[0].off,1500);}
 console.log('alternadas: ok');
