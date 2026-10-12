@@ -6,8 +6,15 @@ const num=v=>Math.max(0,Math.round(Number(v)||0));
 let base=null,perfiles=[],cajas=[],sinDatos=false;
 let editCaja=null,editPerfil=null,confirmar=null,ultimoResumen='';
 let pedido={tipo:'carton',holgura:5,lineas:[]};
-try{const g=JSON.parse(localStorage.getItem('pedido-embalaje')||'null');if(g&&Array.isArray(g.lineas))pedido=Object.assign(pedido,g);}catch(e){}
-function guardarPedido(){try{localStorage.setItem('pedido-embalaje',JSON.stringify(pedido));}catch(e){}}
+// La app se abre siempre con el pedido vacío. El último pedido se conserva aparte (anterior) por si se quiere recuperar,
+// hasta que se empieza uno nuevo.
+let anterior=null;
+try{const g=JSON.parse(localStorage.getItem('pedido-embalaje')||'null');if(g&&Array.isArray(g.lineas)&&g.lineas.length)anterior=g;}catch(e){}
+function guardarPedido(){
+  if(anterior&&!pedido.lineas.length) return; // sin nada nuevo todavía: no se pisa el último pedido guardado
+  anterior=null;
+  try{localStorage.setItem('pedido-embalaje',JSON.stringify(pedido));}catch(e){}
+}
 function estado(t){$('estado').textContent=t||'';}
 
 // Leyenda de colores por módulo (solo si el pedido tiene más de uno).
@@ -38,7 +45,7 @@ function renderPedido(){
   $('lineas').innerHTML=L.length?`<div class="scroll"><table><thead><tr><th>Perfil</th><th class="n">Largo</th><th class="n">Uds</th><th></th></tr></thead><tbody>${L.map((l,i)=>{
     const p=perfiles.find(x=>x.id===l.pid);
     return `<tr><td>${modTxt(l)||(pedido.hojas||[]).length>1?`<input class="modin" data-mod="${i}" value="${esc(l.mod||'')}" aria-label="Módulo"> `:''}${p?esc(p.nombre):'<span class="tag">perfil borrado</span>'}${l.marcas&&l.marcas.length?` <small class="marca">${esc(l.marcas.join(', '))}</small>`:''}</td><td class="n">${l.largo}</td><td class="n">${l.cant}</td><td class="act"><button class="btn small danger" data-act="quitar" data-i="${i}" type="button" aria-label="Quitar línea">Quitar</button></td></tr>`;}).join('')}</tbody></table></div>`
-    :'<div class="empty">Añade aquí los perfiles de la hoja de corte: tipo, largo y cantidad.</div>';
+    :'<div class="empty">Añade aquí los perfiles de la hoja de corte: tipo, largo y cantidad.</div>'+(anterior?`<button class="btn ghost" type="button" data-act="recuperar">Recuperar el último pedido${anterior.ref?': '+esc(anterior.ref):''} (${anterior.lineas.length} líneas)</button>`:'');
   renderHojas();
   renderResultado();
 }
@@ -646,6 +653,7 @@ document.addEventListener('click',async e=>{
   if(!b)return;
   const a=b.dataset.act,id=b.dataset.id;
   if(a==='quitar'){pedido.lineas.splice(Number(b.dataset.i),1);guardarPedido();renderPedido();}
+  else if(a==='recuperar'&&anterior){pedido=Object.assign({tipo:'carton',holgura:5,lineas:[]},anterior);anterior=null;renderPedido();estado('Último pedido recuperado.');}
   else if(a==='quitar-hoja'){pedido.lineas=pedido.lineas.filter(l=>l.hoja!==id);pedido.hojas=(pedido.hojas||[]).filter(h=>h.id!==id);if(!pedido.hojas.length&&!pedido.lineas.length)pedido.ref='';guardarPedido();renderPedido();}
   else if(a==='cancelar'){confirmar=null;renderCajas();renderPerfiles();renderCatalogo();}
   else if(a==='exportar'){exportar();}

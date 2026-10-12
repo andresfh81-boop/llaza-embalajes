@@ -33,7 +33,7 @@ Para verla en local hace falta servirla (abierta como archivo suelto no carga el
 - `montados` (solo en `datos/catalogo.json`, no se edita desde la app): referencias que van montadas en otro perfil y no llevan bulto propio — tapas, soporte medio lama, transmisión y LED perimetral en la viga; tapa pilar en el pilar. La app las lee de la hoja y las marca «Va montado en…» sin avisar de que faltan.
 - Lama LED (33020) y media lama (33000) se envuelven igual que la lama normal, en bultos de 2 (dicho por Andrés, 11/10/2026).
 - Cada ficha lleva un `id` fijo (en los perfiles iniciales, la referencia). Las líneas del pedido apuntan a ese `id`: no cambiarlo.
-- El pedido en curso también se guarda en el navegador (clave `pedido-embalaje`).
+- **La app se abre siempre con el pedido vacío** (pedido por Andrés, 12/10/2026). El último pedido sigue guardado en el navegador (clave `pedido-embalaje`) y se puede traer con el botón «Recuperar el último pedido», que también recupera su reparto guardado; en cuanto se empieza un pedido nuevo, lo sustituye.
 
 ## Qué hace
 
