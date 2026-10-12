@@ -181,3 +181,5 @@ b.mod{font-family:var(--display);font-weight:700;letter-spacing:.02em;white-spac
 .leyenda .sw,ul.hojas .sw{width:14px;height:14px;margin-right:5px;vertical-align:-2px}
 #leidas input[data-k="mod"]{width:64px}
 @media print{#imprimir .datos{margin:6px 0}#imprimir .leyenda{margin:4px 0}}
+.scroll.alto{max-height:45vh;overflow:auto}
+.note.pend{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}

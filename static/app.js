@@ -175,7 +175,8 @@ function renderResultado(recalcular){
   if(!base){el.innerHTML=head+'<div class="empty">Cargando catálogo…</div>';return;}
   const modelos=modelosAct=cajas.filter(c=>c.tipo===pedido.tipo);
   if(!modelos.length){el.innerHTML=head+`<div class="empty">Todavía no hay ninguna caja de tipo <b>${TIPOS[pedido.tipo]}</b>. Dala de alta en la pestaña Cajas con sus medidas interiores y exteriores y aquí aparecerá el reparto.</div>`;return;}
-  if(!pedido.lineas.length){el.innerHTML=head+`<div class="empty">Hay ${modelos.length} ${modelos.length===1?'caja':'cajas'} de ${TIPOS[pedido.tipo]} en el catálogo. Añade perfiles al pedido para ver cuántas hacen falta.</div>`;return;}
+  const pend=leidas.length?`<div class="note pend">Has leído ${leidas.length} líneas de ${leidasHojas.length} ${leidasHojas.length===1?'hoja de corte':'hojas de corte'} y todavía no están en el pedido: las cajas se calculan al añadirlas. <button class="btn" type="button" data-act="leidas-ok">Añadir al pedido y calcular</button></div>`:'';
+  if(!pedido.lineas.length){el.innerHTML=head+(pend||`<div class="empty">Hay ${modelos.length} ${modelos.length===1?'caja':'cajas'} de ${TIPOS[pedido.tipo]} en el catálogo. Añade perfiles al pedido para ver cuántas hacen falta.</div>`);return;}
   const hol=num(pedido.holgura),clave=JSON.stringify([pedido,modelos,perfiles]);
   if(recalcular||!reparto||clave!==repartoClave){
     const g=recalcular?null:cargarReparto(clave,modelos);
@@ -206,6 +207,7 @@ function renderResultado(recalcular){
   // Cuánto se aprovecha: sección ocupada de media y el mínimo de cajas que saldría solo por superficie (cota inferior, no siempre alcanzable).
   const todos=r.bins.flatMap(b=>b.items),secB=todos.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)+r.unfit.reduce((s,it)=>s+it.w*it.h,0),secC=r.bins.reduce((s,b)=>s+b.model.intA*b.model.intH,0),minC=Math.max(1,Math.ceil(secB/Math.max(...modelos.map(m=>m.intA*m.intH))));
   if(secC) html+=`<div class="sub">Sección aprovechada: <b>${Math.round(secB/secC*100)} %</b>. ${r.bins.length<=minC?'Con estas cajas no se puede hacer con menos.':`Solo por superficie cabría en ${minC} ${minC===1?'caja':'cajas'}, pero las piezas no se pueden partir ni encajar sin huecos: es un mínimo teórico, no un fallo.`}</div>`;
+  html+=pend;
   if(marcadas.size) html+=`<div class="manual">${marcadas.size} ${marcadas.size===1?'caja seleccionada':'cajas seleccionadas'}. <button class="btn small" type="button" data-act="ver-marcadas">Ver en pantalla completa</button> <button class="btn small ghost" type="button" data-act="desmarcar">Quitar selección</button></div>`;
   if(avisoMov) html+=`<div class="note" role="alert">${esc(avisoMov)}</div>`;
   if(repartoManual) html+=`<div class="manual">${repartoGuardado?'Reparto a mano guardado en este navegador.':'Has movido bultos a mano. <button class="btn small" type="button" data-act="guardar-reparto">Guardar reparto</button>'} <button class="btn small ghost" type="button" data-act="auto">Volver al reparto automático</button></div>`;
@@ -409,15 +411,18 @@ function soltarPlanta(de,k,a,off,x,rot){
 })();
 
 let leidas=[],leidasHojas=[];
+// Botones de lo leído: van arriba y abajo de la tabla, que puede ser muy larga.
+const ACC_LEIDAS='<div class="acciones"><button class="btn" type="button" data-l="ok">Añadir al pedido</button><button class="btn ghost" type="button" data-l="no">Descartar</button></div>';
 function renderLeidas(){
   const el=$('leidas');
   if(!leidas.length){el.innerHTML='';return;}
   const sin=leidas.filter(l=>!l.pid&&!l.montado).length,mont=leidas.filter(l=>!l.pid&&l.montado).length;
-  el.innerHTML=`<h3>Leído de ${leidasHojas.length===1?esc(leidasHojas[0].archivo):leidasHojas.length+' hojas de corte'}</h3><ul class="hojas">${leidasHojas.map(h=>`<li>${h.mod?`<b class="mod">${esc(h.mod)}</b> `:''}${esc(h.dimsModulo||'')} <small>${esc(h.archivo)} · ${leidas.filter(l=>l.hoja===h.id).length} líneas</small></li>`).join('')}</ul>`+
+  el.innerHTML=`<h3>Leído de ${leidasHojas.length===1?esc(leidasHojas[0].archivo):leidasHojas.length+' hojas de corte'}</h3><ul class="hojas">${leidasHojas.map(h=>`<li>${h.mod?`<b class="mod">${esc(h.mod)}</b> `:''}${esc(h.dimsModulo||'')} <small>${esc(h.archivo)} · ${leidas.filter(l=>l.hoja===h.id).length} líneas</small></li>`).join('')}</ul>${ACC_LEIDAS}`+
     (sin?`<div class="note">${sin} ${sin===1?'línea no tiene':'líneas no tienen'} perfil asignado: su referencia no está en el catálogo. Elige el perfil o se quedará fuera.</div>`:'')+
     (mont?`<div class="sub">${mont} ${mont===1?'línea va montada':'líneas van montadas'} en otro perfil y no ${mont===1?'ocupa':'ocupan'} sitio aparte.</div>`:'')+
-    `<div class="scroll"><table><thead><tr><th>Ref.</th><th>Pieza</th><th>Largo</th><th>Uds</th><th>Módulo</th><th>Marcaje</th><th>Perfil</th></tr></thead><tbody>${leidas.map((l,i)=>`<tr><td>${esc(l.ref)}</td><td>${esc(l.desc)}</td><td><input type="number" min="1" id="lh-l${i}" data-k="largo" data-i="${i}" value="${l.largo}" aria-label="Largo"></td><td><input type="number" min="1" id="lh-c${i}" data-k="cant" data-i="${i}" value="${l.cant}" aria-label="Cantidad"></td><td><input id="lh-o${i}" data-k="mod" data-i="${i}" value="${esc(l.mod||'')}" aria-label="Módulo"></td><td><input class="ancho" id="lh-m${i}" data-k="marcas" data-i="${i}" value="${esc((l.marcas||[]).join(', '))}" aria-label="Marcaje"></td><td><select id="lh-p${i}" data-k="pid" data-i="${i}" aria-label="Perfil"><option value="">${l.montado?'Va montado en '+esc(l.montado.en):'No embalar'}</option>${perfiles.map(p=>`<option value="${esc(p.id)}"${p.id===l.pid?' selected':''}>${esc(p.nombre)}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div>
-    <div class="acciones"><button class="btn" type="button" id="leidas-ok">Añadir al pedido</button><button class="btn ghost" type="button" id="leidas-no">Descartar</button></div>`;
+    `<div class="scroll alto"><table><thead><tr><th>Ref.</th><th>Pieza</th><th>Largo</th><th>Uds</th><th>Módulo</th><th>Marcaje</th><th>Perfil</th></tr></thead><tbody>${leidas.map((l,i)=>`<tr><td>${esc(l.ref)}</td><td>${esc(l.desc)}</td><td><input type="number" min="1" id="lh-l${i}" data-k="largo" data-i="${i}" value="${l.largo}" aria-label="Largo"></td><td><input type="number" min="1" id="lh-c${i}" data-k="cant" data-i="${i}" value="${l.cant}" aria-label="Cantidad"></td><td><input id="lh-o${i}" data-k="mod" data-i="${i}" value="${esc(l.mod||'')}" aria-label="Módulo"></td><td><input class="ancho" id="lh-m${i}" data-k="marcas" data-i="${i}" value="${esc((l.marcas||[]).join(', '))}" aria-label="Marcaje"></td><td><select id="lh-p${i}" data-k="pid" data-i="${i}" aria-label="Perfil"><option value="">${l.montado?'Va montado en '+esc(l.montado.en):'No embalar'}</option>${perfiles.map(p=>`<option value="${esc(p.id)}"${p.id===l.pid?' selected':''}>${esc(p.nombre)}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div>
+    ${ACC_LEIDAS}`;
+  if(base) renderResultado();
 }
 // Lee una o varias hojas de corte (una pérgola grande trae una por módulo o grupo de módulos).
 // Cada hoja se queda con los datos de su cabecera y sus líneas llevan el módulo (M1, M2-3…).
@@ -467,11 +472,12 @@ async function leerPDF(files){
     if(t.dataset.k==='pid')renderLeidas();
   });
   $('leidas').addEventListener('click',e=>{
-    if(e.target.id==='leidas-no'){leidas=[];leidasHojas=[];if(!pedido.lineas.length){pedido.ref='';guardarPedido();$('ref-pedido').value='';}renderLeidas();estado('');}
-    if(e.target.id==='leidas-ok'){
+    if(e.target.dataset.l==='no'){leidas=[];leidasHojas=[];if(!pedido.lineas.length){pedido.ref='';guardarPedido();$('ref-pedido').value='';}renderLeidas();estado('');}
+    if(e.target.dataset.l==='ok'){
       const ok=leidas.filter(l=>l.pid&&l.largo&&l.cant);
       ok.forEach(l=>pedido.lineas.push({pid:l.pid,largo:l.largo,cant:l.cant,marcas:l.marcas||[],mod:l.mod||'',hoja:l.hoja}));
       pedido.hojas=(pedido.hojas||[]).filter(h=>!leidasHojas.some(n=>n.archivo===h.archivo)).concat(leidasHojas);
+      if(!pedido.ref&&leidasHojas.length){const h=leidasHojas[0];pedido.ref=[h.numero,h.nombre].filter(Boolean).join(' · ')||h.archivo.replace(/\.pdf$/i,'');}
       const fuera=leidas.length-ok.length;leidas=[];leidasHojas=[];renderLeidas();guardarPedido();renderPedido();
       estado(`${ok.length} líneas añadidas al pedido`+(fuera?`, ${fuera} sin bulto propio.`:'.'));
     }
@@ -602,6 +608,7 @@ document.addEventListener('click',async e=>{
   else if(a==='auto'){renderResultado(true);}
   else if(a==='caja-vacia'){const m=cajas.find(c=>c.id===modeloNuevo);if(m){reparto.bins.push({model:m,free:[],items:[]});hecho();renderResultado();}}
   else if(a==='quitar-caja'){const n=Number(b.dataset.i);if(reparto.bins[n]&&!reparto.bins[n].items.length){reparto.bins.splice(n,1);hecho();renderResultado();}}
+  else if(a==='leidas-ok'){const x=document.querySelector('#leidas [data-l=ok]');if(x)x.click();}
   else if(a==='zoom'){cambiarZoom(b.dataset.v,Number(b.dataset.d));}
   else if(a==='imprimir'){imprimirLista();}
   else if(a==='completa'){completa=completa?null:new Set([Number(b.dataset.i)]);renderResultado();}
