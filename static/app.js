@@ -93,9 +93,16 @@ function bulto(p,L,m,n,mod){
   if(num(p.capL)&&num(p.anchoMedio)&&num(p.anchoMedio)<num(p.ancho)) it.cap={l:num(p.capL),w:num(p.anchoMedio)+hol};
   return it;
 }
-// Peso de una caja: suma de los bultos que tienen peso por metro en el catálogo, y cuántos no lo tienen.
-function pesoCaja(b){const con=b.items.filter(p=>p.it.kg>0);return {kg:con.reduce((s,p)=>s+p.it.kg,0),faltan:b.items.length-con.length};}
-function txtPeso(b){const w=pesoCaja(b);return w.kg?` · peso <b>${Math.round(w.kg)} kg</b>${w.faltan?` (sin contar ${w.faltan} ${w.faltan===1?'bulto':'bultos'} sin peso)`:''}`:'';}
+// Peso de una caja: sus bultos (los que tienen peso por metro en el catálogo) más la propia caja vacía (kg del modelo).
+// faltan = bultos sin peso en el catálogo.
+function pesoCaja(b){
+  const con=b.items.filter(p=>p.it.kg>0),kg=con.reduce((s,p)=>s+p.it.kg,0),tara=Number(b.model.kg)||0;
+  return {kg,tara,total:kg+tara,faltan:b.items.length-con.length};
+}
+function txtPeso(b){
+  const w=pesoCaja(b);if(!w.total)return '';
+  return ` · peso <b>${Math.round(w.total)} kg</b>${w.tara&&w.kg?` (${Math.round(w.kg)} de perfiles + ${Math.round(w.tara)} de la caja)`:w.tara?' (solo la caja vacía)':''}${w.faltan?` · sin contar ${w.faltan} ${w.faltan===1?'bulto':'bultos'} sin peso`:''}${w.tara?'':' · sin el peso de la caja'}`;
+}
 function guardarReparto(){
   const par=it=>[it.p.id,it.L,it.m||'',it.n,it.mod||''];
   const sitio=p=>[p.it.p.id,p.it.L,p.x,p.y,p.w,p.h,p.off||0,p.it.m||'',p.it.n,p.it.mod||''];
@@ -222,7 +229,7 @@ function renderResultado(recalcular){
   const m3=volBins(r.bins)/1e9;
   const porModelo={};r.bins.forEach(b=>porModelo[b.model.nombre]=(porModelo[b.model.nombre]||0)+1);
   const desg=Object.entries(porModelo).map(([n,c])=>`${c} × ${n}`).join(', ');
-  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length}</b> <span>bultos en total <small>(${nb} de perfil + ${r.bins.length} ${r.bins.length===1?'caja':'cajas'})</small></span></div>${r.bins.some(b=>pesoCaja(b).kg)?`<div><b>${Math.round(r.bins.reduce((s,b)=>s+pesoCaja(b).kg,0))}</b> <span>kg${r.bins.some(b=>pesoCaja(b).faltan)?' <small>(faltan pesos)</small>':''}</span></div>`:''}<span class="acciones"><button class="btn" type="button" data-act="imprimir">Imprimir lista de embalaje</button><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></span></div><div class="sub">${esc(desg)}</div>${leyenda()}`;
+  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length}</b> <span>bultos en total <small>(${nb} de perfil + ${r.bins.length} ${r.bins.length===1?'caja':'cajas'})</small></span></div>${r.bins.some(b=>pesoCaja(b).total)?`<div><b>${Math.round(r.bins.reduce((s,b)=>s+pesoCaja(b).total,0))}</b> <span>kg${r.bins.some(b=>pesoCaja(b).faltan||!pesoCaja(b).tara)?' <small>(faltan pesos)</small>':''}</span></div>`:''}<span class="acciones"><button class="btn" type="button" data-act="imprimir">Imprimir lista de embalaje</button><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></span></div><div class="sub">${esc(desg)}</div>${leyenda()}`;
   // Cuánto se aprovecha: sección ocupada de media y el mínimo de cajas que saldría solo por superficie (cota inferior, no siempre alcanzable).
   const todos=r.bins.flatMap(b=>b.items),secB=todos.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)+r.unfit.reduce((s,it)=>s+it.w*it.h,0),secC=r.bins.reduce((s,b)=>s+b.model.intA*b.model.intH,0),minC=Math.max(1,Math.ceil(secB/Math.max(...modelos.map(m=>m.intA*m.intH))));
   if(secC) html+=`<div class="sub">Sección aprovechada: <b>${Math.round(secB/secC*100)} %</b>. ${r.bins.length<=minC?'Con estas cajas no se puede hacer con menos.':`Solo por superficie cabría en ${minC} ${minC===1?'caja':'cajas'}, pero las piezas no se pueden partir ni encajar sin huecos: es un mínimo teórico, no un fallo.`}</div>`;
@@ -275,7 +282,7 @@ function imprimirLista(solo){
   let html=`<section class="hoja">${cab('Lista de embalaje')}
     ${datosPedido().length?`<p class="datos">${datosPedido().map(d=>`${d[0]}: <b>${esc(d[1])}</b>`).join(' · ')}</p>`:''}${leyenda()}
       <p class="tot"><b>${n}</b> ${n===1?'caja':'cajas'} · <b>${(volBins(r.bins)/1e9).toFixed(2)}</b> m³ de transporte · <b>${nb+n}</b> bultos en total (${nb} de perfil + ${n} ${n===1?'caja':'cajas'})</p>
-    <table><thead><tr><th>Caja</th><th>Modelo</th><th>Tipo</th><th>Exterior L×A×H (mm)</th><th class="n">Bultos</th><th class="n">Peso (kg)</th><th>Contenido</th></tr></thead><tbody>${r.bins.map((b,i)=>`<tr><td>${i+1}</td><td>${esc(b.model.nombre)}</td><td>${TIPOS[b.model.tipo]||''}</td><td>${b.model.extL}×${b.model.extA}×${b.model.extH}</td><td class="n">${b.items.length}</td><td class="n">${pesoCaja(b).kg?Math.round(pesoCaja(b).kg)+(pesoCaja(b).faltan?' +':''):''}</td><td>${grupos(b).map(c=>`${c.n} × ${c.mod?esc(c.mod)+' ':''}${esc(c.p.nombre)} ${c.L} mm${num(c.p.uds)>1?' ('+c.pz+' uds)':''}${c.ms.length?' ['+esc(c.ms.join(', '))+']':''}`).join('<br>')}</td></tr>`).join('')}</tbody></table>
+    <table><thead><tr><th>Caja</th><th>Modelo</th><th>Tipo</th><th>Exterior L×A×H (mm)</th><th class="n">Bultos</th><th class="n">Peso (kg)</th><th>Contenido</th></tr></thead><tbody>${r.bins.map((b,i)=>`<tr><td>${i+1}</td><td>${esc(b.model.nombre)}</td><td>${TIPOS[b.model.tipo]||''}</td><td>${b.model.extL}×${b.model.extA}×${b.model.extH}</td><td class="n">${b.items.length}</td><td class="n">${pesoCaja(b).total?Math.round(pesoCaja(b).total)+(pesoCaja(b).faltan||!pesoCaja(b).tara?' +':''):''}</td><td>${grupos(b).map(c=>`${c.n} × ${c.mod?esc(c.mod)+' ':''}${esc(c.p.nombre)} ${c.L} mm${num(c.p.uds)>1?' ('+c.pz+' uds)':''}${c.ms.length?' ['+esc(c.ms.join(', '))+']':''}`).join('<br>')}</td></tr>`).join('')}</tbody></table>
     ${(r.aparcados||[]).length?`<p class="ojo">Aparcados, sin meter en ninguna caja: ${r.aparcados.map(it=>esc(nombreB({it}))).join(', ')}.</p>`:''}${r.unfit.length?`<p class="ojo">Sin caja: ${r.unfit.map(it=>esc(it.p.nombre+' '+it.L+' mm')).join(', ')}.</p>`:''}</section>`;
   if(solo!==undefined) html='';
   html+=r.bins.map((b,i)=>{
@@ -556,7 +563,7 @@ function botones(tipo,id){
 }
 function renderCajas(){
   $('c-guardar').textContent=editCaja?'Guardar cambios':'Guardar caja';
-  $('lista-cajas').innerHTML=cajas.length?`<table><thead><tr><th>Nombre</th><th>Tipo</th><th class="n">Interior L×A×H</th><th class="n">Exterior L×A×H</th><th class="n">m³</th><th></th></tr></thead><tbody>${cajas.map(c=>`<tr><td>${esc(c.nombre)}</td><td>${TIPOS[c.tipo]||''}</td><td class="n">${num(c.intL)}×${num(c.intA)}×${num(c.intH)}</td><td class="n">${num(c.extL)}×${num(c.extA)}×${num(c.extH)}</td><td class="n">${(vol(c)/1e9).toFixed(3)}</td><td class="act">${botones('caja',c.id)}</td></tr>`).join('')}</tbody></table>`
+  $('lista-cajas').innerHTML=cajas.length?`<table><thead><tr><th>Nombre</th><th>Tipo</th><th class="n">Interior L×A×H</th><th class="n">Exterior L×A×H</th><th class="n">m³</th><th class="n">Vacía (kg)</th><th></th></tr></thead><tbody>${cajas.map(c=>`<tr><td>${esc(c.nombre)}</td><td>${TIPOS[c.tipo]||''}</td><td class="n">${num(c.intL)}×${num(c.intA)}×${num(c.intH)}</td><td class="n">${num(c.extL)}×${num(c.extA)}×${num(c.extH)}</td><td class="n">${(vol(c)/1e9).toFixed(3)}</td><td class="n">${Number(c.kg)>0?String(c.kg).replace('.',','):''}</td><td class="act">${botones('caja',c.id)}</td></tr>`).join('')}</tbody></table>`
     :'<div class="empty">Aún no hay cajas. Mide cada modelo por dentro y por fuera y guárdalo con el formulario de arriba.</div>';
 }
 function renderPerfiles(){
@@ -631,6 +638,7 @@ $('vaciar').addEventListener('click',()=>{pedido.lineas=[];pedido.hojas=[];pedid
 $('f-caja').addEventListener('submit',e=>{
   e.preventDefault();
   const d={nombre:$('c-nombre').value.trim(),tipo:$('c-tipo').value,intL:num($('c-il').value),intA:num($('c-ia').value),intH:num($('c-ih').value),extL:num($('c-el').value),extA:num($('c-ea').value),extH:num($('c-eh').value)};
+  if(Number($('c-kg').value)>0) d.kg=Math.round(Number($('c-kg').value)*10)/10;
   if(d.extL<d.intL||d.extA<d.intA||d.extH<d.intH){estado('Revisa las medidas: el exterior no puede ser menor que el interior.');return;}
   if(!base){estado('No se puede guardar: catálogo no disponible.');return;}
   poner(cajas,editCaja,d);editCaja=null;e.target.reset();guardarCatalogo();
@@ -695,7 +703,7 @@ document.addEventListener('click',async e=>{
   else if(a==='borrar-perfil'){confirmar=null;perfiles=perfiles.filter(x=>x.id!==id);guardarCatalogo();}
   else if(a==='editar-caja'){
     const c=cajas.find(x=>x.id===id);if(!c)return;editCaja=id;
-    $('c-nombre').value=c.nombre;$('c-tipo').value=c.tipo;$('c-il').value=c.intL;$('c-ia').value=c.intA;$('c-ih').value=c.intH;$('c-el').value=c.extL;$('c-ea').value=c.extA;$('c-eh').value=c.extH;
+    $('c-nombre').value=c.nombre;$('c-tipo').value=c.tipo;$('c-il').value=c.intL;$('c-ia').value=c.intA;$('c-ih').value=c.intH;$('c-el').value=c.extL;$('c-ea').value=c.extA;$('c-eh').value=c.extH;$('c-kg').value=c.kg||'';
     renderCajas();$('c-nombre').focus();
   }
   else if(a==='editar-perfil'){
