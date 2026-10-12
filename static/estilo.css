@@ -183,3 +183,4 @@ b.mod{font-family:var(--display);font-weight:700;letter-spacing:.02em;white-spac
 @media print{#imprimir .datos{margin:6px 0}#imprimir .leyenda{margin:4px 0}}
 .scroll.alto{max-height:45vh;overflow:auto}
 .note.pend{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+input.modin{width:58px;padding:3px 5px;font:700 13px var(--display);display:inline-block}

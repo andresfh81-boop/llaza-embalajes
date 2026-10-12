@@ -35,7 +35,7 @@ function renderPedido(){
   const L=pedido.lineas;
   $('lineas').innerHTML=L.length?`<div class="scroll"><table><thead><tr><th>Perfil</th><th class="n">Largo</th><th class="n">Uds</th><th></th></tr></thead><tbody>${L.map((l,i)=>{
     const p=perfiles.find(x=>x.id===l.pid);
-    return `<tr><td>${modTxt(l)?`<b class="mod">${esc(l.mod)}</b> `:''}${p?esc(p.nombre):'<span class="tag">perfil borrado</span>'}${l.marcas&&l.marcas.length?` <small class="marca">${esc(l.marcas.join(', '))}</small>`:''}</td><td class="n">${l.largo}</td><td class="n">${l.cant}</td><td class="act"><button class="btn small danger" data-act="quitar" data-i="${i}" type="button" aria-label="Quitar línea">Quitar</button></td></tr>`;}).join('')}</tbody></table></div>`
+    return `<tr><td>${modTxt(l)||(pedido.hojas||[]).length>1?`<input class="modin" data-mod="${i}" value="${esc(l.mod||'')}" aria-label="Módulo"> `:''}${p?esc(p.nombre):'<span class="tag">perfil borrado</span>'}${l.marcas&&l.marcas.length?` <small class="marca">${esc(l.marcas.join(', '))}</small>`:''}</td><td class="n">${l.largo}</td><td class="n">${l.cant}</td><td class="act"><button class="btn small danger" data-act="quitar" data-i="${i}" type="button" aria-label="Quitar línea">Quitar</button></td></tr>`;}).join('')}</tbody></table></div>`
     :'<div class="empty">Añade aquí los perfiles de la hoja de corte: tipo, largo y cantidad.</div>';
   renderHojas();
   renderResultado();
@@ -175,7 +175,7 @@ function renderResultado(recalcular){
   if(!base){el.innerHTML=head+'<div class="empty">Cargando catálogo…</div>';return;}
   const modelos=modelosAct=cajas.filter(c=>c.tipo===pedido.tipo);
   if(!modelos.length){el.innerHTML=head+`<div class="empty">Todavía no hay ninguna caja de tipo <b>${TIPOS[pedido.tipo]}</b>. Dala de alta en la pestaña Cajas con sus medidas interiores y exteriores y aquí aparecerá el reparto.</div>`;return;}
-  const pend=leidas.length?`<div class="note pend">Has leído ${leidas.length} líneas de ${leidasHojas.length} ${leidasHojas.length===1?'hoja de corte':'hojas de corte'} y todavía no están en el pedido: las cajas se calculan al añadirlas. <button class="btn" type="button" data-act="leidas-ok">Añadir al pedido y calcular</button></div>`:'';
+  const pend=leidas.length?`<div class="note pend">${leidas.length} ${leidas.length===1?'línea de las hojas de corte tiene':'líneas de las hojas de corte tienen'} una referencia que no está en el catálogo y no ${leidas.length===1?'está':'están'} en el pedido. Elige su perfil en la columna izquierda y pulsa «Añadir al pedido», o descártalas.</div>`:'';
   if(!pedido.lineas.length){el.innerHTML=head+(pend||`<div class="empty">Hay ${modelos.length} ${modelos.length===1?'caja':'cajas'} de ${TIPOS[pedido.tipo]} en el catálogo. Añade perfiles al pedido para ver cuántas hacen falta.</div>`);return;}
   const hol=num(pedido.holgura),clave=JSON.stringify([pedido,modelos,perfiles]);
   if(recalcular||!reparto||clave!==repartoClave){
@@ -424,6 +424,19 @@ function renderLeidas(){
     ${ACC_LEIDAS}`;
   if(base) renderResultado();
 }
+// Pasa al pedido lo leído que tiene perfil y deja a la vista solo las líneas con una referencia que no está en el catálogo.
+// Si una hoja ya estaba en el pedido (mismo archivo), sus líneas anteriores se sustituyen.
+function volcarLeidas(){
+  const ok=leidas.filter(l=>l.pid&&l.largo&&l.cant),mont=leidas.filter(l=>!l.pid&&l.montado).length;
+  for(const v of (pedido.hojas||[]).filter(h=>leidasHojas.some(n=>n.archivo===h.archivo&&n.id!==h.id))) pedido.lineas=pedido.lineas.filter(l=>l.hoja!==v.id);
+  ok.forEach(l=>pedido.lineas.push({pid:l.pid,largo:l.largo,cant:l.cant,marcas:l.marcas||[],mod:l.mod||'',hoja:l.hoja}));
+  pedido.hojas=(pedido.hojas||[]).filter(h=>!leidasHojas.some(n=>n.archivo===h.archivo)).concat(leidasHojas);
+  if(!pedido.ref&&leidasHojas.length){const h=leidasHojas[0];pedido.ref=[h.numero,h.nombre].filter(Boolean).join(' · ')||h.archivo.replace(/\.pdf$/i,'');}
+  leidas=leidas.filter(l=>!l.pid&&!l.montado);
+  if(!leidas.length) leidasHojas=[];
+  guardarPedido();renderLeidas();renderPedido();
+  return {ok:ok.length,mont,pend:leidas.length};
+}
 // Lee una o varias hojas de corte (una pérgola grande trae una por módulo o grupo de módulos).
 // Cada hoja se queda con los datos de su cabecera y sus líneas llevan el módulo (M1, M2-3…).
 async function leerPDF(files){
@@ -454,10 +467,9 @@ async function leerPDF(files){
       nuevas+=filas.length;
     }catch(e){malas.push(file.name+' (no se ha podido leer)');}
   }
-  // la referencia del pedido se rellena en cuanto se lee la primera hoja, sin esperar a «Añadir al pedido»
-  if(!pedido.ref&&leidasHojas.length){const h=leidasHojas[0];pedido.ref=[h.numero,h.nombre].filter(Boolean).join(' · ')||h.archivo.replace(/\.pdf$/i,'');guardarPedido();$('ref-pedido').value=pedido.ref;}
-  renderLeidas();
-  estado((nuevas?`${nuevas} líneas leídas de ${leidasHojas.length} ${leidasHojas.length===1?'hoja':'hojas'}. Revísalas y pulsa Añadir al pedido.`:'')+(malas.length?` No se ha leído: ${malas.join('; ')}.`:''));
+  const nh=leidasHojas.length,r=nuevas?volcarLeidas():{ok:0,mont:0,pend:0};
+  if(!nuevas) renderLeidas();
+  estado((nuevas?`${r.ok} líneas de ${nh} ${nh===1?'hoja':'hojas'} añadidas al pedido`+(r.mont?`; ${r.mont} van montadas en otro perfil`:'')+(r.pend?`; ${r.pend} sin perfil, revísalas debajo`:'')+'.':'')+(malas.length?` No se ha leído: ${malas.join('; ')}.`:''));
 }
 (function(){
   const d=$('drop');
@@ -636,7 +648,9 @@ document.addEventListener('click',async e=>{
   }
 });
 
-document.addEventListener('change',e=>{if(e.target.id==='cat-file'){importar(e.target.files[0]);e.target.value='';}if(e.target.id==='modelo-nuevo')modeloNuevo=e.target.value;
+document.addEventListener('change',e=>{
+  if(e.target.dataset&&e.target.dataset.mod!==undefined&&pedido.lineas[e.target.dataset.mod]){pedido.lineas[e.target.dataset.mod].mod=e.target.value.trim();guardarPedido();renderPedido();return;}
+  if(e.target.id==='cat-file'){importar(e.target.files[0]);e.target.value='';}if(e.target.id==='modelo-nuevo')modeloNuevo=e.target.value;
   if(e.target.dataset&&e.target.dataset.marcar!==undefined){const n=Number(e.target.dataset.marcar);if(e.target.checked)marcadas.add(n);else marcadas.delete(n);renderResultado();}});
 
 renderTodo();
