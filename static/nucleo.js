@@ -11,6 +11,42 @@ function parseHoja(lineas){
   }
   return out;
 }
+// Datos de la cabecera de la hoja de corte: número, nombre de la pérgola, tipología, medidas, módulo y colores.
+// Algunos PDF traen la cabecera palabra a palabra ("DIMENS." "MÓDULO" "2" "‐" "3:"…). Se vuelven a juntar en frases:
+// misma línea y casi pegadas (w = ancho del texto; si no se sabe, se mira lo que separa los comienzos).
+function frases(its){
+  const filas=[];
+  for(const it of its.slice().sort((a,b)=>a.y-b.y||a.x-b.x)){let r=filas.find(r=>Math.abs(r.y-it.y)<=2.2);if(!r){r={y:it.y,its:[]};filas.push(r);}r.its.push(it);}
+  const out=[];
+  for(const r of filas){
+    let f=null,fin=0;
+    for(const it of r.its.sort((a,b)=>a.x-b.x)){
+      const pegado=f&&(it.w!==undefined&&f.w!==undefined?it.x-fin<=7:false);
+      if(pegado){f.s+=' '+it.s;} else{f={s:it.s,x:it.x,y:it.y,w:it.w};out.push(f);}
+      fin=it.x+(it.w||0);
+    }
+  }
+  return out;
+}
+function leerCabecera(its){
+  its=frases(its);
+  const c={},limpia=t=>t.replace(/\s+/g,' ').trim();
+  const coge=(re,k)=>{for(const i of its){const m=i.s.match(re);if(m){c[k]=limpia(m[1]);return i;}}return null;};
+  const tip=coge(/TIPOLOG[ÍI]A:\s*(.+)$/i,'tipologia');
+  coge(/DIMENS(?:IONES|\.)?\s*(?:P[ÉE]RGOLA)?\s*:\s*(.+)$/i,'pergola'); // «DIMENS. PÉRGOLA:» o, si es de un solo módulo, «DIMENSIONES:»
+  coge(/COLOR ESTRUC\w*\.?:\s*(.+)$/i,'colorE');
+  coge(/COLOR LAMAS:\s*(.+)$/i,'colorL');
+  for(const i of its){
+    const m=i.s.match(/DIMENS\.?\s*M[ÓO]DULO\s*([\d\s\-\u2010-\u2015\u2212]+?)\s*:\s*(.+)$/i);
+    if(m){c.modulo=m[1].replace(/[\u2010-\u2015\u2212]/g,'-').replace(/\s+/g,'');c.dimsModulo=limpia(m[2]);break;}
+  }
+  const hc=its.find(i=>/^HOJA DE CORTE$/i.test(i.s));
+  const n=its.find(i=>/^\d{6,10}$/.test(i.s)&&(!hc||(Math.abs(i.x-hc.x)<80&&i.y>hc.y&&i.y<hc.y+40)));
+  if(n) c.numero=n.s;
+  // el nombre de la pérgola va justo encima de la tipología, en su misma columna
+  if(tip){const nom=its.filter(i=>i!==tip&&Math.abs(i.x-tip.x)<4&&i.y<tip.y&&i.y>tip.y-25).sort((a,b)=>b.y-a.y)[0];if(nom)c.nombre=limpia(nom.s);}
+  return c;
+}
 // Una página de la hoja de corte ya leída del PDF: its = [{s,x,y}] (texto y posición).
 // Devuelve las filas de perfil con su marcaje. El marcaje está en la columna MARCAJE, en una o dos líneas
 // justo encima y debajo de la fila (V1-2 / V4-5); a veces el PDF lo trae troceado ("V","4","-","5").
@@ -30,13 +66,13 @@ function leerPagina(its){
     if(p) filas.push(Object.assign(p,{y:f.y,marcas:[]}));
   }
   for(const m of agrupa(its.filter(esMarca))){
-    const t=m.its.map(i=>i.s).join('').replace(/ /g,'');
+    const t=m.its.map(i=>i.s).join('').replace(/ /g,'').replace(/[\u2010-\u2015\u2212]/g,'-');
     if(!t||t.slice(-1)===':') continue; // "1ª:", "n/2:"… son casillas para rellenar a mano
     let fila=null;
     for(const f of filas){const d=Math.abs(f.y-m.y);if(d<=14&&(!fila||d<Math.abs(fila.y-m.y)))fila=f;}
     if(fila) fila.marcas.push(t);
   }
-  return {filas,letras};
+  return {filas,letras,cab:leerCabecera(its)};
 }
 function newBin(model){return {model, free:[{x:0,y:0,w:model.intA,h:model.intH}], items:[]};}
 function tryPlace(bin,it){
@@ -189,4 +225,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={parseHoja,leerPagina,packWith,plan,planGrupos,chocan,libre,apoyado,vol,volBins,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,vol,volBins,aplicar,diferencia};

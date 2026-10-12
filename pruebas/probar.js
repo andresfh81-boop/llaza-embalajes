@@ -1,6 +1,6 @@
 // node pruebas/probar.js  — comprueba el encaje, la lectura de filas de la hoja de corte y la mezcla del catálogo
 const assert=require('assert'),path=require('path');
-const {packWith:packWithSolo,leerPagina,plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
+const {packWith:packWithSolo,leerPagina,leerCabecera,plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
 const G={nombre:'G',intL:6000,intA:600,intH:400,extL:6100,extA:660,extH:460};
 const S={nombre:'S',intL:4000,intA:300,intH:300,extL:4080,extA:350,extH:350};
 const mk=(n,w,h,L)=>Array.from({length:n},()=>({p:{nombre:w+'x'+h},w,h,L}));
@@ -60,6 +60,16 @@ const pag=leerPagina([{s:'MARCAJE',x:1055,y:116.9},{s:'CHECK',x:1123,y:116.9},
   {s:'P3',x:1068,y:457.6},...fila(466.1,'33004','PILAR',2652,2),{s:'P6',x:1068,y:475.6},
   {s:'1ª:',x:1060,y:500},...fila(508,'33000','LAMA',3855,26),{s:'2ª:',x:1060,y:516}]);
 assert.deepStrictEqual(pag.filas.map(f=>[f.ref,f.largo,f.cant,f.marcas.join('|')]),[['33017',6000,2,'V1-2|V4-5'],['33016',5863,2,''],['33004',2652,2,'P3|P6'],['33000',3855,26,'']]);
+// Cabecera de la hoja: número, nombre, tipología, medidas, módulo (también "2-3" con guion raro) y colores.
+const cabe=m=>leerCabecera([{s:'PERGOLA PARED PORTERÍA',x:264,y:64.9},{s:'HOJA DE CORTE',x:154,y:75.5},{s:'TIPOLOGÍA: MIXTA',x:264,y:77},{s:'COLOR ESTRUC: 7416 TEXT',x:444,y:77},{s:'DIMENS. PÉRGOLA: 7380x8640 mm',x:264,y:89.2},{s:'COLOR LAMAS: 9016',x:444,y:89.2},{s:'54007372',x:172,y:94.6},{s:m,x:264,y:101.3},{s:'33017',x:157,y:142.4}]);
+assert.deepStrictEqual(cabe('DIMENS. MÓDULO 2\u20103: 6680 x 2640 mm'),{tipologia:'MIXTA',pergola:'7380x8640 mm',colorE:'7416 TEXT',colorL:'9016',modulo:'2-3',dimsModulo:'6680 x 2640 mm',numero:'54007372',nombre:'PERGOLA PARED PORTERÍA'});
+assert.strictEqual(cabe('DIMENS. MÓDULO 1: 4060 x 6000 mm').modulo,'1');
+assert.strictEqual(pag.cab.numero,undefined);
+// La misma cabecera troceada palabra a palabra (así viene en la hoja del módulo 2-3) y la de un solo módulo ("DIMENSIONES:").
+const tro=(y,x,t)=>t.split(' ').map((s,i,a)=>({s,y,x:x+a.slice(0,i).join(' ').length*5+i,w:s.length*5}));
+const c23=leerCabecera([...tro(64.4,262,'PERGOLA PARED PORTERÍA'),...tro(75.2,152,'HOJA DE CORTE'),...tro(76.7,262,'TIPOLOGÍA: MIXTA'),...tro(76.7,451,'COLOR ESTRUC: 7416 TEXT'),...tro(89,262,'DIMENS. PÉRGOLA: 7380x8640 mm'),...tro(89,451,'COLOR LAMAS: 9016'),{s:'CORTE',x:680,y:89.3,w:30},{s:'54007372',x:171,y:94.3,w:40},...tro(101.3,262,'DIMENS. MÓDULO 2 \u2010 3: 6680 x 2640 mm'),{s:'ANG.',x:751,y:101.5,w:20}]);
+assert.deepStrictEqual(c23,{tipologia:'MIXTA',pergola:'7380x8640 mm',colorE:'7416 TEXT',colorL:'9016',modulo:'2-3',dimsModulo:'6680 x 2640 mm',numero:'54007372',nombre:'PERGOLA PARED PORTERÍA'});
+assert.strictEqual(leerCabecera([{s:'DIMENSIONES: 3020 x 5450 mm',x:296,y:91.3,w:120}]).pergola,'3020 x 5450 mm');
 console.log('marcaje: ok');
 
 const base=[{id:'a',nombre:'A',ancho:1},{id:'b',nombre:'B',ancho:2},{id:'c',nombre:'C',ancho:3}];

@@ -7,12 +7,13 @@ const cat=JSON.parse(fs.readFileSync(path.join(raiz,'datos','catalogo.json'),'ut
 (async()=>{
   pdfjsLib.GlobalWorkerOptions.workerSrc=path.join(raiz,'vendor','pdfjs','pdf.worker.min.js');
   const pdf=await pdfjsLib.getDocument({data:new Uint8Array(fs.readFileSync(process.argv[2]))}).promise;
-  const leidas=[];
+  const leidas=[];let cab={};
   for(let n=1;n<=pdf.numPages;n++){
     const page=await pdf.getPage(n),vp=page.getViewport({scale:1}),c=await page.getTextContent();
-    const its=c.items.filter(i=>i.str&&i.str.trim()).map(i=>{const p=vp.convertToViewportPoint(i.transform[4],i.transform[5]);return {s:i.str.trim(),x:p[0],y:p[1]};});
-    leidas.push(...leerPagina(its).filas);
+    const its=c.items.filter(i=>i.str&&i.str.trim()).map(i=>{const p=vp.convertToViewportPoint(i.transform[4],i.transform[5]);return {s:i.str.trim(),x:p[0],y:p[1],w:i.width};});
+    const r=leerPagina(its);leidas.push(...r.filas);cab=Object.assign({},r.cab,cab);
   }
+  console.log('--- cabecera ---');console.log(cab);
   console.log('--- líneas de perfil ---');
   const tipo=process.argv[3]||'carton',items=[];
   for(const l of leidas){

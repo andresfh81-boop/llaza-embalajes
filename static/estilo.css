@@ -167,3 +167,17 @@ rect.bulto.sel,rect.plano.sel{stroke:var(--accent);stroke-width:4}
 .boxes.completa .visor{max-height:none}
 .boxes.completa .visor>div{min-width:0}
 @media (max-width:900px){.boxes.completa{grid-template-columns:minmax(0,1fr)}}
+#hojas{display:flex;flex-direction:column;gap:8px}
+#hojas:empty{display:none}
+#hojas dl{margin:0;display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}
+#hojas dt{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+#hojas dd{margin:0;font-weight:500}
+ul.hojas{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+ul.hojas li{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:4px}
+ul.hojas small{color:var(--muted)}
+ul.hojas .btn{margin-left:auto}
+b.mod{font-family:var(--display);font-weight:700;letter-spacing:.02em;white-space:nowrap}
+.leyenda{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center}
+.leyenda .sw,ul.hojas .sw{width:14px;height:14px;margin-right:5px;vertical-align:-2px}
+#leidas input[data-k="mod"]{width:64px}
+@media print{#imprimir .datos{margin:6px 0}#imprimir .leyenda{margin:4px 0}}
