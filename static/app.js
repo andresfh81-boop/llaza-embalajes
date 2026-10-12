@@ -55,19 +55,19 @@ function renderPedido(){
 const CLAVE_REP='reparto-embalaje';
 let reparto=null,repartoClave='',repartoManual=false,repartoGuardado=false,avisoMov='',modelosAct=[];
 // Ampliación de cada dibujo con sus botones + y −: zoom[caja+vista]={z, sl, st} (aumento y hasta dónde está desplazado).
-const PASOS=[1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,2.2,2.4,2.6,2.8,3,3.25,3.5,3.75,4];
+const PASOS=[.3,.4,.5,.6,.7,.8,.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,2.2,2.4,2.6,2.8,3,3.25,3.5,3.75,4];
 let zoom={},arrastrado=false;
 // Cajas a pantalla completa (conjunto de números, o null), cajas marcadas con su casilla para verlas juntas, y bulto seleccionado con un clic ({b: caja, k: posición}) para pasarlo a otra caja con la barra de abajo.
 let completa=null,marcadas=new Set(),sel=null;
 function visor(i,vista,titulo,svg){
   const id=i+vista,z=(zoom[id]||{}).z||1;
-  return `<div class="vcab"><span class="tag">${titulo}</span><span class="zbot"><button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="-1" aria-label="Reducir"${z<=1?' disabled':''}>−</button><b>${Math.round(z*100)} %</b><button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="1" aria-label="Ampliar"${z>=PASOS[PASOS.length-1]?' disabled':''}>+</button>${z>1?`<button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="0">Normal</button>`:''}</span></div><div class="visor" data-v="${id}"><div style="${completa&&completa.has(i)&&vista==='f'?`width:min(${z*100}%,${z*78}vh);margin:0 auto`:`width:${z*100}%`}">${svg}</div></div>`;
+  return `<div class="vcab"><span class="tag">${titulo}</span><span class="zbot"><button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="-1" aria-label="Reducir"${z<=PASOS[0]?' disabled':''}>−</button><b>${Math.round(z*100)} %</b><button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="1" aria-label="Ampliar"${z>=PASOS[PASOS.length-1]?' disabled':''}>+</button>${z!==1?`<button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="0">Normal</button>`:''}</span></div><div class="visor" data-v="${id}"><div style="${completa&&completa.has(i)&&vista==='f'?`width:min(${z*100}%,${z*78}vh);margin:0 auto`:`width:${z*100}%`}">${svg}</div></div>`;
 }
 // Cambia el aumento de un dibujo manteniendo a la vista el mismo punto central.
 function cambiarZoom(id,d){
   const s=zoom[id]=zoom[id]||{z:1},v=document.querySelector(`.visor[data-v="${id}"]`);
   const fx=v?(v.scrollLeft+v.clientWidth/2)/v.scrollWidth:.5,fy=v?(v.scrollTop+v.clientHeight/2)/v.scrollHeight:.5,k=PASOS.indexOf(s.z);
-  s.z=d?PASOS[Math.max(0,Math.min(PASOS.length-1,(k<0?0:k)+d))]:1;s.sl=s.st=0;
+  s.z=d?PASOS[Math.max(0,Math.min(PASOS.length-1,(k<0?PASOS.indexOf(1):k)+d))]:1;s.sl=s.st=0;
   renderResultado();
   const n=document.querySelector(`.visor[data-v="${id}"]`);
   if(n&&s.z>1){n.scrollLeft=s.sl=Math.max(0,fx*n.scrollWidth-n.clientWidth/2);n.scrollTop=s.st=Math.max(0,fy*n.scrollHeight-n.clientHeight/2);}
@@ -179,11 +179,34 @@ function dibujoSeccion(b,i,col,hol){
     const y=M.intH-p.y-p.h,rw=p.medio||p.w,rx=p.x+(p.w-rw)/2,t=corto(p.it.p),fm=Math.min(fc*.9,rw/5,p.h/5),lin=[[t,1],...(varias(p.it)?[[piezas(p.it),1]]:[]),...(modTxt(p.it)||p.it.m?[[[modTxt(p.it),p.it.m].filter(Boolean).join(' · '),2]]:[]),[`${P.w-hol}×${P.h-hol}`,0],[`×${p.it.L}`,0]],f=Math.min(fs,(p.h-fm*1.4)/(lin.length+.2),(rw-fm*1.8)/(Math.max(...lin.map(l=>String(l[0]).length))*.6)),tx=rx+rw/2+fm*.5,ty=y+(p.h-fm*1.4)/2,aire=!apoyado(P,b);
     return (P.medio||P.medioH?`<rect class="prot" x="${P.x}" y="${M.intH-P.y-P.h}" width="${P.w}" height="${P.h}" vector-effect="non-scaling-stroke"/>`:'')+`<rect class="bulto${aire?' aire':''}${sel&&sel.b===i&&sel.k===k?' sel':''}" data-b="${i}" data-k="${k}" x="${rx}" y="${y}" width="${rw}" height="${p.h}" fill="var(--p${col(p.it)})" ${trazo(p.it,1.5)} vector-effect="non-scaling-stroke"><title>${esc(p.it.p.nombre)} · ${p.it.L} mm${varias(p.it)?' · '+piezas(p.it):''}${p.it.m?' · marcaje '+esc(p.it.m):''}${aire?' · en el aire, sin apoyo':''}</title></rect>${lin.map((l,j)=>`<text${l[1]===2?' class="marca"':''} x="${tx}" y="${ty+(j-(lin.length-1)/2)*f}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)"${l[1]?' font-family="var(--display)" font-weight="700"':''}>${esc(l[0])}</text>`).join('')}<text x="${rx+rw/2}" y="${y+p.h-fm*.7}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${rw-hol}</text><text transform="translate(${rx+fm*.75} ${y+p.h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.h-hol}</text>`;}).join('')}${huecos(b,fc)}${cota(M.intA,ocA,1,M.intH,mg,fc,false)}${cota(M.intH,ocH,1,M.intH,mg,fc,true)}</svg>`;
 }
+// Huecos a lo largo en la vista desde arriba: lo que queda libre detrás y delante de cada bulto, hasta la pared de la caja
+// o hasta el bulto que tenga en su misma calle y a su misma altura. Los bultos apilados que coinciden dan una sola cota.
+function huecosPlanta(b,k,ky,fc){
+  const M=b.model,out=[],vistos=new Set(),MIN=15;
+  for(const p of b.items){
+    const z1=p.off||0,z2=z1+p.it.L,cy=(p.x+p.w/2)*ky;
+    // solo los bultos que se ven desde arriba (sin otro encima): las cotas de los tapados se pisarían con las de encima
+    if(b.items.some(o=>o!==p&&o.y>=p.y+p.h-.01&&o.x<p.x+p.w-.01&&p.x<o.x+o.w-.01&&(o.off||0)<z2-.01&&z1<(o.off||0)+o.it.L-.01)) continue;
+    const calle=b.items.filter(o=>o!==p&&o.x<p.x+p.w-.01&&p.x<o.x+o.w-.01&&o.y<p.y+p.h-.01&&p.y<o.y+o.h-.01);
+    const izq=Math.max(0,...calle.filter(o=>(o.off||0)+o.it.L<=z1+.01).map(o=>(o.off||0)+o.it.L)),der=Math.min(M.intL,...calle.filter(o=>(o.off||0)>=z2-.01).map(o=>o.off||0));
+    for(const [a,c] of [[izq,z1],[z2,der]]){
+      const lib=Math.round(c-a),clave=[Math.round(p.x),Math.round(a),Math.round(c)].join();
+      if(lib<MIN||vistos.has(clave)) continue;
+      vistos.add(clave);
+      out.push(`<line class="cota hueco" x1="${a*k}" x2="${c*k}" y1="${cy}" y2="${cy}" vector-effect="non-scaling-stroke"/><text class="cota libre hueco" x="${(a+c)/2*k}" y="${cy}" font-size="${Math.min(fc,lib*k/(String(lib).length*.62))}" text-anchor="middle" dominant-baseline="central">${lib}</text>`);
+    }
+  }
+  return out.join('');
+}
 // Vista desde arriba: largo en horizontal y ancho en vertical (el ancho va ampliado para que se vea). Lo de más arriba tapa lo de debajo.
 const AMPLIA=2,PW=600;
 function dibujoPlanta(b,i,col){
   const M=b.model,W=PW,k=W/M.intL,ky=k*AMPLIA,H=M.intA*ky,mg=42,fc=13;
   const ocL=Math.max(0,...b.items.map(p=>(p.off||0)+p.it.L));
+  // Cota del ancho, a la izquierda: ocupado (desde arriba, donde empieza la caja), libre y total.
+  const ocA=Math.max(0,...b.items.map(p=>p.x+p.w)),libA=Math.round(M.intA-ocA);
+  const tv=(y,d,t,cls)=>`<text class="cota${cls||''}" font-size="${fc}" text-anchor="middle" dominant-baseline="central" transform="translate(${-d} ${y}) rotate(-90)">${t}</text>`,rv=y=>`<line class="cota" x1="${-mg*.5}" x2="0" y1="${y}" y2="${y}" vector-effect="non-scaling-stroke"/>`;
+  const cotaA=rv(0)+rv(ocA*ky)+rv(H)+(ocA?tv(ocA*ky/2,mg*.27,Math.round(ocA)):'')+(libA>0?tv((ocA*ky+H)/2,mg*.27,libA,' libre'):'')+tv(H/2,mg*.76,M.intA+' mm');
   const pieza=(p,n)=>{
     const c=`class="plano${sel&&sel.b===i&&sel.k===n?' sel':''}" data-b="${i}" data-k="${n}" fill="var(--p${col(p.it)})" ${trazo(p.it,1)} vector-effect="non-scaling-stroke"`,x0=(p.off||0)*k,L=p.it.L*k,y0=p.x*ky,h=p.w*ky,t=corto(p.it.p);
     let g;
@@ -191,7 +214,7 @@ function dibujoPlanta(b,i,col){
     else g=`<rect x="${x0}" y="${y0}" width="${L}" height="${h}" ${c}/>`;
     return g+(h>=fc*1.1?`<text x="${x0+L/2}" y="${y0+h/2}" font-size="${Math.min(fc,h*.7)}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${modTxt(p.it)?esc(modTxt(p.it))+' · ':''}${esc(t)}${varias(p.it)?' · '+piezas(p.it):''}${p.it.m?' '+esc(p.it.m):''} · ${p.it.L}</text>`:'');
   };
-  return `<svg class="planta" viewBox="${-mg} -2 ${W+mg+2} ${H+mg+2}" role="img" aria-label="Caja ${i+1} vista desde arriba"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,n)=>({p,n})).sort((u,v)=>u.p.y-v.p.y).map(({p,n})=>pieza(p,n)).join('')}${cota(M.intL,ocL,k,H,mg,fc,false)}<text class="cota" font-size="${fc}" text-anchor="middle" dominant-baseline="central" transform="translate(${-mg*.5} ${H/2}) rotate(-90)">${M.intA} mm</text></svg>`;
+  return `<svg class="planta" viewBox="${-mg} -2 ${W+mg+2} ${H+mg+2}" role="img" aria-label="Caja ${i+1} vista desde arriba"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,n)=>({p,n})).sort((u,v)=>u.p.y-v.p.y).map(({p,n})=>pieza(p,n)).join('')}${huecosPlanta(b,k,ky,fc)}${cota(M.intL,ocL,k,H,mg,fc,false)}${cotaA}</svg>`;
 }
 function renderResultado(recalcular){
   const el=$('resultado');ultimoResumen='';document.body.classList.remove('con-lupa');
