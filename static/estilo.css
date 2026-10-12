@@ -195,3 +195,4 @@ input.modin{width:58px;padding:3px 5px;font:700 13px var(--display);display:inli
 .chip{padding:6px 10px;border-radius:4px;border:1px solid var(--line);color:var(--pfg);font:600 13px var(--display);cursor:grab;touch-action:none;user-select:none}
 .chip.sel{outline:3px solid var(--accent);outline-offset:1px}
 .boxes.completa .boxcard.aparcados{display:flex}
+@media print{#imprimir h2{font-size:14pt;margin:10px 0 2px}#imprimir .hoja table{break-inside:auto}#imprimir .dib>div{break-inside:avoid}}
