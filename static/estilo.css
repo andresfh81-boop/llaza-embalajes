@@ -202,3 +202,8 @@ fieldset.comp legend{font:600 12px var(--body);letter-spacing:.05em;text-transfo
 fieldset.comp .row{grid-template-columns:repeat(4,minmax(0,1fr))}
 .boxcard.comp{border-style:dashed}
 .boxcard.comp p{margin:0;color:var(--muted);font-size:13px}
+.boxcard.comp{border-style:solid}
+.compdib{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}
+.boxcard.comp svg{max-height:170px;cursor:default}
+fieldset.comp{border:2px solid var(--accent)}
+fieldset.comp legend{color:var(--accent)}
