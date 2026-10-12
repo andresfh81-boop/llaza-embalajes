@@ -449,6 +449,8 @@ async function leerPDF(files){
       nuevas+=filas.length;
     }catch(e){malas.push(file.name+' (no se ha podido leer)');}
   }
+  // la referencia del pedido se rellena en cuanto se lee la primera hoja, sin esperar a «Añadir al pedido»
+  if(!pedido.ref&&leidasHojas.length){const h=leidasHojas[0];pedido.ref=[h.numero,h.nombre].filter(Boolean).join(' · ')||h.archivo.replace(/\.pdf$/i,'');guardarPedido();$('ref-pedido').value=pedido.ref;}
   renderLeidas();
   estado((nuevas?`${nuevas} líneas leídas de ${leidasHojas.length} ${leidasHojas.length===1?'hoja':'hojas'}. Revísalas y pulsa Añadir al pedido.`:'')+(malas.length?` No se ha leído: ${malas.join('; ')}.`:''));
 }
@@ -465,12 +467,11 @@ async function leerPDF(files){
     if(t.dataset.k==='pid')renderLeidas();
   });
   $('leidas').addEventListener('click',e=>{
-    if(e.target.id==='leidas-no'){leidas=[];leidasHojas=[];renderLeidas();estado('');}
+    if(e.target.id==='leidas-no'){leidas=[];leidasHojas=[];if(!pedido.lineas.length){pedido.ref='';guardarPedido();$('ref-pedido').value='';}renderLeidas();estado('');}
     if(e.target.id==='leidas-ok'){
       const ok=leidas.filter(l=>l.pid&&l.largo&&l.cant);
       ok.forEach(l=>pedido.lineas.push({pid:l.pid,largo:l.largo,cant:l.cant,marcas:l.marcas||[],mod:l.mod||'',hoja:l.hoja}));
       pedido.hojas=(pedido.hojas||[]).filter(h=>!leidasHojas.some(n=>n.archivo===h.archivo)).concat(leidasHojas);
-      if(!pedido.ref&&ok.length){const h=leidasHojas[0];pedido.ref=[h.numero,h.nombre].filter(Boolean).join(' · ')||h.archivo.replace(/\.pdf$/i,'');}
       const fuera=leidas.length-ok.length;leidas=[];leidasHojas=[];renderLeidas();guardarPedido();renderPedido();
       estado(`${ok.length} líneas añadidas al pedido`+(fuera?`, ${fuera} sin bulto propio.`:'.'));
     }
