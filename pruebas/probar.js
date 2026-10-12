@@ -1,6 +1,6 @@
 // node pruebas/probar.js  — comprueba el encaje, la lectura de filas de la hoja de corte y la mezcla del catálogo
 const assert=require('assert'),path=require('path');
-const {packWith:packWithSolo,leerPagina,leerCabecera,plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
+const {repartir,apoyado:apoy,packWith:packWithSolo,leerPagina,leerCabecera,plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
 const G={nombre:'G',intL:6000,intA:600,intH:400,extL:6100,extA:660,extH:460};
 const S={nombre:'S',intL:4000,intA:300,intH:300,extL:4080,extA:350,extH:350};
 const mk=(n,w,h,L)=>Array.from({length:n},()=>({p:{nombre:w+'x'+h},w,h,L}));
@@ -33,7 +33,7 @@ assert.strictEqual(r.unfit.length,0);assert.deepStrictEqual(r.bins.map(b=>b.item
 assert.ok(r.bins[0].items.some(p=>p.off===300)&&r.bins[0].items.some(p=>p.off===0));
 // Si la caja no tiene largo para adelantar un bulto, no se alterna.
 r=planGrupos(conCap.map(it=>Object.assign({},it,{L:4900})),[C5]);check(r);
-assert.strictEqual(r.bins.length,4);assert.ok(!r.bins[0].items.some(p=>p.off));
+assert.strictEqual(r.bins.length,4);assert.ok(r.bins[0].items.every(p=>r.bins[0].items.every(q=>q.y!==p.y||q.off===p.off))); // sin alternar: los de una misma fila van a la par
 // El reparto automático no deja nada chocando ni fuera, tampoco con el criterio que usa el movimiento a mano.
 for(const b of planGrupos(conCap.concat(mod.filter(it=>it.g==='estructura')),[C5,C7]).bins) for(const p of b.items) assert.ok(libre(p,b,p));
 // Dos piezas cortas en el mismo sitio de la sección chocan, salvo que una vaya detrás de la otra.
@@ -51,6 +51,17 @@ assert.ok(!apoyado(Object.assign(pz(2000,2500),{y:180}),cajaA));
 // Lama girada: el cuerpo es más bajo; dos giradas, una adelantada, se pueden montar en alto encajando cuerpo con protección.
 {const lg=(y,off)=>({it:{L:3855,cap:{l:300,w:205}},x:0,y,w:275,h:282,medioH:205,off});
  assert.ok(chocan(lg(0,0),lg(243.5,0)));assert.ok(!chocan(lg(0,0),lg(243.5,300)));}
+// Carga repartida a lo largo: piezas cortas no se quedan todas en el mismo extremo, nada choca, nada se sale y todo sigue apoyado.
+{const cortas=[...mk(1,236,138,6680),...mk(2,236,138,2423),...mk(3,180,180,2652),...mk(2,147,157,2423),...mk(1,213,233,3775)];
+ const rr=planGrupos(cortas,[C7]);check(rr);assert.strictEqual(rr.bins.length,1);const b=rr.bins[0];
+ for(const p of b.items){assert.ok(libre(p,b,p));assert.ok(apoy(p,b));}
+ const izq=b.items.filter(p=>p.off===0).length,der=b.items.filter(p=>p.off+p.it.L===C7.intL).length;
+ assert.ok(izq>=1&&der>=1,'reparto a los dos extremos: '+izq+'/'+der);
+ const peso=p=>p.it.L*p.w*p.h,cdg=b.items.reduce((s,p)=>s+peso(p)*(p.off+p.it.L/2),0)/b.items.reduce((s,p)=>s+peso(p),0);
+ assert.ok(Math.abs(cdg-C7.intL/2)<C7.intL*.1,'centro de gravedad '+Math.round(cdg));
+ console.log('repartida: '+izq+' a un lado, '+der+' al otro, centro de gravedad a '+Math.round(cdg)+' de '+C7.intL);}
+// Un bulto solo en la caja va centrado.
+{const b=planGrupos(mk(1,180,180,2000),[C5]).bins[0];assert.strictEqual(b.items[0].off,1500);}
 console.log('alternadas: ok');
 // Marcaje de la hoja: dos marcas por fila (encima y debajo), a veces troceadas; las casillas "1ª:" no cuentan.
 const fila=(y,ref,nom,largo,cant)=>[{s:ref,x:157,y},{s:nom,x:250,y},{s:largo+' mm',x:354,y},{s:'45º/45º',x:451,y},{s:String(cant),x:529,y}];

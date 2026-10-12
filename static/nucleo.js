@@ -191,11 +191,45 @@ function apoyado(p,bin){
   return bin.items.some(o=>o!==p&&Math.abs(o.y+o.h-p.y)<=1&&o.x<p.x+p.w-HOLG&&p.x<o.x+o.w-HOLG&&(o.off||0)<z+p.it.L-HOLG&&z<(o.off||0)+o.it.L-HOLG);
 }
 
+// Reparte la carga a lo largo de la caja. El encaje deja todos los bultos pegados al mismo extremo; aquí se van
+// poniendo a un extremo o al otro, de abajo arriba y de más largo a más corto, eligiendo cada vez el lado que deja
+// el peso más centrado. Lo que va encima de otro bulto se queda siempre apoyado en él, y las filas de bultos
+// alternados (lamas con protección) se mueven en bloque para no deshacer el encaje.
+function repartir(bin){
+  const M=bin.model,grupos={},peso=p=>p.it.L*(p.medio||p.w)*p.h;
+  bin.items.forEach((p,i)=>{const k=p.medio?['f',p.y,p.it.L,p.h].join():'u'+i;(grupos[k]=grupos[k]||[]).push(p);});
+  const us=Object.values(grupos).map(its=>{
+    const z0=Math.min(...its.map(p=>p.off||0));
+    its.forEach(p=>{p.off=p.off||0;p._r=p.off-z0;p._o=p.off;});
+    return {its,y:its[0].y,span:Math.max(...its.map(p=>p._r+p.it.L))};
+  }).sort((a,b)=>a.y-b.y||b.span-a.span);
+  const hechos=[];let masa=0,mom=0;
+  for(const u of us){
+    const max=M.intL-u.span,cand=us.length===1?[max/2]:[0]; // un bulto (o una fila) solo en la caja va centrado
+    if(max>0) cand.push(max);
+    // para lo que va encima: también alineado con el principio o el final de lo que tiene debajo
+    for(const p of u.its) for(const o of hechos) if(Math.abs(o.y+o.h-p.y)<=1&&o.x<p.x+p.w-HOLG&&p.x<o.x+o.w-HOLG) cand.push(o.off-p._r,o.off+o.it.L-p.it.L-p._r);
+    let mejor=null;
+    for(const b of cand){
+      if(b<-HOLG||b>max+HOLG) continue;
+      u.its.forEach(p=>p.off=Math.round(b+p._r));
+      if(!u.its.every(p=>apoyado(p,{items:hechos}))) continue;
+      const m=u.its.reduce((s,p)=>s+peso(p),0),mm=u.its.reduce((s,p)=>s+peso(p)*(p.off+p.it.L/2),0),d=Math.abs((mom+mm)/(masa+m)-M.intL/2);
+      if(!mejor||d<mejor.d-1) mejor={b,d,m,mm};
+    }
+    if(mejor){u.its.forEach(p=>p.off=Math.round(mejor.b+p._r));masa+=mejor.m;mom+=mejor.mm;}
+    else{u.its.forEach(p=>p.off=p._o);for(const p of u.its){masa+=peso(p);mom+=peso(p)*(p.off+p.it.L/2);}} // sin sitio con apoyo: se queda donde estaba
+    u.its.forEach(p=>{delete p._r;delete p._o;});
+    hechos.push(...u.its);
+  }
+  return bin;
+}
+
 // Reparto por grupos (estructura, lamas…): cada grupo va en sus propias cajas.
 // Solo se juntan dos cajas de grupos distintos si caben en una sola y así sobra una.
 function planGrupos(items,models){
   const gs=[...new Set(items.map(it=>it.g||''))].sort();
-  if(gs.length<2) return plan(items,models);
+  if(gs.length<2){const r=plan(items,models);r.bins.forEach(repartir);return r;}
   let bins=[],unfit=[];
   for(const g of gs){const r=plan(items.filter(it=>(it.g||'')===g),models);bins=bins.concat(r.bins);unfit=unfit.concat(r.unfit);}
   const asc=models.slice().sort((a,b)=>vol(a)-vol(b)),de=b=>[...new Set(b.items.map(p=>p.it.g||''))].sort().join();
@@ -211,6 +245,7 @@ function planGrupos(items,models){
       }
     }
   }
+  bins.forEach(repartir);
   return {bins,unfit};
 }
 
@@ -225,4 +260,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,vol,volBins,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={repartir,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,vol,volBins,aplicar,diferencia};
