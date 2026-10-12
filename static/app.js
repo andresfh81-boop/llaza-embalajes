@@ -266,7 +266,7 @@ function renderResultado(recalcular){
   const m3=volBins(r.bins)/1e9;
   const porModelo={};r.bins.forEach(b=>porModelo[b.model.nombre]=(porModelo[b.model.nombre]||0)+1);
   const desg=Object.entries(porModelo).map(([n,c])=>`${c} × ${n}`).join(', ');
-  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length}</b> <span>bultos en total <small>(${nb} dentro + ${r.bins.length} ${r.bins.length===1?'caja':'cajas'})</small></span></div>${r.bins.some(b=>pesoCaja(b).total)?`<div><b>${Math.round(r.bins.reduce((s,b)=>s+pesoCaja(b).total,0))}</b> <span>kg${r.bins.some(b=>pesoCaja(b).faltan||!pesoCaja(b).tara)?' <small>(faltan pesos)</small>':''}</span></div>`:''}<span class="acciones"><button class="btn" type="button" data-act="solicitar">Descargar solicitud de cajas (PDF)</button><button class="btn ghost" type="button" data-act="imprimir">Imprimir lista de embalaje</button><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></span></div><div class="sub">${esc(desg)}</div>${leyenda()}`;
+  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length}</b> <span>bultos en total <small>(${nb} dentro + ${r.bins.length} ${r.bins.length===1?'caja':'cajas'})</small></span></div>${r.bins.some(b=>pesoCaja(b).total)?`<div><b>${Math.round(r.bins.reduce((s,b)=>s+pesoCaja(b).total,0))}</b> <span>kg${r.bins.some(b=>pesoCaja(b).faltan||!pesoCaja(b).tara)?' <small>(faltan pesos)</small>':''}</span></div>`:''}<span class="acciones"><button class="btn" type="button" data-act="solicitar">Solicitud de cajas al almacén</button><button class="btn ghost" type="button" data-act="imprimir">Imprimir lista de embalaje</button><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></span></div><div class="sub">${esc(desg)}</div>${leyenda()}`;
   // Cuánto se aprovecha: sección ocupada de media y el mínimo de cajas que saldría solo por superficie (cota inferior, no siempre alcanzable).
   const todos=r.bins.flatMap(b=>b.items),secB=todos.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)+r.unfit.reduce((s,it)=>s+it.w*it.h,0),secC=r.bins.reduce((s,b)=>s+b.model.intA*b.model.intH,0),minC=Math.max(1,Math.ceil(secB/Math.max(...modelos.map(m=>m.intA*m.intH))));
   if(secC) html+=`<div class="sub">Sección aprovechada: <b>${Math.round(secB/secC*100)} %</b>. ${r.bins.length<=minC?'Con estas cajas no se puede hacer con menos.':`Solo por superficie cabría en ${minC} ${minC===1?'caja':'cajas'}, pero las piezas no se pueden partir ni encajar sin huecos: es un mínimo teórico, no un fallo.`}</div>`;
@@ -319,13 +319,30 @@ async function solicitarCajas(){
   const r=reparto;
   if(!r||!r.bins.length||!pedido.lineas.length){estado('Todavía no hay cajas calculadas: arrastra las hojas de corte o añade perfiles al pedido y después solicita las cajas.');return;}
   if(r.aparcados.length||r.unfit.length){avisoMov=`Antes de pedir las cajas: hay ${r.aparcados.length+r.unfit.length} ${r.aparcados.length+r.unfit.length===1?'bulto':'bultos'} sin caja (aparcados o que no caben). Mételos en alguna caja para que la solicitud esté completa.`;sel=null;return renderResultado();}
-  // La solicitud se descarga como PDF para adjuntarla al correo (abrir el programa de correo desde la app no funcionaba).
-  const s=solicitud(),hoy=new Date().toLocaleDateString('es-ES');
+  // La solicitud se enseña en una ventana, con el asunto y el texto a la vista para copiarlos o cortarlos y pegarlos en el correo.
+  const s=solicitud();
+  $('sol-asunto').value=s.asunto;$('sol-texto').value=s.cuerpo.replace(/\r\n/g,'\n');$('sol-aviso').textContent='';
+  $('dlg-sol').showModal();$('sol-texto').focus();$('sol-texto').select();
+}
+// Copia un campo de la ventana de solicitud al portapapeles (y lo deja seleccionado, por si el navegador no deja copiar).
+async function copiarSolicitud(id,que){
+  const c=$(id);c.focus();c.select();
+  try{await navigator.clipboard.writeText(c.value);$('sol-aviso').textContent=que+' copiado. Pégalo en el correo con Ctrl+V.';}
+  catch(e){
+    let ok=false;try{ok=document.execCommand('copy');}catch(err){}
+    $('sol-aviso').textContent=ok?que+' copiado. Pégalo en el correo con Ctrl+V.':'No he podido copiarlo solo: está seleccionado, pulsa Ctrl+C.';
+  }
+}
+// El mismo texto de la ventana (con lo que se haya retocado en ella), en un PDF para adjuntar.
+function pdfSolicitud(){
+  const hoy=new Date().toLocaleDateString('es-ES'),txt=$('sol-texto').value.split('\n').map(l=>l.trimEnd());
+  const cuerpo=txt.filter((l,i)=>!(i<2&&/^hola\b/i.test(l))&&!/^gracias\.?$/i.test(l.trim()));
+  while(cuerpo.length&&!cuerpo[0]) cuerpo.shift();
+  while(cuerpo.length&&!cuerpo[cuerpo.length-1]) cuerpo.pop();
   const lineas=[{t:'Solicitud de cajas',b:1,s:20,gap:4},...(pedido.ref?[{t:pedido.ref,b:1,s:13}]:[]),{t:'Fecha: '+hoy,gap:12}];
-  for(const l of s.cuerpo.split('\r\n').slice(2,-2)) lineas.push(l?{t:l,b:/:$/.test(l)}:{t:' ',s:6});
+  for(const l of cuerpo) lineas.push(l?{t:l,b:/:$/.test(l)}:{t:' ',s:6});
   const nombre=descargar(pdfDeTexto(lineas),`Solicitud de cajas ${pedido.ref||hoy.replace(/\//g,'-')}.pdf`);
-  try{await navigator.clipboard.writeText(s.cuerpo);}catch(e){}
-  estado(`Descargado «${nombre}»: adjúntalo al correo para el almacén. El texto también está copiado, por si prefieres pegarlo en el mensaje.`);
+  $('sol-aviso').textContent=`Descargado «${nombre}».`;
 }
 
 // Lista de embalaje para imprimir: una hoja de resumen y una hoja por caja, con su contenido y sus dos dibujos.
@@ -765,6 +782,10 @@ document.addEventListener('click',async e=>{
   else if(a==='zoom'){cambiarZoom(b.dataset.v,Number(b.dataset.d));}
   else if(a==='imprimir'){imprimirLista();}
   else if(a==='solicitar'){solicitarCajas();}
+  else if(a==='sol-copiar'){copiarSolicitud('sol-texto','Texto');}
+  else if(a==='sol-asunto'){copiarSolicitud('sol-asunto','Asunto');}
+  else if(a==='sol-pdf'){pdfSolicitud();}
+  else if(a==='sol-cerrar'){$('dlg-sol').close();}
   else if(a==='auto-caja'){colocarCaja(Number(b.dataset.i));}
   else if(a==='imprimir-caja'){imprimirLista(Number(b.dataset.i));}
   else if(a==='completa'){completa=completa?null:new Set([Number(b.dataset.i)]);renderResultado();}

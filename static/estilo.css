@@ -207,3 +207,10 @@ fieldset.comp .row{grid-template-columns:repeat(4,minmax(0,1fr))}
 .boxcard.comp svg{max-height:170px;cursor:default}
 fieldset.comp{border:2px solid var(--accent)}
 fieldset.comp legend{color:var(--accent)}
+dialog#dlg-sol{width:min(760px,calc(100vw - 24px));border:1px solid var(--line);border-radius:8px;padding:18px;background:var(--panel);color:var(--fg)}
+dialog#dlg-sol[open]{display:flex;flex-direction:column;gap:12px}
+dialog#dlg-sol::backdrop{background:rgba(0,0,0,.5)}
+dialog#dlg-sol h2{margin:0}
+textarea{font:400 15px/1.45 var(--body);padding:10px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--fg);width:100%;resize:vertical;text-transform:none;letter-spacing:0}
+#sol-aviso{color:var(--accent);font-weight:600;min-height:1.3em}
+@media print{dialog{display:none!important}}

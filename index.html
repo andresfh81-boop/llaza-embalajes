@@ -8,7 +8,7 @@
   <link rel="icon" href="static/favicon.ico">
   <link rel="apple-touch-icon" href="static/icon-180.png">
   <meta name="theme-color" content="#0b5c8a">
-  <link rel="stylesheet" href="static/estilo.css?v=45">
+  <link rel="stylesheet" href="static/estilo.css?v=46">
 </head>
 <body>
 <div class="wrap">
@@ -53,7 +53,7 @@
         <label>Alto (mm)<input id="comp-h" type="number" min="1" step="10"></label>
       </div></fieldset>
       <label>Referencia del pedido (sale en la lista y en la solicitud)<input id="ref-pedido"></label>
-      <button class="btn" type="button" data-act="solicitar">Descargar solicitud de cajas (PDF)</button>
+      <button class="btn" type="button" data-act="solicitar">Solicitud de cajas al almacén</button>
       <button class="btn ghost" id="vaciar" type="button">Vaciar pedido</button>
     </div>
     <div class="panel" id="resultado"></div>
@@ -95,11 +95,24 @@
     <div id="lista-perfiles" class="scroll"></div>
   </section>
 </div>
+<dialog id="dlg-sol">
+  <h2>Solicitud de cajas al almacén</h2>
+  <p class="sub">Copia el asunto y el texto y pégalos en un correo nuevo. Puedes retocar el texto aquí antes de copiarlo.</p>
+  <label>Asunto<input id="sol-asunto"></label>
+  <label>Texto del correo<textarea id="sol-texto" rows="12"></textarea></label>
+  <div id="sol-aviso" role="status"></div>
+  <div class="acciones">
+    <button class="btn" type="button" data-act="sol-copiar">Copiar texto</button>
+    <button class="btn ghost" type="button" data-act="sol-asunto">Copiar asunto</button>
+    <button class="btn ghost" type="button" data-act="sol-pdf">Descargar en PDF</button>
+    <button class="btn ghost" type="button" data-act="sol-cerrar">Cerrar</button>
+  </div>
+</dialog>
 <div id="imprimir"></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script src="static/nucleo.js?v=45"></script>
-<script src="static/pdf.js?v=45"></script>
-<script src="static/app.js?v=45"></script>
+<script src="static/nucleo.js?v=46"></script>
+<script src="static/pdf.js?v=46"></script>
+<script src="static/app.js?v=46"></script>
 </body>
 </html>
