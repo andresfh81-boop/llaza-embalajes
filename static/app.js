@@ -21,7 +21,7 @@ function estado(t){$('estado').textContent=t||'';}
 function leyenda(){
   const ms=modulos(),col=paleta(),ps=perfiles.filter(p=>pedido.lineas.some(l=>l.pid===p.id));
   if(!ps.length)return '';
-  return `<div class="leyenda"><span class="tag">Perfiles</span>${ps.map(p=>`<span><i class="sw" style="background:var(--p${col({p})})"></i>${esc(corto(p))}</span>`).join('')}</div>`+
+  return `<div class="leyenda"><span class="tag">Perfiles</span>${ps.map(p=>`<span><i class="sw" style="background:var(--p${col({p})})"></i>${esc(corto(p))}</span>`).join('')}${componentes().n?'<span><i class="sw" style="background:var(--p9)"></i>Componentes</span>':''}</div>`+
     (ms.length>1?`<div class="leyenda"><span class="tag">Módulos (borde)</span>${ms.map((m,i)=>{const h=(pedido.hojas||[]).find(x=>x.mod===m);return `<span><i class="sw mod" style="border-color:var(--m${i%4})"></i><b>${esc(m)}</b>${h&&h.dimsModulo?' · '+esc(h.dimsModulo):''}</span>`;}).join('')}</div>`:'');
 }
 // Datos de la pérgola tal como vienen en la cabecera de las hojas de corte.
@@ -34,23 +34,17 @@ function renderHojas(){
   const hs=pedido.hojas||[],ms=modulos();
   $('hojas').innerHTML=hs.length?`<h3>Hojas de corte del pedido</h3><dl>${datosPedido().map(d=>`<div><dt>${d[0]}</dt><dd>${esc(d[1])}</dd></div>`).join('')}</dl><ul class="hojas">${hs.map(h=>{const k=ms.indexOf(h.mod);return `<li>${ms.length>1&&k>=0?`<i class="sw mod" style="border-color:var(--m${k%4})"></i>`:''}${h.mod?`<b class="mod">${esc(h.mod)}</b> `:''}${esc(h.dimsModulo||'')} <small>${esc(h.archivo)} · ${pedido.lineas.filter(l=>l.hoja===h.id).length} líneas</small> <button class="btn small danger" type="button" data-act="quitar-hoja" data-id="${esc(h.id)}">Quitar</button></li>`;}).join('')}</ul>${ms.length>1&&ms.some(m=>!hs.some(h=>h.mod===m))?leyenda():''}`:'';
 }
-// Caja de componentes: toda pérgola lleva al menos una, aparte de las cajas de perfiles. Medidas (mm) y cantidad editables;
+// Bulto de componentes e instrucciones: toda pérgola lleva al menos uno. Es un bulto más, que va dentro de las cajas
+// grandes con los perfiles. Medidas (mm) y cantidad editables;
 // las medidas se recuerdan en el navegador para el siguiente pedido.
 const COMP_DEF={n:1,L:500,A:400,H:200};
 function componentes(){
   if(!pedido.comp){let g=null;try{g=JSON.parse(localStorage.getItem('componentes-embalaje')||'null');}catch(e){}pedido.comp=Object.assign({},COMP_DEF,g||{},{n:1});}
   const c=pedido.comp;return {n:num(c.n),L:num(c.L),A:num(c.A),H:num(c.H)};
 }
-// Tarjeta de la caja de componentes: va numerada a continuación de las cajas de perfiles y dibujada con sus medidas,
-// de frente y desde arriba, como las demás.
-function tarjetaComp(cp,nCajas){
-  const dib=(w,h)=>{const mx=Math.max(w,h),mg=mx*.24,fc=mx/9;return `<svg viewBox="${-mg} -2 ${w+mg+2} ${h+mg+2}" role="img" aria-label="Caja de componentes"><rect x="0" y="0" width="${w}" height="${h}" fill="var(--p9)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/><text class="cota" x="${w/2}" y="${h+mg*.55}" font-size="${fc}" text-anchor="middle" dominant-baseline="central">${w} mm</text><text class="cota" transform="translate(${-mg*.5} ${h/2}) rotate(-90)" font-size="${fc}" text-anchor="middle" dominant-baseline="central">${h} mm</text></svg>`;};
-  return `<div class="boxcard comp"><div class="cab"><div><span class="tag">Caja ${nCajas+1}${cp.n>1?' a '+(nCajas+cp.n):''} · Componentes</span><h3>${cp.n} × caja de componentes</h3></div></div>
-    <div class="compdib"><div><span class="tag">De frente · ancho × alto</span>${dib(cp.A,cp.H)}</div><div><span class="tag">Desde arriba · largo × ancho</span>${dib(cp.L,cp.A)}</div></div>
-    <div class="meta">${cp.L} × ${cp.A} × ${cp.H} mm cada una · ${(cp.n*cp.L*cp.A*cp.H/1e9).toFixed(3)} m³ en total</div>
-    <p>Va aparte de las cajas de perfiles. La cantidad y las medidas se cambian en el bloque «Caja de componentes» de la columna del pedido.</p></div>`;
-}
-const txtComp=c=>`${c.n} × caja de componentes ${c.L} × ${c.A} × ${c.H} mm`;
+// El bulto de componentes se trata como un perfil más (va con la estructura) para encajarlo dentro de las cajas.
+function perfilComp(){const c=componentes();return {id:'_comp',ref:'',nombre:'Bulto componentes e instrucciones',corto:'Componentes',grupo:'estructura',ancho:c.A,alto:c.H,uds:1};}
+const perfilDe=pid=>pid==='_comp'?perfilComp():perfiles.find(x=>x.id===pid);
 function renderPedido(){
   const cp=componentes();
   for(const [id,k] of [['comp-n','n'],['comp-l','L'],['comp-a','A'],['comp-h','H']]) if(document.activeElement!==$(id)) $(id).value=cp[k];
@@ -99,7 +93,7 @@ const modTxt=it=>it.mod||'';
 // Color de relleno de cada bulto: uno por perfil (12 colores). El módulo, cuando hay varios, va en el color del borde.
 function paleta(){
   const ms=modulos(),pi=new Map(perfiles.map((p,ci)=>[p.id,ci%12]));
-  return it=>pi.get(it.p.id)||0;
+  return it=>it.p.id==='_comp'?9:(pi.get(it.p.id)||0);
 }
 function trazo(it,w){
   const ms=modulos(),k=ms.indexOf(it.mod);
@@ -135,7 +129,7 @@ function cargarReparto(clave,modelos){
   try{
     const g=JSON.parse(localStorage.getItem(CLAVE_REP)||'null');
     if(!g||g.clave!==clave) return null;
-    const it=([pid,L,m,n,mod])=>bulto(perfiles.find(x=>x.id===pid),L,m,n,mod),bins=[];
+    const it=([pid,L,m,n,mod])=>bulto(perfilDe(pid),L,m,n,mod),bins=[];
     for(const b of g.bins){
       const bin={model:cajas.find(m=>m.id===b.m),free:[],items:[]};
       if(!bin.model) return null;
@@ -244,7 +238,7 @@ function renderResultado(recalcular){
   if(!modelos.length){el.innerHTML=head+`<div class="empty">Todavía no hay ninguna caja de tipo <b>${TIPOS[pedido.tipo]}</b>. Dala de alta en la pestaña Cajas con sus medidas interiores y exteriores y aquí aparecerá el reparto.</div>`;return;}
   const pend=leidas.length?`<div class="note pend">${leidas.length} ${leidas.length===1?'línea de las hojas de corte tiene':'líneas de las hojas de corte tienen'} una referencia que no está en el catálogo y no ${leidas.length===1?'está':'están'} en el pedido. Elige su perfil en la columna izquierda y pulsa «Añadir al pedido», o descártalas.</div>`:'';
   if(!pedido.lineas.length){el.innerHTML=head+(pend||`<div class="empty">Hay ${modelos.length} ${modelos.length===1?'caja':'cajas'} de ${TIPOS[pedido.tipo]} en el catálogo. Añade perfiles al pedido para ver cuántas hacen falta.</div>`);return;}
-  const hol=num(pedido.holgura),clave=JSON.stringify([{tipo:pedido.tipo,holgura:pedido.holgura,lineas:pedido.lineas},modelos,perfiles]);
+  const hol=num(pedido.holgura),clave=JSON.stringify([{tipo:pedido.tipo,holgura:pedido.holgura,lineas:pedido.lineas,comp:componentes()},modelos,perfiles]);
   if(recalcular||!reparto||clave!==repartoClave){
     const g=recalcular?null:cargarReparto(clave,modelos);
     if(g){reparto=g;repartoManual=repartoGuardado=true;}
@@ -256,6 +250,7 @@ function renderResultado(recalcular){
         const u=Math.max(1,num(p.uds)),n=Math.ceil(l.cant/u);
         for(let i=0;i<n;i++) items.push(bulto(p,l.largo,(l.marcas||[]).slice(i*u,(i+1)*u).join(' '),Math.min(u,l.cant-i*u),l.mod));
       }
+      {const c=componentes(),pc=perfilComp();for(let i=0;i<c.n;i++) items.push(bulto(pc,c.L,'',1,''));}
       reparto=planGrupos(items,modelos);reparto.aparcados=[];repartoManual=repartoGuardado=false;
       if(recalcular) try{localStorage.removeItem(CLAVE_REP);}catch(e){}
     }
@@ -268,10 +263,10 @@ function renderResultado(recalcular){
   document.body.classList.toggle('con-lupa',completa!==null);
   const r=reparto,col=paleta();
   const nb=r.bins.reduce((s,b)=>s+b.items.length,0)+r.unfit.length+r.aparcados.length;
-  const cp=componentes(),m3=(volBins(r.bins)+cp.n*cp.L*cp.A*cp.H)/1e9;
+  const m3=volBins(r.bins)/1e9;
   const porModelo={};r.bins.forEach(b=>porModelo[b.model.nombre]=(porModelo[b.model.nombre]||0)+1);
   const desg=Object.entries(porModelo).map(([n,c])=>`${c} × ${n}`).join(', ');
-  let html=head+`<div class="totals"><div><b>${r.bins.length+cp.n}</b> <span>${r.bins.length+cp.n===1?'caja':'cajas'}${cp.n?` <small>(${r.bins.length} de perfiles + ${cp.n} de componentes)</small>`:''}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length+cp.n}</b> <span>bultos en total <small>(${nb} de perfil + ${r.bins.length+cp.n} ${r.bins.length+cp.n===1?'caja':'cajas'})</small></span></div>${r.bins.some(b=>pesoCaja(b).total)?`<div><b>${Math.round(r.bins.reduce((s,b)=>s+pesoCaja(b).total,0))}</b> <span>kg${r.bins.some(b=>pesoCaja(b).faltan||!pesoCaja(b).tara)?' <small>(faltan pesos)</small>':''}</span></div>`:''}<span class="acciones"><button class="btn" type="button" data-act="solicitar">Descargar solicitud de cajas (PDF)</button><button class="btn ghost" type="button" data-act="imprimir">Imprimir lista de embalaje</button><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></span></div><div class="sub">${esc(desg)}</div>${leyenda()}`;
+  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length}</b> <span>bultos en total <small>(${nb} dentro + ${r.bins.length} ${r.bins.length===1?'caja':'cajas'})</small></span></div>${r.bins.some(b=>pesoCaja(b).total)?`<div><b>${Math.round(r.bins.reduce((s,b)=>s+pesoCaja(b).total,0))}</b> <span>kg${r.bins.some(b=>pesoCaja(b).faltan||!pesoCaja(b).tara)?' <small>(faltan pesos)</small>':''}</span></div>`:''}<span class="acciones"><button class="btn" type="button" data-act="solicitar">Descargar solicitud de cajas (PDF)</button><button class="btn ghost" type="button" data-act="imprimir">Imprimir lista de embalaje</button><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></span></div><div class="sub">${esc(desg)}</div>${leyenda()}`;
   // Cuánto se aprovecha: sección ocupada de media y el mínimo de cajas que saldría solo por superficie (cota inferior, no siempre alcanzable).
   const todos=r.bins.flatMap(b=>b.items),secB=todos.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)+r.unfit.reduce((s,it)=>s+it.w*it.h,0),secC=r.bins.reduce((s,b)=>s+b.model.intA*b.model.intH,0),minC=Math.max(1,Math.ceil(secB/Math.max(...modelos.map(m=>m.intA*m.intH))));
   if(secC) html+=`<div class="sub">Sección aprovechada: <b>${Math.round(secB/secC*100)} %</b>. ${r.bins.length<=minC?'Con estas cajas no se puede hacer con menos.':`Solo por superficie cabría en ${minC} ${minC===1?'caja':'cajas'}, pero las piezas no se pueden partir ni encajar sin huecos: es un mínimo teórico, no un fallo.`}</div>`;
@@ -294,8 +289,8 @@ function renderResultado(recalcular){
     lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.mod?c.mod+' ':''}${c.p.nombre} ${c.L} mm${num(c.p.uds)>1?' ('+c.pz+' uds)':''}${c.ms.length?' ['+c.ms.join(', ')+']':''}`).join(', '));
     const flot=b.items.filter(p=>!apoyado(p,b));if(flot.length)lineasTxt.push(`  OJO, sin apoyo: ${flot.map(nombreB).join(', ')}`);
     return `<div class="boxcard${completa&&completa.has(i)?' vista':''}" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><label class="marca-caja"><input type="checkbox" data-marcar="${i}"${marcadas.has(i)?' checked':''}>Seleccionar</label>${cont.length?`<button class="btn small" type="button" data-act="auto-caja" data-i="${i}">Colocación automática</button>`:''}<button class="btn small ghost" type="button" data-act="imprimir-caja" data-i="${i}">Imprimir</button><button class="btn small ghost" type="button" data-act="completa" data-i="${i}">${completa?'Salir de pantalla completa':'Pantalla completa'}</button>${cont.length?'':`<button class="btn small danger" type="button" data-act="quitar-caja" data-i="${i}">Quitar caja</button>`}</div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}${visor(i,'f','De frente · ancho × alto',dibujoSeccion(b,i,col,hol))}${visor(i,'a',`Desde arriba · largo × ancho (ancho ×${AMPLIA})`,dibujoPlanta(b,i,col))}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %${txtPeso(b)}</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col(c)})"></span>${c.n} × ${c.mod?`<b class="mod">${esc(c.mod)}</b> `:''}${esc(c.p.nombre)} · ${c.L} mm${num(c.p.uds)>1?` · ${c.pz} uds`:''}${c.ms.length?` · <b class="marca">${esc(c.ms.join(', '))}</b>`:''}</li>`).join('')}</ul></div>`;
-  }).join('')+(cp.n?tarjetaComp(cp,r.bins.length):'')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Para pasar un bulto a una caja que no tienes a la vista, haz clic en él y elige la caja en la barra que sale abajo; también puedes arrastrarlo, y la página se desplaza sola al acercarte al borde. «Pantalla completa» abre una caja en grande; para ver varias a la vez, marca su casilla «Seleccionar» y pulsa «Ver en pantalla completa»: entre ellas se pueden arrastrar bultos. Con los botones − y + de cada dibujo lo reduces o amplías; ampliado, arrastra el fondo del dibujo para moverte por él. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, moverlo a lo largo y a lo ancho, también a otra caja. Si choca con otro o se sale, te aviso y se queda donde estaba. Para girar un bulto: clic derecho encima, o la tecla R mientras lo arrastras. Si te estorba un bulto para recolocar los demás, llévalo al «Aparcamiento» de arriba y devuélvelo después. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
-  ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas de perfiles (${desg})${cp.n?' + '+txtComp(cp):''}, ${m3.toFixed(2)} m³\nBultos en total: ${nb+r.bins.length+cp.n} (${nb} de perfil + ${r.bins.length+cp.n} cajas)\n`+lineasTxt.join('\n')+(cp.n?`\nComponentes: ${txtComp(cp)}`:'')+(r.aparcados.length?`\nAPARCADOS, sin caja: ${r.aparcados.map(it=>nombreB({it})).join(', ')}`:'');
+  }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Para pasar un bulto a una caja que no tienes a la vista, haz clic en él y elige la caja en la barra que sale abajo; también puedes arrastrarlo, y la página se desplaza sola al acercarte al borde. «Pantalla completa» abre una caja en grande; para ver varias a la vez, marca su casilla «Seleccionar» y pulsa «Ver en pantalla completa»: entre ellas se pueden arrastrar bultos. Con los botones − y + de cada dibujo lo reduces o amplías; ampliado, arrastra el fondo del dibujo para moverte por él. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, moverlo a lo largo y a lo ancho, también a otra caja. Si choca con otro o se sale, te aviso y se queda donde estaba. Para girar un bulto: clic derecho encima, o la tecla R mientras lo arrastras. Si te estorba un bulto para recolocar los demás, llévalo al «Aparcamiento» de arriba y devuélvelo después. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
+  ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas (${desg}), ${m3.toFixed(2)} m³\nBultos en total: ${nb+r.bins.length} (${nb} dentro + ${r.bins.length} cajas)\n`+lineasTxt.join('\n')+(r.aparcados.length?`\nAPARCADOS, sin caja: ${r.aparcados.map(it=>nombreB({it})).join(', ')}`:'');
   // Barra del bulto seleccionado: siempre a la vista abajo, para pasarlo a cualquier caja sin tener que arrastrar.
   if(sel){
     const s=origen(sel.b,sel.k),enAp=sel.b==='ap';
@@ -309,7 +304,7 @@ function renderResultado(recalcular){
 // Solicitud de cajas al almacén: la app sirve para pedir las cajas por anticipado, antes de fabricar la pérgola.
 // Genera un PDF con la solicitud para adjuntarlo al correo; la app no envía nada por sí sola.
 function solicitud(){
-  const r=reparto,n=r.bins.length,porModelo=new Map(),cp=componentes();
+  const r=reparto,n=r.bins.length,porModelo=new Map();
   r.bins.forEach(b=>porModelo.set(b.model.id,{m:b.model,n:((porModelo.get(b.model.id)||{}).n||0)+1}));
   const grupos=b=>{const g={};b.items.forEach(p=>{const md=modTxt(p.it),k=p.it.p.id+'|'+p.it.L+'|'+md;const c=(g[k]=g[k]||{p:p.it.p,L:p.it.L,mod:md,n:0});c.n++;});return Object.values(g);};
   const datos=datosPedido().filter(d=>d[0]!=='Hoja de corte'&&d[0]!=='Pérgola').map(d=>d[0]+': '+d[1]),ms=modulos(),kg=r.bins.reduce((s,b)=>s+pesoCaja(b).total,0);
@@ -317,8 +312,8 @@ function solicitud(){
     'Hola:','',
     `Para ${pedido.ref?'el pedido '+pedido.ref:'un pedido de pérgola'} vamos a necesitar las siguientes cajas:`,'',
     ...[...porModelo.values()].map(x=>`- ${x.n} × ${x.m.nombre} (${TIPOS[x.m.tipo]||''}), exterior ${x.m.extL} × ${x.m.extA} × ${x.m.extH} mm, interior ${x.m.intL} × ${x.m.intA} × ${x.m.intH} mm`),
-    ...(cp.n?[`- ${txtComp(cp)}`]:[]),'',
-    `Total: ${n+cp.n} ${n+cp.n===1?'caja':'cajas'}, ${((volBins(r.bins)+cp.n*cp.L*cp.A*cp.H)/1e9).toFixed(2).replace('.',',')} m³ de transporte${kg?`, unos ${Math.round(kg)} kg`:''}.`,
+    '',
+    `Total: ${n} ${n===1?'caja':'cajas'}, ${(volBins(r.bins)/1e9).toFixed(2).replace('.',',')} m³ de transporte${kg?`, unos ${Math.round(kg)} kg`:''}.`,
     ...(datos.length?['',datos.join(' · ')]:[]),
     ...(ms.length?['Módulos: '+ms.map(m=>{const h=(pedido.hojas||[]).find(x=>x.mod===m);return m+(h&&h.dimsModulo?' '+h.dimsModulo:'');}).join(' · ')]:[]),
     '','Contenido previsto de cada caja:',
@@ -354,10 +349,10 @@ function imprimirLista(solo){
   const cab=t=>`<header><h1>${t}</h1><p>${pedido.ref?`Pedido: <b>${esc(pedido.ref)}</b> · `:''}${hoy}</p></header>`;
   // contenido de una caja agrupado por perfil y largo
   const grupos=b=>{const g={};b.items.forEach(p=>{const md=modTxt(p.it),k=p.it.p.id+'|'+p.it.L+'|'+md;const c=(g[k]=g[k]||{p:p.it.p,L:p.it.L,mod:md,n:0,pz:0,ms:[]});c.n++;c.pz+=p.it.n||1;if(p.it.m)c.ms.push(p.it.m);});return Object.values(g);};
-  const nb=r.bins.reduce((s,b)=>s+b.items.length,0),cp=componentes();
+  const nb=r.bins.reduce((s,b)=>s+b.items.length,0);
   let html=`<section class="hoja">${cab('Lista de embalaje')}
     ${datosPedido().length?`<p class="datos">${datosPedido().map(d=>`${d[0]}: <b>${esc(d[1])}</b>`).join(' · ')}</p>`:''}${leyenda()}
-      <p class="tot"><b>${n+cp.n}</b> ${n+cp.n===1?'caja':'cajas'}${cp.n?` (${n} de perfiles + ${cp.n} de componentes)`:''} · <b>${((volBins(r.bins)+cp.n*cp.L*cp.A*cp.H)/1e9).toFixed(2)}</b> m³ de transporte · <b>${nb+n+cp.n}</b> bultos en total (${nb} de perfil + ${n+cp.n} ${n+cp.n===1?'caja':'cajas'})</p>${cp.n?`<p class="tot">Componentes: <b>${txtComp(cp)}</b>.</p>`:''}
+      <p class="tot"><b>${n}</b> ${n===1?'caja':'cajas'} · <b>${(volBins(r.bins)/1e9).toFixed(2)}</b> m³ de transporte · <b>${nb+n}</b> bultos en total (${nb} dentro + ${n} ${n===1?'caja':'cajas'})</p>
     <table><thead><tr><th>Caja</th><th>Modelo</th><th>Tipo</th><th>Exterior L×A×H (mm)</th><th class="n">Bultos</th><th class="n">Peso (kg)</th><th>Contenido</th></tr></thead><tbody>${r.bins.map((b,i)=>`<tr><td>${i+1}</td><td>${esc(b.model.nombre)}</td><td>${TIPOS[b.model.tipo]||''}</td><td>${b.model.extL}×${b.model.extA}×${b.model.extH}</td><td class="n">${b.items.length}</td><td class="n">${pesoCaja(b).total?Math.round(pesoCaja(b).total)+(pesoCaja(b).faltan||!pesoCaja(b).tara?' +':''):''}</td><td>${grupos(b).map(c=>`${c.n} × ${c.mod?esc(c.mod)+' ':''}${esc(c.p.nombre)} ${c.L} mm${num(c.p.uds)>1?' ('+c.pz+' uds)':''}${c.ms.length?' ['+esc(c.ms.join(', '))+']':''}`).join('<br>')}</td></tr>`).join('')}</tbody></table>
     ${(r.aparcados||[]).length?`<p class="ojo">Aparcados, sin meter en ninguna caja: ${r.aparcados.map(it=>esc(nombreB({it}))).join(', ')}.</p>`:''}${r.unfit.length?`<p class="ojo">Sin caja: ${r.unfit.map(it=>esc(it.p.nombre+' '+it.L+' mm')).join(', ')}.</p>`:''}</section>`;
   if(solo!==undefined) html='';
@@ -380,7 +375,7 @@ function iman(v,cands,tol){let m=v,d=tol;for(const c of cands){const e=Math.abs(
 // Piezas que lleva un bulto: se enseña en los perfiles que se envuelven de varias en varias (lamas, canalón).
 const varias=it=>num(it.p.uds)>1||it.n>1;
 const piezas=it=>`${it.n} ${it.n===1?'ud':'uds'}`;
-const corto=p=>String(p.nombre||p.ref||'').replace(/\s*\(.*?\)/g,'').trim();
+const corto=p=>p.corto||String(p.nombre||p.ref||'').replace(/\s*\(.*?\)/g,'').trim();
 const nombreB=p=>`${modTxt(p.it)?modTxt(p.it)+' ':''}${p.it.p.nombre} de ${p.it.L} mm${p.it.m?' ('+p.it.m+')':''}`;
 const porNum=(u,v)=>u-v;
 function hecho(){avisoMov='';repartoManual=true;repartoGuardado=false;sel=null;}
