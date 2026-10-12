@@ -252,7 +252,7 @@ function renderResultado(recalcular){
   const m3=volBins(r.bins)/1e9;
   const porModelo={};r.bins.forEach(b=>porModelo[b.model.nombre]=(porModelo[b.model.nombre]||0)+1);
   const desg=Object.entries(porModelo).map(([n,c])=>`${c} × ${n}`).join(', ');
-  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length}</b> <span>bultos en total <small>(${nb} de perfil + ${r.bins.length} ${r.bins.length===1?'caja':'cajas'})</small></span></div>${r.bins.some(b=>pesoCaja(b).total)?`<div><b>${Math.round(r.bins.reduce((s,b)=>s+pesoCaja(b).total,0))}</b> <span>kg${r.bins.some(b=>pesoCaja(b).faltan||!pesoCaja(b).tara)?' <small>(faltan pesos)</small>':''}</span></div>`:''}<span class="acciones"><button class="btn" type="button" data-act="solicitar">Solicitar cajas al almacén</button><button class="btn ghost" type="button" data-act="imprimir">Imprimir lista de embalaje</button><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></span></div><div class="sub">${esc(desg)}</div>${leyenda()}`;
+  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length}</b> <span>bultos en total <small>(${nb} de perfil + ${r.bins.length} ${r.bins.length===1?'caja':'cajas'})</small></span></div>${r.bins.some(b=>pesoCaja(b).total)?`<div><b>${Math.round(r.bins.reduce((s,b)=>s+pesoCaja(b).total,0))}</b> <span>kg${r.bins.some(b=>pesoCaja(b).faltan||!pesoCaja(b).tara)?' <small>(faltan pesos)</small>':''}</span></div>`:''}<span class="acciones"><button class="btn" type="button" data-act="solicitar">Descargar solicitud de cajas (PDF)</button><button class="btn ghost" type="button" data-act="imprimir">Imprimir lista de embalaje</button><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></span></div><div class="sub">${esc(desg)}</div>${leyenda()}`;
   // Cuánto se aprovecha: sección ocupada de media y el mínimo de cajas que saldría solo por superficie (cota inferior, no siempre alcanzable).
   const todos=r.bins.flatMap(b=>b.items),secB=todos.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)+r.unfit.reduce((s,it)=>s+it.w*it.h,0),secC=r.bins.reduce((s,b)=>s+b.model.intA*b.model.intH,0),minC=Math.max(1,Math.ceil(secB/Math.max(...modelos.map(m=>m.intA*m.intH))));
   if(secC) html+=`<div class="sub">Sección aprovechada: <b>${Math.round(secB/secC*100)} %</b>. ${r.bins.length<=minC?'Con estas cajas no se puede hacer con menos.':`Solo por superficie cabría en ${minC} ${minC===1?'caja':'cajas'}, pero las piezas no se pueden partir ni encajar sin huecos: es un mínimo teórico, no un fallo.`}</div>`;
@@ -288,8 +288,7 @@ function renderResultado(recalcular){
 }
 
 // Solicitud de cajas al almacén: la app sirve para pedir las cajas por anticipado, antes de fabricar la pérgola.
-// Prepara el correo (asunto y texto) y lo abre en el programa de correo del equipo; no envía nada por sí sola.
-const CLAVE_CORREO='correo-almacen';
+// Genera un PDF con la solicitud para adjuntarlo al correo; la app no envía nada por sí sola.
 function solicitud(){
   const r=reparto,n=r.bins.length,porModelo=new Map();
   r.bins.forEach(b=>porModelo.set(b.model.id,{m:b.model,n:((porModelo.get(b.model.id)||{}).n||0)+1}));
@@ -312,10 +311,13 @@ async function solicitarCajas(){
   const r=reparto;
   if(!r||!r.bins.length||!pedido.lineas.length){estado('Todavía no hay cajas calculadas: arrastra las hojas de corte o añade perfiles al pedido y después solicita las cajas.');return;}
   if(r.aparcados.length||r.unfit.length){avisoMov=`Antes de pedir las cajas: hay ${r.aparcados.length+r.unfit.length} ${r.aparcados.length+r.unfit.length===1?'bulto':'bultos'} sin caja (aparcados o que no caben). Mételos en alguna caja para que la solicitud esté completa.`;sel=null;return renderResultado();}
-  const s=solicitud(),para=($('correo-almacen').value||'').trim();
+  // La solicitud se descarga como PDF para adjuntarla al correo (abrir el programa de correo desde la app no funcionaba).
+  const s=solicitud(),hoy=new Date().toLocaleDateString('es-ES');
+  const lineas=[{t:'Solicitud de cajas',b:1,s:20,gap:4},...(pedido.ref?[{t:pedido.ref,b:1,s:13}]:[]),{t:'Fecha: '+hoy,gap:12}];
+  for(const l of s.cuerpo.split('\r\n').slice(2,-2)) lineas.push(l?{t:l,b:/:$/.test(l)}:{t:' ',s:6});
+  const nombre=descargar(pdfDeTexto(lineas),`Solicitud de cajas ${pedido.ref||hoy.replace(/\//g,'-')}.pdf`);
   try{await navigator.clipboard.writeText(s.cuerpo);}catch(e){}
-  location.href='mailto:'+encodeURIComponent(para)+'?subject='+encodeURIComponent(s.asunto)+'&body='+encodeURIComponent(s.cuerpo);
-  estado('Se ha abierto el correo con la solicitud ya escrita'+(para?'':' (falta poner el destinatario)')+'. El texto también está copiado, por si usas el correo en el navegador.');
+  estado(`Descargado «${nombre}»: adjúntalo al correo para el almacén. El texto también está copiado, por si prefieres pegarlo en el mensaje.`);
 }
 
 // Lista de embalaje para imprimir: una hoja de resumen y una hoja por caja, con su contenido y sus dos dibujos.
@@ -689,8 +691,6 @@ document.querySelector('.tabs').addEventListener('click',e=>{
   $('cat-bar').hidden=b.dataset.tab==='pedido';
 });
 $('tipos').addEventListener('change',e=>{pedido.tipo=e.target.value;guardarPedido();renderResultado();});
-try{$('correo-almacen').value=localStorage.getItem(CLAVE_CORREO)||'';}catch(e){}
-$('correo-almacen').addEventListener('input',e=>{try{localStorage.setItem(CLAVE_CORREO,e.target.value.trim());}catch(err){}});
 $('ref-pedido').addEventListener('input',e=>{pedido.ref=e.target.value.trim();guardarPedido();});
 $('holgura').addEventListener('input',e=>{pedido.holgura=num(e.target.value);guardarPedido();renderResultado();});
 $('f-linea').addEventListener('submit',e=>{
