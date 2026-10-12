@@ -306,18 +306,11 @@ function renderResultado(recalcular){
 function solicitud(){
   const r=reparto,n=r.bins.length,porModelo=new Map();
   r.bins.forEach(b=>porModelo.set(b.model.id,{m:b.model,n:((porModelo.get(b.model.id)||{}).n||0)+1}));
-  const grupos=b=>{const g={};b.items.forEach(p=>{const md=modTxt(p.it),k=p.it.p.id+'|'+p.it.L+'|'+md;const c=(g[k]=g[k]||{p:p.it.p,L:p.it.L,mod:md,n:0});c.n++;});return Object.values(g);};
-  const datos=datosPedido().filter(d=>d[0]!=='Hoja de corte'&&d[0]!=='Pérgola').map(d=>d[0]+': '+d[1]),ms=modulos(),kg=r.bins.reduce((s,b)=>s+pesoCaja(b).total,0);
+  // Solo lo que el almacén necesita: qué cajas y cuántas (pedido por Andrés: sin totales, datos de la pérgola ni contenido).
   const L=[
     'Hola:','',
     `Para ${pedido.ref?'el pedido '+pedido.ref:'un pedido de pérgola'} vamos a necesitar las siguientes cajas:`,'',
     ...[...porModelo.values()].map(x=>`- ${x.n} × ${x.m.nombre} (${TIPOS[x.m.tipo]||''}), exterior ${x.m.extL} × ${x.m.extA} × ${x.m.extH} mm, interior ${x.m.intL} × ${x.m.intA} × ${x.m.intH} mm`),
-    '',
-    `Total: ${n} ${n===1?'caja':'cajas'}, ${(volBins(r.bins)/1e9).toFixed(2).replace('.',',')} m³ de transporte${kg?`, unos ${Math.round(kg)} kg`:''}.`,
-    ...(datos.length?['',datos.join(' · ')]:[]),
-    ...(ms.length?['Módulos: '+ms.map(m=>{const h=(pedido.hojas||[]).find(x=>x.mod===m);return m+(h&&h.dimsModulo?' '+h.dimsModulo:'');}).join(' · ')]:[]),
-    '','Contenido previsto de cada caja:',
-    ...r.bins.map((b,i)=>`Caja ${i+1} · ${b.model.nombre}: `+(grupos(b).map(c=>`${c.n} × ${c.mod?c.mod+' ':''}${corto(c.p)} ${c.L} mm`).join(', ')||'vacía')),
     '','Gracias.'
   ];
   return {asunto:`Solicitud de cajas${pedido.ref?' · '+pedido.ref:''}`,cuerpo:L.join('\r\n')};
