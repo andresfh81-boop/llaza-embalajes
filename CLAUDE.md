@@ -16,6 +16,7 @@ La versión anterior sigue publicada como artifact (https://claude.ai/artifact/J
 - `static/app.js` — interfaz: pedido, catálogos, lectura del PDF, exportar/importar.
 - `datos/catalogo.json` — catálogo común: `{ "perfiles": [...], "cajas": [...] }`, medidas en mm.
 - `vendor/pdfjs/` — pdf.js 3.11.174, la misma copia que `llaza-etiquetas-web`.
+- `manifest.json`, `sw.js` e iconos en `static/` — la app se puede instalar en ordenador y móvil y funciona sin conexión (12/10/2026), igual que `llaza-etiquetas-web`. `sw.js` va con «red primero»: con internet siempre pide lo último y guarda copia; sin conexión sirve la copia. Si se añaden archivos nuevos a la app, apuntarlos en `APP_SHELL` y subir el número de `CACHE_NAME`.
 - `pruebas/probar.js` — `node pruebas/probar.js`.
 - `ejemplos/` — todavía no existe; aquí irán las hojas de corte reales de muestra (ojo: el repo es público, sin datos de clientes).
 
@@ -74,7 +75,6 @@ Para verla en local hace falta servirla (abierta como archivo suelto no carga el
 - La lectura del PDF está comprobada con una hoja de corte real (módulo 4060×6000, 11/10/2026): leyó bien las 19 líneas. Para repetirlo sin navegador: `node pruebas/leer-pdf.js "hoja.pdf"`. Las hojas reales no se suben al repo (es público).
 - No coloca dos perfiles cortos uno detrás de otro dentro de la misma caja.
 - No tiene en cuenta peso ni peso máximo por caja.
-- No es instalable ni funciona sin conexión (no lleva `manifest.json` ni `sw.js` como la app de etiquetas).
 
 ## Siguiente paso
 

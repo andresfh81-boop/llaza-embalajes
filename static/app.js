@@ -602,3 +602,8 @@ renderTodo();
   try{c=JSON.parse(localStorage.getItem(CLAVE_CAT)||'null')||{};}catch(e){}
   montar(c);renderTodo();
 })();
+
+// Instalable como app y con copia para trabajar sin conexión (sw.js).
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});
+}
