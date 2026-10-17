@@ -46,17 +46,21 @@
     var oculta = false; try { oculta = localStorage.getItem('catalogoNoInstalar') === '1'; } catch (e) {}
     var aviso = null;
     var esIphone = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    /* La barra sale siempre en el navegador: Chrome a veces no da el aviso de instalar (no cuenta lo que se toca dentro del Catálogo). */
+    window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); aviso = e; });
     if (!instalada && !oculta) {
-      window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); aviso = e; barra.hidden = false; });
+      barra.hidden = false;
       /* iPhone no tiene botón de instalar: se explica cómo hacerlo. */
-      if (esIphone) { txt.textContent = 'Para instalarla: botón Compartir → «Añadir a pantalla de inicio»'; btn.hidden = true; barra.hidden = false; }
+      if (esIphone) { txt.textContent = 'Para instalarla: botón Compartir → «Añadir a pantalla de inicio»'; btn.hidden = true; }
     }
     btn.onclick = function () {
-      if (!aviso) { txt.textContent = 'Menú ⋮ de Chrome → «Instalar aplicación»'; return; }
+      if (!aviso) { txt.textContent = 'Toca los tres puntos ⋮ de Chrome → «Instalar aplicación» (o «Añadir a pantalla de inicio»)'; return; }
       aviso.prompt();
       aviso.userChoice.then(function (r) { if (r.outcome === 'accepted') barra.hidden = true; aviso = null; });
     };
-    window.addEventListener('appinstalled', function () { barra.hidden = true; });
+    window.addEventListener('appinstalled', function () {
+      barra.hidden = true; try { localStorage.setItem('catalogoNoInstalar', '1'); } catch (e) {}
+    });
     document.getElementById('ahoraNo').onclick = function () {
       barra.hidden = true; try { localStorage.setItem('catalogoNoInstalar', '1'); } catch (e) {}
     };
