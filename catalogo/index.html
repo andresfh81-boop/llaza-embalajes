@@ -10,12 +10,27 @@
   <link rel="apple-touch-icon" href="../static/catalogo/icon-180.png">
   <style>
     html, body { margin: 0; height: 100%; background: #f2f4f5; font-family: system-ui, sans-serif; }
-    iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; }
+    body { display: flex; flex-direction: column; }
+    iframe { flex: 1; width: 100%; border: 0; }
+    .barra { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #0b5c8a; color: #fff; font-size: 15px; }
+    .barra[hidden] { display: none; }
+    .barra img { width: 36px; height: 36px; border-radius: 8px; }
+    .barra span { flex: 1; }
+    .barra button { border: 0; border-radius: 999px; font-size: 15px; padding: 8px 14px; cursor: pointer; }
+    #instalar { background: #e0773a; color: #fff; font-weight: bold; }
+    #ahoraNo { background: transparent; color: #fff; padding: 8px 6px; }
     #aviso { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px; background: #0b5c8a; color: #fff; font-size: 15px; text-align: center; }
     #aviso a { color: #fff; font-weight: bold; }
   </style>
 </head>
 <body>
+  <!-- Barra para instalar: solo sale en el navegador, nunca dentro de la app ya instalada. -->
+  <div class="barra" id="barra" hidden>
+    <img src="../static/catalogo/icon-192.png" alt="">
+    <span id="barraTxt">Instala el Catálogo como una app</span>
+    <button type="button" id="instalar">📲 Instalar</button>
+    <button type="button" id="ahoraNo" aria-label="Ahora no">✕</button>
+  </div>
   <!-- La app de verdad es la de Apps Script (repositorio catalogo-llaza-app); esta página solo la muestra para que se pueda instalar con su icono. -->
   <iframe id="app" src="https://script.google.com/macros/s/AKfycbyqeQNPmjtzhhU6pr4uA97C4o1Xq4tOZKgtxJ52k36JBoo7cncbaQXtrzK9bwJ39gz0IQ/exec" allow="clipboard-write; camera; web-share" title="Catálogo Llaza"></iframe>
   <div id="aviso" hidden>¿No carga? <a href="https://script.google.com/macros/s/AKfycbyqeQNPmjtzhhU6pr4uA97C4o1Xq4tOZKgtxJ52k36JBoo7cncbaQXtrzK9bwJ39gz0IQ/exec" target="_blank" rel="noopener">Ábrelo en Chrome</a> y entra con tu cuenta de Google.</div>
@@ -24,6 +39,27 @@
     var cargada = false;
     document.getElementById('app').addEventListener('load', function () { cargada = true; });
     setTimeout(function () { if (!cargada) document.getElementById('aviso').hidden = false; }, 15000);
+
+    /* ---------- botón Instalar ---------- */
+    var barra = document.getElementById('barra'), txt = document.getElementById('barraTxt'), btn = document.getElementById('instalar');
+    var instalada = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+    var oculta = false; try { oculta = localStorage.getItem('catalogoNoInstalar') === '1'; } catch (e) {}
+    var aviso = null;
+    var esIphone = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (!instalada && !oculta) {
+      window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); aviso = e; barra.hidden = false; });
+      /* iPhone no tiene botón de instalar: se explica cómo hacerlo. */
+      if (esIphone) { txt.textContent = 'Para instalarla: botón Compartir → «Añadir a pantalla de inicio»'; btn.hidden = true; barra.hidden = false; }
+    }
+    btn.onclick = function () {
+      if (!aviso) { txt.textContent = 'Menú ⋮ de Chrome → «Instalar aplicación»'; return; }
+      aviso.prompt();
+      aviso.userChoice.then(function (r) { if (r.outcome === 'accepted') barra.hidden = true; aviso = null; });
+    };
+    window.addEventListener('appinstalled', function () { barra.hidden = true; });
+    document.getElementById('ahoraNo').onclick = function () {
+      barra.hidden = true; try { localStorage.setItem('catalogoNoInstalar', '1'); } catch (e) {}
+    };
   </script>
 </body>
 </html>
