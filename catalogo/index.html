@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b5c8a">
+  <title>Catálogo Llaza</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="../static/catalogo/icon-32.png">
+  <link rel="apple-touch-icon" href="../static/catalogo/icon-180.png">
+  <style>
+    html, body { margin: 0; height: 100%; background: #f2f4f5; font-family: system-ui, sans-serif; }
+    iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; }
+    #aviso { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px; background: #0b5c8a; color: #fff; font-size: 15px; text-align: center; }
+    #aviso a { color: #fff; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <!-- La app de verdad es la de Apps Script (repositorio catalogo-llaza-app); esta página solo la muestra para que se pueda instalar con su icono. -->
+  <iframe id="app" src="https://script.google.com/macros/s/AKfycbyqeQNPmjtzhhU6pr4uA97C4o1Xq4tOZKgtxJ52k36JBoo7cncbaQXtrzK9bwJ39gz0IQ/exec" allow="clipboard-write; camera; web-share" title="Catálogo Llaza"></iframe>
+  <div id="aviso" hidden>¿No carga? <a href="https://script.google.com/macros/s/AKfycbyqeQNPmjtzhhU6pr4uA97C4o1Xq4tOZKgtxJ52k36JBoo7cncbaQXtrzK9bwJ39gz0IQ/exec" target="_blank" rel="noopener">Ábrelo en Chrome</a> y entra con tu cuenta de Google.</div>
+  <script>
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+    var cargada = false;
+    document.getElementById('app').addEventListener('load', function () { cargada = true; });
+    setTimeout(function () { if (!cargada) document.getElementById('aviso').hidden = false; }, 15000);
+  </script>
+</body>
+</html>
