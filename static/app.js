@@ -22,17 +22,18 @@ function leyenda(){
   const ms=modulos(),col=paleta(),ps=perfiles.filter(p=>pedido.lineas.some(l=>l.pid===p.id));
   if(!ps.length)return '';
   return `<div class="leyenda"><span class="tag">Perfiles</span>${ps.map(p=>`<span><i class="sw" style="background:var(--p${col({p})})"></i>${esc(corto(p))}</span>`).join('')}${componentes().n?'<span><i class="sw" style="background:var(--p9)"></i>Componentes</span>':''}</div>`+
-    (ms.length>1?`<div class="leyenda"><span class="tag">Módulos (borde)</span>${ms.map((m,i)=>{const h=(pedido.hojas||[]).find(x=>x.mod===m);return `<span><i class="sw mod" style="border-color:var(--m${i%4})"></i><b>${esc(m)}</b>${h&&h.dimsModulo?' · '+esc(h.dimsModulo):''}</span>`;}).join('')}</div>`:'');
+    (ms.length>1?`<div class="leyenda"><span class="tag">Módulos (borde)</span>${ms.map((m,i)=>{const h=(pedido.hojas||[]).find(x=>grupoHoja(x)===m);return `<span><i class="sw mod" style="border-color:var(--m${i%4})"></i><b>${esc(m)}</b>${h&&h.dimsModulo?' · '+esc(h.dimsModulo):''}</span>`;}).join('')}</div>`:'');
 }
 // Datos de la pérgola tal como vienen en la cabecera de las hojas de corte.
 function datosPedido(){
   const h=(pedido.hojas||[])[0];if(!h)return [];
-  return [['Hoja de corte',h.numero],['Pérgola',h.nombre],['Tipología',[...new Set(pedido.hojas.map(x=>x.tipologia).filter(Boolean))].join(' / ')],['Medidas pérgola',h.pergola],['Color estructura',h.colorE],['Color lamas',h.colorL]].filter(d=>d[1]);
+  const u=k=>[...new Set(pedido.hojas.map(x=>x[k]).filter(Boolean))].join(' + ');
+  return [[pedidosDe().length>1?'Hojas de corte (envío compartido)':'Hoja de corte',u('numero')],['Pérgola',u('nombre')],['Tipología',[...new Set(pedido.hojas.map(x=>x.tipologia).filter(Boolean))].join(' / ')],['Medidas pérgola',h.pergola],['Color estructura',h.colorE],['Color lamas',h.colorL]].filter(d=>d[1]);
 }
 // Bloque «Hojas de corte del pedido»: datos de la pérgola y una fila por hoja leída, con su módulo y su color.
 function renderHojas(){
   const hs=pedido.hojas||[],ms=modulos();
-  $('hojas').innerHTML=hs.length?`<h3>Hojas de corte del pedido</h3><dl>${datosPedido().map(d=>`<div><dt>${d[0]}</dt><dd>${esc(d[1])}</dd></div>`).join('')}</dl><ul class="hojas">${hs.map(h=>{const k=ms.indexOf(h.mod);return `<li>${ms.length>1&&k>=0?`<i class="sw mod" style="border-color:var(--m${k%4})"></i>`:''}${h.mod?`<b class="mod">${esc(h.mod)}</b> `:''}${esc(h.dimsModulo||'')} <small>${esc(h.archivo)} · ${pedido.lineas.filter(l=>l.hoja===h.id).length} líneas</small> <button class="btn small danger" type="button" data-act="quitar-hoja" data-id="${esc(h.id)}">Quitar</button></li>`;}).join('')}</ul>${ms.length>1&&ms.some(m=>!hs.some(h=>h.mod===m))?leyenda():''}`:'';
+  $('hojas').innerHTML=hs.length?`<h3>Hojas de corte del pedido</h3><dl>${datosPedido().map(d=>`<div><dt>${d[0]}</dt><dd>${esc(d[1])}</dd></div>`).join('')}</dl><ul class="hojas">${hs.map(h=>{const g=grupoHoja(h),k=ms.indexOf(g);return `<li>${ms.length>1&&k>=0?`<i class="sw mod" style="border-color:var(--m${k%4})"></i>`:''}${g?`<b class="mod">${esc(g)}</b> `:''}${esc(h.dimsModulo||'')} <small>${esc(h.archivo)} · ${pedido.lineas.filter(l=>l.hoja===h.id).length} líneas</small> <button class="btn small danger" type="button" data-act="quitar-hoja" data-id="${esc(h.id)}">Quitar</button></li>`;}).join('')}</ul>${ms.length>1&&ms.some(m=>!hs.some(h=>grupoHoja(h)===m))?leyenda():''}`:'';
 }
 // Bulto de componentes e instrucciones: toda pérgola lleva al menos uno. Es un bulto más, que va dentro de las cajas
 // grandes con los perfiles. Medidas (mm) y cantidad editables;
@@ -88,19 +89,33 @@ function cambiarZoom(id,d){
 // Modelo elegido en «Añadir caja» (de cualquier tipo de embalaje).
 let modeloNuevo='';
 // Módulos que hay en el pedido (M1, M2-3…). Solo se enseñan y dan color cuando hay más de uno.
-function modulos(){return [...new Set(pedido.lineas.map(l=>l.mod||'').filter(Boolean))];}
-const modTxt=it=>it.mod||'';
+// Envío compartido (Andrés, 27/10/2026): un cliente puede pedir dos pérgolas con números de pedido distintos que van en las
+// mismas cajas. Cada línea sabe de qué pedido es (nº de su hoja de corte); si en el pedido hay más de uno, el nº va delante
+// del módulo en dibujos, listas y colores de borde, para saber de quién es cada bulto.
+const pedDe=l=>l.ped||((pedido.hojas||[]).find(h=>h.id===l.hoja)||{}).numero||'';
+function pedidosDe(){return [...new Set(pedido.lineas.map(pedDe).filter(Boolean))];}
+const modTxt=it=>[pedidosDe().length>1?it.ped:'',it.mod].filter(Boolean).join(' ');
+const grupoLinea=l=>modTxt({ped:pedDe(l),mod:l.mod});
+const grupoHoja=h=>modTxt({ped:h.numero,mod:h.mod});
+function modulos(){return [...new Set(pedido.lineas.map(grupoLinea).filter(Boolean))];}
+// Referencia automática con todos los números y nombres de las hojas (54007592 + 54007600 · Pérgola A + Pérgola B).
+function refDeHojas(hs){
+  const u=k=>[...new Set(hs.map(h=>h[k]).filter(Boolean))].join(' + ');
+  return [u('numero'),u('nombre')].filter(Boolean).join(' · ')||(hs[0]?hs[0].archivo.replace(/\.pdf$/i,''):'');
+}
+// La referencia se rellena sola mientras no la cambie nadie a mano.
+function refAuto(){if(!pedido.ref||pedido.ref===pedido.refAuto){pedido.ref=pedido.refAuto=refDeHojas(pedido.hojas||[]);}}
 // Color de relleno de cada bulto: uno por perfil (12 colores). El módulo, cuando hay varios, va en el color del borde.
 function paleta(){
   const ms=modulos(),pi=new Map(perfiles.map((p,ci)=>[p.id,ci%12]));
   return it=>it.p.id==='_comp'?9:(pi.get(it.p.id)||0);
 }
 function trazo(it,w){
-  const ms=modulos(),k=ms.indexOf(it.mod);
+  const ms=modulos(),k=ms.indexOf(modTxt(it));
   return ms.length>1&&k>=0?`stroke="var(--m${k%4})" stroke-width="${w*2.4}"`:`stroke="var(--panel)" stroke-width="${w}"`;
 }
-function bulto(p,L,m,n,mod){
-  const hol=num(pedido.holgura),it={p,g:p.grupo||'',mod:mod||'',m:m||'',n:n||Math.max(1,num(p.uds)),L,w:num(p.ancho)+hol,h:num(p.alto)+hol};
+function bulto(p,L,m,n,mod,ped){
+  const hol=num(pedido.holgura),it={p,g:p.grupo||'',mod:mod||'',ped:ped||'',m:m||'',n:n||Math.max(1,num(p.uds)),L,w:num(p.ancho)+hol,h:num(p.alto)+hol};
   // peso del bulto: kg por metro de una pieza × largo × piezas que lleva
   if(Number(p.kgm)>0) it.kg=Number(p.kgm)*L/1000*it.n;
   if(num(p.capL)&&num(p.anchoMedio)&&num(p.anchoMedio)<num(p.ancho)) it.cap={l:num(p.capL),w:num(p.anchoMedio)+hol};
@@ -117,8 +132,8 @@ function txtPeso(b){
   return ` · peso <b>${Math.round(w.total)} kg</b>${w.tara&&w.kg?` (${Math.round(w.kg)} de perfiles + ${Math.round(w.tara)} de la caja)`:w.tara?' (solo la caja vacía)':''}${w.faltan?` · sin contar ${w.faltan} ${w.faltan===1?'bulto':'bultos'} sin peso`:''}${w.tara?'':' · sin el peso de la caja'}`;
 }
 function guardarReparto(){
-  const par=it=>[it.p.id,it.L,it.m||'',it.n,it.mod||''];
-  const sitio=p=>[p.it.p.id,p.it.L,p.x,p.y,p.w,p.h,p.off||0,p.it.m||'',p.it.n,p.it.mod||''];
+  const par=it=>[it.p.id,it.L,it.m||'',it.n,it.mod||'',it.ped||''];
+  const sitio=p=>[p.it.p.id,p.it.L,p.x,p.y,p.w,p.h,p.off||0,p.it.m||'',p.it.n,p.it.mod||'',p.it.ped||''];
   try{
     localStorage.setItem(CLAVE_REP,JSON.stringify({clave:repartoClave,bins:reparto.bins.map(b=>({m:b.model.id,its:b.items.map(sitio)})),sin:reparto.unfit.map(par),ap:reparto.aparcados.map(par)}));
     repartoGuardado=true;estado('Reparto guardado en este navegador.');
@@ -129,12 +144,12 @@ function cargarReparto(clave,modelos){
   try{
     const g=JSON.parse(localStorage.getItem(CLAVE_REP)||'null');
     if(!g||g.clave!==clave) return null;
-    const it=([pid,L,m,n,mod])=>bulto(perfilDe(pid),L,m,n,mod),bins=[];
+    const it=([pid,L,m,n,mod,ped])=>bulto(perfilDe(pid),L,m,n,mod,ped),bins=[];
     for(const b of g.bins){
       const bin={model:cajas.find(m=>m.id===b.m),free:[],items:[]};
       if(!bin.model) return null;
-      for(const [pid,L,x,y,w,h,off,m,n,mod] of b.its){
-        const i=it([pid,L,m,n,mod]),p={it:i,x,y,w,h,off};
+      for(const [pid,L,x,y,w,h,off,m,n,mod,ped] of b.its){
+        const i=it([pid,L,m,n,mod,ped]),p={it:i,x,y,w,h,off};
         if(i.cap&&w===i.w) p.medio=i.cap.w; else if(i.cap&&w===i.h) p.medioH=i.cap.w;
         if(!libre(p,bin)) return null;
         bin.items.push(p);
@@ -313,7 +328,7 @@ function bultosDe(lineas,c){
     const p=perfiles.find(x=>x.id===l.pid);if(!p)continue;
     // cada bulto se lleva el marcaje de las piezas que contiene, en el orden de la hoja
     const u=Math.max(1,num(p.uds)),n=Math.ceil(l.cant/u);
-    for(let i=0;i<n;i++) items.push(bulto(p,l.largo,(l.marcas||[]).slice(i*u,(i+1)*u).join(' '),Math.min(u,l.cant-i*u),l.mod));
+    for(let i=0;i<n;i++) items.push(bulto(p,l.largo,(l.marcas||[]).slice(i*u,(i+1)*u).join(' '),Math.min(u,l.cant-i*u),l.mod,pedDe(l)));
   }
   const pc={id:'_comp',ref:'',nombre:'Bulto componentes e instrucciones',corto:'Componentes',grupo:'estructura',ancho:c.A,alto:c.H,uds:1};
   for(let i=0;i<c.n;i++) items.push(bulto(pc,c.L,'',1,''));
@@ -695,9 +710,9 @@ function renderLeidas(){
 function volcarLeidas(){
   const ok=leidas.filter(l=>l.pid&&l.largo&&l.cant),mont=leidas.filter(l=>!l.pid&&l.montado).length;
   for(const v of (pedido.hojas||[]).filter(h=>leidasHojas.some(n=>n.archivo===h.archivo&&n.id!==h.id))) pedido.lineas=pedido.lineas.filter(l=>l.hoja!==v.id);
-  ok.forEach(l=>pedido.lineas.push({pid:l.pid,largo:l.largo,cant:l.cant,marcas:l.marcas||[],mod:l.mod||'',hoja:l.hoja}));
+  ok.forEach(l=>pedido.lineas.push({pid:l.pid,largo:l.largo,cant:l.cant,marcas:l.marcas||[],mod:l.mod||'',hoja:l.hoja,ped:(leidasHojas.find(h=>h.id===l.hoja)||{}).numero||''}));
   pedido.hojas=(pedido.hojas||[]).filter(h=>!leidasHojas.some(n=>n.archivo===h.archivo)).concat(leidasHojas);
-  if(!pedido.ref&&leidasHojas.length){const h=leidasHojas[0];pedido.ref=[h.numero,h.nombre].filter(Boolean).join(' · ')||h.archivo.replace(/\.pdf$/i,'');}
+  refAuto();
   leidas=leidas.filter(l=>!l.pid&&!l.montado);
   if(!leidas.length) leidasHojas=[];
   guardarPedido();renderLeidas();renderPedido();
@@ -758,9 +773,9 @@ async function leerPDF(files){
     if(e.target.dataset.l==='no'){leidas=[];leidasHojas=[];if(!pedido.lineas.length){pedido.ref='';guardarPedido();$('ref-pedido').value='';}renderLeidas();estado('');}
     if(e.target.dataset.l==='ok'){
       const ok=leidas.filter(l=>l.pid&&l.largo&&l.cant);
-      ok.forEach(l=>pedido.lineas.push({pid:l.pid,largo:l.largo,cant:l.cant,marcas:l.marcas||[],mod:l.mod||'',hoja:l.hoja}));
+      ok.forEach(l=>pedido.lineas.push({pid:l.pid,largo:l.largo,cant:l.cant,marcas:l.marcas||[],mod:l.mod||'',hoja:l.hoja,ped:(leidasHojas.find(h=>h.id===l.hoja)||{}).numero||''}));
       pedido.hojas=(pedido.hojas||[]).filter(h=>!leidasHojas.some(n=>n.archivo===h.archivo)).concat(leidasHojas);
-      if(!pedido.ref&&leidasHojas.length){const h=leidasHojas[0];pedido.ref=[h.numero,h.nombre].filter(Boolean).join(' · ')||h.archivo.replace(/\.pdf$/i,'');}
+      refAuto();
       const fuera=leidas.length-ok.length;leidas=[];leidasHojas=[];renderLeidas();guardarPedido();renderPedido();
       estado(`${ok.length} líneas añadidas al pedido`+(fuera?`, ${fuera} sin bulto propio.`:'.'));
     }
@@ -894,7 +909,7 @@ document.addEventListener('click',async e=>{
   const a=b.dataset.act,id=b.dataset.id;
   if(a==='quitar'){pedido.lineas.splice(Number(b.dataset.i),1);guardarPedido();renderPedido();}
   else if(a==='recuperar'&&anterior){pedido=Object.assign({tipo:'carton',holgura:5,lineas:[]},anterior);anterior=null;renderPedido();estado('Último pedido recuperado.');}
-  else if(a==='quitar-hoja'){pedido.lineas=pedido.lineas.filter(l=>l.hoja!==id);pedido.hojas=(pedido.hojas||[]).filter(h=>h.id!==id);if(!pedido.hojas.length&&!pedido.lineas.length)pedido.ref='';guardarPedido();renderPedido();}
+  else if(a==='quitar-hoja'){pedido.lineas=pedido.lineas.filter(l=>l.hoja!==id);pedido.hojas=(pedido.hojas||[]).filter(h=>h.id!==id);if(!pedido.hojas.length&&!pedido.lineas.length)pedido.ref='';else refAuto();guardarPedido();renderPedido();}
   else if(a==='cancelar'){confirmar=null;renderCajas();renderPerfiles();renderCatalogo();}
   else if(a==='exportar'){exportar();}
   else if(a==='auto'){renderResultado(true);}
@@ -960,7 +975,7 @@ document.addEventListener('click',e=>{if(e.target&&e.target.id==='dlg-planta'&&!
 // hoja es un pedido, con el reparto automático). Sale una lista con cliente, nº de pedido y cajas, y el total por modelo,
 // que se guarda en Excel o se manda por correo. Cada tipo de embalaje va en su color, con leyenda.
 const CLAVE_PREV='prevision-embalaje';
-let prevision=[],prevTipo='',prevVaciar=false;
+let prevision=[],prevTipo='',prevVaciar=false,prevMarcas=new Set(); // prevMarcas: ids de los pedidos marcados para juntar
 try{const g=JSON.parse(localStorage.getItem(CLAVE_PREV)||'[]');if(Array.isArray(g))prevision=g;}catch(e){}
 function guardarPrevision(){try{localStorage.setItem(CLAVE_PREV,JSON.stringify(prevision));}catch(e){estado('No se ha podido guardar la previsión en este navegador.');}}
 const tipoTxt=t=>`<b class="t-${esc(t)}">${esc(TIPOS[t]||t)}</b>`;
@@ -976,18 +991,34 @@ function calcularPrev(e){
   delete e.sinCajas;
   return Object.assign(e,resumenCajas(planGrupos(bultosDe(e.lineas,e.comp),mods)));
 }
-// Mete un pedido en la previsión; si ya estaba (mismo nº de pedido), lo sustituye.
+// Mete un pedido en la previsión; si ya estaba (mismo nº de pedido), lo sustituye. Si estaba dentro de un envío
+// compartido, se sustituye su parte y el envío se vuelve a calcular junto.
 function meterPrevision(e){
   const k=prevision.findIndex(x=>e.numero&&x.numero===e.numero);
-  if(k>=0) prevision[k]=Object.assign(e,{id:prevision[k].id}); else prevision.push(e);
-  return k>=0;
+  if(k>=0){prevision[k]=Object.assign(e,{id:prevision[k].id});return true;}
+  const j=prevision.findIndex(x=>e.numero&&x.partes&&x.partes.some(p=>p.numero===e.numero));
+  if(j>=0){const ps=prevision[j].partes.map(p=>p.numero===e.numero?e:p);prevision[j]=Object.assign(juntarPrev(ps,prevision[j].tipo),{id:prevision[j].id});return true;}
+  prevision.push(e);return false;
+}
+// Envío compartido: varios pedidos que van en las mismas cajas. Se calculan juntos (colocación automática), con un bulto de
+// componentes por pedido, y guardan sus partes para poder separarlos después.
+function juntarPrev(ps,tipo){
+  const partes=ps.flatMap(p=>p.partes||[p]).map(p=>{const q=Object.assign({},p);delete q.partes;return q;});
+  const u=k=>[...new Set(partes.map(p=>p[k]).filter(Boolean))].join(' + ');
+  return calcularPrev({id:nuevoId(),fecha:new Date().toISOString().slice(0,10),numero:u('numero'),cliente:u('cliente'),tipo:tipo||partes[0].tipo,origen:'lote',
+    lineas:partes.flatMap(p=>p.lineas),comp:Object.assign({},partes[0].comp,{n:partes.reduce((s,p)=>s+num(p.comp&&p.comp.n),0)}),
+    sinPerfil:partes.reduce((s,p)=>s+(p.sinPerfil||0),0),partes});
 }
 function aPrevision(){
   const r=reparto;
   if(!r||!r.bins.length||!pedido.lineas.length){estado('Todavía no hay cajas calculadas: arrastra las hojas de corte o añade perfiles al pedido.');return;}
   const h=(pedido.hojas||[])[0]||{};
-  const e=Object.assign({id:nuevoId(),fecha:new Date().toISOString().slice(0,10),numero:h.numero||'',cliente:h.nombre||pedido.ref||'',tipo:pedido.tipo,origen:'pedido',
-    lineas:pedido.lineas.map(l=>({pid:l.pid,largo:l.largo,cant:l.cant})),comp:componentes()},resumenCajas(r));
+  const hs=pedido.hojas||[],peds=pedidosDe(),hoy=new Date().toISOString().slice(0,10);
+  const lin=ls=>ls.map(l=>({pid:l.pid,largo:l.largo,cant:l.cant}));
+  // con varios números, cada uno es una parte (con un bulto de componentes) para poder separarlos en la previsión
+  const partes=peds.length>1?peds.map(n=>calcularPrev({id:nuevoId(),fecha:hoy,numero:n,cliente:(hs.find(x=>x.numero===n)||{}).nombre||'',tipo:pedido.tipo,origen:'lote',lineas:lin(pedido.lineas.filter(l=>pedDe(l)===n)),comp:Object.assign({},componentes(),{n:1})})):null;
+  const e=Object.assign({id:nuevoId(),fecha:hoy,numero:peds.length>1?peds.join(' + '):h.numero||'',cliente:peds.length>1?[...new Set(hs.map(x=>x.nombre).filter(Boolean))].join(' + '):h.nombre||pedido.ref||'',tipo:pedido.tipo,origen:'pedido',
+    lineas:lin(pedido.lineas),comp:componentes()},resumenCajas(r),partes?{partes}:{});
   const ya=meterPrevision(e);guardarPrevision();renderPrevision();
   estado(`${ya?'Pedido sustituido':'Pedido añadido'} en la previsión${e.numero?' ('+e.numero+')':''}: ${e.total} ${e.total===1?'caja':'cajas'}. Está en la pestaña Previsión.`);
 }
@@ -1038,26 +1069,26 @@ function renderPrevision(){
   const tot=totalesPrev(),nc=tot.reduce((s,c)=>s+c.n,0),m3=prevision.reduce((s,e)=>s+(e.m3||0),0);
   el.innerHTML=`<div class="totals"><div><b>${prevision.length}</b> <span>${prevision.length===1?'pedido':'pedidos'}</span></div><div><b>${nc}</b> <span>${nc===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><span class="acciones"><button class="btn" type="button" data-act="prev-correo">Enviar por correo</button><button class="btn ghost" type="button" data-act="prev-excel">Guardar en Excel</button><button class="btn ${prevVaciar?'danger':'ghost'}" type="button" data-act="prev-vaciar">${prevVaciar?'¿Seguro? Pulsa otra vez':'Vaciar previsión'}</button></span></div>${leyenda}
     <h3>Cajas que hacen falta</h3><div class="scroll"><table><thead><tr><th>Modelo</th><th>Tipo</th><th>Exterior L×A×H <span class="u">(mm)</span></th><th class="n">Cantidad</th></tr></thead><tbody>${tot.map(c=>`<tr><td><b class="t-${esc(c.tipo)}">${esc(c.nombre)}</b></td><td>${tipoTxt(c.tipo)}</td><td>${c.ext.join(' × ')} mm</td><td class="n"><b class="t-${esc(c.tipo)}">${uds(c.n)}</b></td></tr>`).join('')}</tbody></table></div>
-    <h3>Pedidos</h3><div class="scroll"><table class="prev"><thead><tr><th>Fecha</th><th>Nº pedido</th><th>Cliente / pérgola</th><th>Embalaje</th><th>Cajas</th><th class="n">Total</th><th class="n">m³</th><th></th></tr></thead><tbody>${prevision.map((e,i)=>`<tr><td>${fechaEs(e.fecha)}</td><td><input class="prev-in" data-pi="${i}" data-pk="numero" value="${esc(e.numero)}" aria-label="Nº de pedido"></td><td><input class="prev-in ancho" data-pi="${i}" data-pk="cliente" value="${esc(e.cliente)}" aria-label="Cliente"></td><td><select class="prev-in t-${esc(e.tipo)}" data-pi="${i}" data-pk="tipo" aria-label="Tipo de embalaje">${Object.entries(TIPOS).map(([k,t])=>`<option value="${k}"${k===e.tipo?' selected':''}>${t}</option>`).join('')}</select></td><td>${e.sinCajas?`<span class="ojo">No hay cajas de ${esc(TIPOS[e.tipo].toLowerCase())} en el catálogo</span>`:e.cajas.map(c=>`<b class="t-${esc(c.tipo)}">${c.n} × ${esc(c.nombre)}</b>`).join(', ')}${e.fuera?` <span class="ojo">· ${e.fuera} ${e.fuera===1?'bulto no cabe':'bultos no caben'}</span>`:''}${e.sinPerfil?` <span class="ojo">· ${e.sinPerfil} ${e.sinPerfil===1?'línea sin perfil en el catálogo':'líneas sin perfil en el catálogo'}</span>`:''}${e.origen==='pedido'?' <small class="sub">(del pedido, con sus retoques)</small>':''}</td><td class="n">${uds(e.total)}</td><td class="n">${(e.m3||0).toFixed(2)}</td><td class="act"><button class="btn small danger" type="button" data-act="prev-quitar" data-i="${i}">Quitar</button></td></tr>`).join('')}</tbody></table></div>
-    <p class="sub">La previsión se guarda sola en este navegador. Los pedidos leídos de varias hojas usan la colocación automática; los que vienen de la pestaña Pedido guardan las cajas tal como estaban. Si cambias el embalaje de un pedido, se recalcula con la colocación automática.</p>`;
+    <h3>Pedidos</h3>${prevMarcas.size>=2?`<div class="manual">${prevMarcas.size} pedidos marcados. <button class="btn small" type="button" data-act="prev-juntar">Juntar en un envío</button> <button class="btn small ghost" type="button" data-act="prev-desmarcar">Quitar marcas</button></div>`:'<p class="sub">Si dos pedidos van en las mismas cajas, márcalos y pulsa «Juntar en un envío».</p>'}<div class="scroll"><table class="prev"><thead><tr><th></th><th>Fecha</th><th>Nº pedido</th><th>Cliente / pérgola</th><th>Embalaje</th><th>Cajas</th><th class="n">Total</th><th class="n">m³</th><th></th></tr></thead><tbody>${prevision.map((e,i)=>`<tr${e.partes?' class="compartido"':''}><td><input type="checkbox" data-pmarca="${esc(e.id)}"${prevMarcas.has(e.id)?' checked':''} aria-label="Marcar para juntar"></td><td>${fechaEs(e.fecha)}</td>${e.partes?`<td>${e.partes.map(p=>esc(p.numero||'sin nº')).join('<br>')}</td><td>${e.partes.map(p=>esc(p.cliente||'')).join('<br>')}</td>`:`<td><input class="prev-in" data-pi="${i}" data-pk="numero" value="${esc(e.numero)}" aria-label="Nº de pedido"></td><td><input class="prev-in ancho" data-pi="${i}" data-pk="cliente" value="${esc(e.cliente)}" aria-label="Cliente"></td>`}<td><select class="prev-in t-${esc(e.tipo)}" data-pi="${i}" data-pk="tipo" aria-label="Tipo de embalaje">${Object.entries(TIPOS).map(([k,t])=>`<option value="${k}"${k===e.tipo?' selected':''}>${t}</option>`).join('')}</select></td><td>${e.sinCajas?`<span class="ojo">No hay cajas de ${esc(TIPOS[e.tipo].toLowerCase())} en el catálogo</span>`:e.cajas.map(c=>`<b class="t-${esc(c.tipo)}">${c.n} × ${esc(c.nombre)}</b>`).join(', ')}${e.fuera?` <span class="ojo">· ${e.fuera} ${e.fuera===1?'bulto no cabe':'bultos no caben'}</span>`:''}${e.sinPerfil?` <span class="ojo">· ${e.sinPerfil} ${e.sinPerfil===1?'línea sin perfil en el catálogo':'líneas sin perfil en el catálogo'}</span>`:''}${e.partes?` <span class="tag">Envío compartido · ${e.partes.length} pedidos</span>`:''}${e.origen==='pedido'?' <small class="sub">(del pedido, con sus retoques)</small>':''}</td><td class="n">${uds(e.total)}</td><td class="n">${(e.m3||0).toFixed(2)}</td><td class="act">${e.partes?`<button class="btn small ghost" type="button" data-act="prev-separar" data-i="${i}">Separar</button>`:''}<button class="btn small danger" type="button" data-act="prev-quitar" data-i="${i}">Quitar</button></td></tr>`).join('')}</tbody></table></div>
+    <p class="sub">La previsión se guarda sola en este navegador. Los pedidos leídos de varias hojas usan la colocación automática; los que vienen de la pestaña Pedido guardan las cajas tal como estaban. Si cambias el embalaje de un pedido, se recalcula con la colocación automática. Un envío compartido cuenta sus cajas una sola vez; «Separar» vuelve a calcular cada pedido por su cuenta.</p>`;
 }
 function excelPrevision(){
   const tot=totalesPrev(),hoy=new Date().toLocaleDateString('es-ES');
   const ley=[[],[{v:'Leyenda',s:'neg'}],...Object.keys(TIPOS).map(t=>[{v:TIPOS[t],s:t}])];
-  const pedidos=[[{v:'Previsión de cajas · '+hoy,s:'titulo'}],[],['Fecha','Nº pedido','Cliente / pérgola','Embalaje','Cajas','Total cajas (uds.)','m³'].map(v=>({v,s:'cab'})),
-    ...prevision.map(e=>[fechaEs(e.fecha),e.numero,e.cliente,{v:TIPOS[e.tipo]||e.tipo,s:e.tipo},{v:cajasTxt(e)+(e.fuera?` (${e.fuera} sin caja)`:''),s:e.tipo},e.total,{v:Math.round((e.m3||0)*100)/100,s:'dec'}]),
+  const pedidos=[[{v:'Previsión de cajas · '+hoy,s:'titulo'}],[],['Fecha','Nº pedido','Cliente / pérgola','Embalaje','Cajas','Total cajas (uds.)','m³','Envío compartido'].map(v=>({v,s:'cab'})),
+    ...prevision.map(e=>[fechaEs(e.fecha),e.numero,e.cliente,{v:TIPOS[e.tipo]||e.tipo,s:e.tipo},{v:cajasTxt(e)+(e.fuera?` (${e.fuera} sin caja)`:''),s:e.tipo},e.total,{v:Math.round((e.m3||0)*100)/100,s:'dec'},e.partes?`Sí, ${e.partes.length} pedidos en las mismas cajas`:'']),
     ['','','','','Total',{v:prevision.reduce((s,e)=>s+e.total,0),s:'neg'},{v:Math.round(prevision.reduce((s,e)=>s+(e.m3||0),0)*100)/100,s:'decneg'}],...ley];
   const totales=[[{v:'Cajas que hacen falta · '+hoy,s:'titulo'}],[],['Modelo','Tipo','Exterior L×A×H (mm)','Cantidad (uds.)'].map(v=>({v,s:'cab'})),
     ...tot.map(c=>[{v:c.nombre,s:c.tipo},{v:TIPOS[c.tipo]||c.tipo,s:c.tipo},c.ext.join(' × ')+' mm',{v:c.n,s:c.tipo}]),
     ['','','Total',{v:tot.reduce((s,c)=>s+c.n,0),s:'neg'}],...ley];
-  const nombre=descargar(xlsx([{nombre:'Pedidos',anchos:[12,14,34,16,46,16,10],filas:pedidos},{nombre:'Total por modelo',anchos:[18,18,24,16],filas:totales}]),`Previsión de cajas ${hoy.replace(/\//g,'-')}.xlsx`);
+  const nombre=descargar(xlsx([{nombre:'Pedidos',anchos:[12,22,40,16,46,16,10,30],filas:pedidos},{nombre:'Total por modelo',anchos:[18,18,24,16],filas:totales}]),`Previsión de cajas ${hoy.replace(/\//g,'-')}.xlsx`);
   return nombre;
 }
 function textoPrevision(){
   const tot=totalesPrev(),n=prevision.length;
   const L=['Hola:','',`Previsión de cajas para ${n} ${n===1?'pedido':'pedidos'}:`,'',
     ...tot.map(c=>`- ${uds(c.n)} de ${c.nombre} (${TIPOS[c.tipo]||c.tipo}), exterior ${c.ext.join(' × ')} mm`),
-    '','Por pedido:',...prevision.map(e=>`- ${[e.numero,e.cliente].filter(Boolean).join(' · ')||'Sin nº'} · ${TIPOS[e.tipo]||e.tipo}: ${cajasTxt(e)||'sin cajas'}`),'','Gracias.'];
+    '','Por pedido:',...prevision.map(e=>`- ${[e.numero,e.cliente].filter(Boolean).join(' · ')||'Sin nº'} · ${TIPOS[e.tipo]||e.tipo}: ${cajasTxt(e)||'sin cajas'}${e.partes?` (envío compartido: ${e.partes.length} pedidos en las mismas cajas)`:''}`),'','Gracias.'];
   return {asunto:`Previsión de cajas · ${n} ${n===1?'pedido':'pedidos'}`,cuerpo:L.join('\n')};
 }
 (function(){
@@ -1068,16 +1099,29 @@ function textoPrevision(){
   $('pdf-prev').addEventListener('change',e=>{const f=[...e.target.files];e.target.value='';lotePrevision(f);});
   $('prev-tipo').addEventListener('change',e=>{prevTipo=e.target.value;});
   $('prevision').addEventListener('change',e=>{
+    if(e.target.dataset.pmarca){const id=e.target.dataset.pmarca;if(e.target.checked)prevMarcas.add(id);else prevMarcas.delete(id);renderPrevision();return;}
     const t=e.target,i=Number(t.dataset.pi),x=prevision[i];if(!x||!t.dataset.pk)return;
-    if(t.dataset.pk==='tipo'){x.tipo=t.value;x.origen='lote';calcularPrev(x);} else x[t.dataset.pk]=t.value.trim();
+    if(t.dataset.pk==='tipo'){x.tipo=t.value;x.origen='lote';if(x.partes)x.partes.forEach(p=>p.tipo=t.value);calcularPrev(x);} else x[t.dataset.pk]=t.value.trim();
     guardarPrevision();renderPrevision();
   });
   document.addEventListener('click',e=>{
     const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
     if(a!=='prev-vaciar'&&prevVaciar){prevVaciar=false;renderPrevision();}
     if(a==='a-prevision') aPrevision();
-    else if(a==='prev-quitar'){prevision.splice(Number(b.dataset.i),1);guardarPrevision();renderPrevision();}
-    else if(a==='prev-vaciar'){if(prevVaciar){prevision=[];prevVaciar=false;guardarPrevision();estado('Previsión vaciada.');}else prevVaciar=true;renderPrevision();}
+    else if(a==='prev-quitar'){const x=prevision.splice(Number(b.dataset.i),1)[0];if(x)prevMarcas.delete(x.id);guardarPrevision();renderPrevision();}
+    else if(a==='prev-juntar'){
+      const ps=prevision.filter(x=>prevMarcas.has(x.id));if(ps.length<2)return;
+      const k=prevision.indexOf(ps[0]),e2=juntarPrev(ps,ps[0].tipo);
+      prevision=prevision.filter(x=>!prevMarcas.has(x.id));prevision.splice(Math.min(k,prevision.length),0,e2);prevMarcas.clear();
+      guardarPrevision();renderPrevision();estado(`Juntados en un envío: ${e2.numero} · ${e2.total} ${e2.total===1?'caja':'cajas'} (por separado eran ${ps.reduce((s,x)=>s+x.total,0)}).`);
+    }
+    else if(a==='prev-desmarcar'){prevMarcas.clear();renderPrevision();}
+    else if(a==='prev-separar'){
+      const k=Number(b.dataset.i),x=prevision[k];if(!x||!x.partes)return;
+      const ps=x.partes.map(p=>calcularPrev(Object.assign({},p,{id:nuevoId(),tipo:x.tipo,origen:'lote'})));
+      prevision.splice(k,1,...ps);guardarPrevision();renderPrevision();estado(`Separado en ${ps.length} pedidos, cada uno con sus cajas.`);
+    }
+    else if(a==='prev-vaciar'){if(prevVaciar){prevision=[];prevMarcas.clear();prevVaciar=false;guardarPrevision();estado('Previsión vaciada.');}else prevVaciar=true;renderPrevision();}
     else if(a==='prev-excel'){const n=excelPrevision();estado(`Descargado «${n}».`);}
     else if(a==='prev-correo'){const t=textoPrevision();$('prev-asunto').value=t.asunto;$('prev-texto').value=t.cuerpo;$('prev-aviso').textContent='';$('dlg-prev').showModal();}
     else if(a==='prev-copiar') copiarSolicitud('prev-texto','Texto','prev-aviso');
