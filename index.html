@@ -8,7 +8,7 @@
   <link rel="icon" href="static/favicon.ico">
   <link rel="apple-touch-icon" href="static/icon-180.png">
   <meta name="theme-color" content="#0b5c8a">
-  <link rel="stylesheet" href="static/estilo.css?v=48">
+  <link rel="stylesheet" href="static/estilo.css?v=49">
 </head>
 <body>
 <div class="wrap">
@@ -39,18 +39,18 @@
       <div id="hojas"></div>
       <form id="f-linea" class="row">
         <label style="grid-column:1/-1">Perfil<select id="l-perfil" required></select></label>
-        <label>Largo (mm)<input id="l-largo" type="number" min="1" step="1" required></label>
+        <label>Largo <span class="u">(mm)</span><input id="l-largo" type="number" min="1" step="1" required></label>
         <label>Cantidad<input id="l-cant" type="number" min="1" step="1" value="1" required></label>
         <label style="grid-column:1/-1">Marcaje (opcional, separado por comas)<input id="l-marcas" placeholder="V1-2, V4-5"></label>
         <button class="btn" style="grid-column:1/-1">Añadir al pedido</button>
       </form>
       <div id="lineas"></div>
-      <label>Holgura por bulto (mm)<input id="holgura" type="number" min="0" step="1"></label>
+      <label>Holgura por bulto <span class="u">(mm)</span><input id="holgura" type="number" min="0" step="1"></label>
       <fieldset class="comp"><legend>Bulto componentes e instrucciones</legend><div class="row">
         <label>Cantidad<input id="comp-n" type="number" min="0" step="1"></label>
-        <label>Largo (mm)<input id="comp-l" type="number" min="1" step="10"></label>
-        <label>Ancho (mm)<input id="comp-a" type="number" min="1" step="10"></label>
-        <label>Alto (mm)<input id="comp-h" type="number" min="1" step="10"></label>
+        <label>Largo <span class="u">(mm)</span><input id="comp-l" type="number" min="1" step="10"></label>
+        <label>Ancho <span class="u">(mm)</span><input id="comp-a" type="number" min="1" step="10"></label>
+        <label>Alto <span class="u">(mm)</span><input id="comp-h" type="number" min="1" step="10"></label>
       </div></fieldset>
       <label>Referencia del pedido (sale en la lista y en la solicitud)<input id="ref-pedido"></label>
       <button class="btn" type="button" data-act="solicitar">Solicitud de cajas al almacén</button>
@@ -64,13 +64,13 @@
     <form id="f-caja" class="row">
       <label>Nombre<input id="c-nombre" required></label>
       <label>Tipo<select id="c-tipo"><option value="carton">Cartón</option><option value="cerrada">Madera cerrada</option><option value="abierta">Madera abierta</option></select></label>
-      <label>Largo interior<input id="c-il" type="number" min="1" required></label>
-      <label>Ancho interior<input id="c-ia" type="number" min="1" required></label>
-      <label>Alto interior<input id="c-ih" type="number" min="1" required></label>
-      <label>Largo exterior<input id="c-el" type="number" min="1" required></label>
-      <label>Ancho exterior<input id="c-ea" type="number" min="1" required></label>
-      <label>Alto exterior<input id="c-eh" type="number" min="1" required></label>
-      <label>Peso vacía (kg)<input id="c-kg" type="number" min="0" step="any"></label>
+      <label>Largo interior <span class="u">(mm)</span><input id="c-il" type="number" min="1" required></label>
+      <label>Ancho interior <span class="u">(mm)</span><input id="c-ia" type="number" min="1" required></label>
+      <label>Alto interior <span class="u">(mm)</span><input id="c-ih" type="number" min="1" required></label>
+      <label>Largo exterior <span class="u">(mm)</span><input id="c-el" type="number" min="1" required></label>
+      <label>Ancho exterior <span class="u">(mm)</span><input id="c-ea" type="number" min="1" required></label>
+      <label>Alto exterior <span class="u">(mm)</span><input id="c-eh" type="number" min="1" required></label>
+      <label>Peso vacía <span class="u">(kg)</span><input id="c-kg" type="number" min="0" step="any"></label>
       <button class="btn" id="c-guardar" style="align-self:end">Guardar caja</button>
     </form>
     <p class="sub">Todas las medidas en milímetros. El peso de la caja vacía se suma al de los perfiles para dar el peso total de cada caja.</p>
@@ -83,12 +83,12 @@
       <label>Nombre<input id="p-nombre" required></label>
       <label>Referencia<input id="p-ref"></label>
       <label>Grupo<select id="p-grupo"><option value="">Sin grupo</option><option value="estructura">Estructura</option><option value="lamas">Lamas</option></select></label>
-      <label>Ancho envuelto<input id="p-ancho" type="number" min="1" required></label>
-      <label>Alto envuelto<input id="p-alto" type="number" min="1" required></label>
+      <label>Ancho envuelto <span class="u">(mm)</span><input id="p-ancho" type="number" min="1" required></label>
+      <label>Alto envuelto <span class="u">(mm)</span><input id="p-alto" type="number" min="1" required></label>
       <label>Piezas por bulto<input id="p-uds" type="number" min="1" value="1" required></label>
-      <label>Ancho en el medio<input id="p-medio" type="number" min="1"></label>
-      <label>Largo protección<input id="p-capl" type="number" min="1"></label>
-      <label>Peso (kg/m por pieza)<input id="p-kgm" type="number" min="0" step="any"></label>
+      <label>Ancho en el medio <span class="u">(mm)</span><input id="p-medio" type="number" min="1"></label>
+      <label>Largo protección <span class="u">(mm)</span><input id="p-capl" type="number" min="1"></label>
+      <label>Peso <span class="u">(kg/m por pieza)</span><input id="p-kgm" type="number" min="0" step="any"></label>
       <button class="btn" id="p-guardar" style="align-self:end">Guardar perfil</button>
     </form>
     <p class="sub">Sección del bulto ya envuelto, en milímetros. Si se envuelven varias piezas juntas (por ejemplo 2 lamas), indica cuántas van en cada bulto. Si el bulto lleva protección solo en los extremos (porexpan), pon el largo de cada protección y el ancho del bulto en el medio: así la app los alterna y caben más por caja. El peso es el de un metro de una sola pieza, con lo que lleve montado; con él la app da el peso de cada caja y reparte la carga con el peso real. El grupo sirve para que la estructura vaya junta en unas cajas y las lamas en otras.</p>
@@ -111,8 +111,8 @@
 <div id="imprimir"></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script src="static/nucleo.js?v=48"></script>
-<script src="static/pdf.js?v=48"></script>
-<script src="static/app.js?v=48"></script>
+<script src="static/nucleo.js?v=49"></script>
+<script src="static/pdf.js?v=49"></script>
+<script src="static/app.js?v=49"></script>
 </body>
 </html>

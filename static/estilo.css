@@ -218,3 +218,5 @@ textarea{font:400 15px/1.45 var(--body);padding:10px;border:1px solid var(--line
 .boxcard .orden-caja{display:inline-flex;gap:6px}
 .boxcard .pasar-sel{font:inherit;font-size:13px;margin-left:6px;max-width:100%;padding:3px 4px}
 @media print{.orden-caja,.pasar-sel{display:none!important}}
+
+.u{text-transform:none;letter-spacing:0}

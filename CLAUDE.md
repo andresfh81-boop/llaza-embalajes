@@ -79,6 +79,11 @@ Para verla en local hace falta servirla (abierta como archivo suelto no carga el
 - **Al arrastrar las hojas se añaden y se calcula directamente** (`volcarLeidas`; pedido por Andrés, 12/10/2026, que no veía el paso intermedio). Todo lo que tiene perfil va al pedido; lo montado en otro perfil se descarta y se cuenta en el mensaje; solo se quedan en la tabla «Leído de…» las líneas cuya referencia no está en el catálogo, para elegirles perfil y añadirlas o descartarlas. Volver a arrastrar una hoja ya añadida sustituye sus líneas. El módulo de cada línea se corrige en la tabla del pedido (casilla junto al perfil) cuando hay varias hojas o módulos.
 - El perfil se asigna por referencia; lo que no está en el catálogo queda como "No embalar" hasta elegirlo.
 
+## Unidades en pantalla (Andrés, 27/10/2026)
+
+- Milímetros siempre «mm» en minúscula, también en las etiquetas de los formularios y cabeceras de tabla, que van en mayúsculas por CSS: la unidad va en `<span class="u">(mm)</span>` (`.u` desactiva la mayúscula). Igual con «kg».
+- Para contar piezas o perfiles se escribe «ud.» (nunca «uds»): «18 ud.», «2 ud.». En la tabla del pedido cada celda lleva su unidad («2255 mm», «18 ud.»); la columna «Paquetes» va solo con el número porque su cabecera ya dice qué es.
+
 ## Limitaciones conocidas
 
 - Cajas del catálogo común (27/10/2026, medidas dictadas por Andrés, todas interiores): 15 modelos. Madera abierta MA-3000 y MA-4000 (675×950), MA-5000, MA-6000 y MA-7000 (675×565); madera cerrada MC con las mismas medidas; cartón C-3000 a C-7000 (700×620). Sustituyen a las provisionales. **Las medidas exteriores están puestas igual que las interiores** (Andrés no las usa de momento), así que los m³ de transporte salen con el volumen interior; cuando se midan las exteriores reales, cambiarlas en `datos/catalogo.json`.
