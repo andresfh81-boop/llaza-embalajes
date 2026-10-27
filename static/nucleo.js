@@ -236,9 +236,62 @@ function repartir(bin){
 
 // Reparto por grupos (estructura, lamas…): cada grupo va en sus propias cajas.
 // Solo se juntan dos cajas de grupos distintos si caben en una sola y así sobra una.
+// Dos bultos se pisan en el dibujo de frente (sección ancho × alto), aunque a lo largo no coincidan. El reparto automático nunca
+// los deja así (se leería mal en pantalla), por eso `bajar` tampoco: usa esta comprobación además de `apoyado`.
+// Las lamas con protección alternadas solo se pisan por el cuerpo del bulto, no por la protección del extremo.
+function solapan(a,b){
+  const sol=(x1,w1,x2,w2)=>x1<x2+w2-1e-6&&x2<x1+w1-1e-6;
+  if(!(a.y<b.y+b.h-1e-6&&b.y<a.y+a.h-1e-6)) return false;
+  if(a.medio&&b.medio&&(a.off||0)!==(b.off||0)){const m=p=>[p.x+(p.w-p.medio)/2,p.medio],[ax,aw]=m(a),[bx,bw]=m(b);return sol(a.x,a.w,bx,bw)||sol(ax,aw,b.x,b.w);}
+  return sol(a.x,a.w,b.x,b.w);
+}
+const cabe=(p,bin)=>dentro(p,bin.model)&&!bin.items.some(o=>o!==p&&solapan(p,o));
+// Baja los bultos todo lo que puedan (Andrés, 27/10/2026: «que bajen los bultos»). Primero deja caer cada uno hasta el punto más bajo
+// donde cabe y tiene apoyo. Después prueba a mover de lado los bultos que llevan algo encima (una caja de lamas pegada a la pared
+// libera el sitio de al lado) y se queda con el cambio solo si, tras volver a dejar caer todo, la altura de la carga baja o, a igual
+// altura, baja la suma de alturas. Se comprueba con `cabe` (sin pisarse en el dibujo de frente) y `apoyado` (en 3D), así que nunca deja un bulto chocando ni en el aire.
+function caer(bin){
+  for(let movido=true;movido;){
+    movido=false;
+    for(const p of bin.items.slice().sort((a,b)=>a.y-b.y)){
+      if(p.y<=0) continue;
+      const y0=p.y,ys=[...new Set([0,...bin.items.filter(o=>o!==p).map(o=>o.y+o.h)])].filter(y=>y<y0).sort((a,b)=>a-b);
+      for(const y of ys){p.y=y;if(cabe(p,bin)&&apoyado(p,bin)){movido=true;break;}p.y=y0;}
+    }
+  }
+}
+function bajar(bin){
+  const A=bin.model.intA,altura=()=>bin.items.reduce((m,p)=>Math.max(m,p.y+p.h),0),suma=()=>bin.items.reduce((s,p)=>s+p.y,0);
+  const foto=()=>bin.items.map(p=>[p,p.x,p.y]),poner=f=>f.forEach(([p,x,y])=>{p.x=x;p.y=y;});
+  caer(bin);
+  for(let vuelta=0,pruebas=0;vuelta<8&&pruebas<3000;vuelta++){
+    const base=[altura(),suma()],inicio=foto();let mejor=null;
+    for(const p of bin.items){
+      // solo interesa mover lo que sostiene a otro bulto: si no, al moverlo no se libera nada
+      if(!bin.items.some(o=>o!==p&&o.y>=p.y+p.h-1&&Math.abs(o.y-(p.y+p.h))<=1&&o.x<p.x+p.w-HOLG&&p.x<o.x+o.w-HOLG)) continue;
+      const xs=new Set([0,A-p.w]);bin.items.forEach(o=>{if(o!==p){xs.add(o.x+o.w);xs.add(o.x-p.w);}});
+      for(const x of xs){
+        if(x===p.x||x<0||x+p.w>A) continue;
+        pruebas++;p.x=x;
+        if(cabe(p,bin)&&apoyado(p,bin)){
+          caer(bin);
+          if(bin.items.every(q=>apoyado(q,bin))){
+            const k=[altura(),suma()];
+            if((k[0]<base[0]||(k[0]===base[0]&&k[1]<base[1]))&&(!mejor||k[0]<mejor.k[0]||(k[0]===mejor.k[0]&&k[1]<mejor.k[1]))) mejor={k,f:foto()};
+          }
+        }
+        poner(inicio);
+      }
+    }
+    if(!mejor) break;
+    poner(mejor.f);
+  }
+  return bin;
+}
+
 function planGrupos(items,models){
   const gs=[...new Set(items.map(it=>it.g||''))].sort();
-  if(gs.length<2){const r=plan(items,models);r.bins.forEach(repartir);return r;}
+  if(gs.length<2){const r=plan(items,models);r.bins.forEach(b=>bajar(repartir(b)));return r;}
   let bins=[],unfit=[];
   for(const g of gs){const r=plan(items.filter(it=>(it.g||'')===g),models);bins=bins.concat(r.bins);unfit=unfit.concat(r.unfit);}
   const coste=costeDe(models),asc=models.slice().sort((a,b)=>coste(a)-coste(b)),de=b=>[...new Set(b.items.map(p=>p.it.g||''))].sort().join();
@@ -254,7 +307,7 @@ function planGrupos(items,models){
       }
     }
   }
-  bins.forEach(repartir);
+  bins.forEach(b=>bajar(repartir(b)));
   return {bins,unfit};
 }
 
@@ -269,4 +322,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={repartir,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,vol,volBins,superficie,costeDe,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={repartir,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};

@@ -453,7 +453,7 @@ function soltarSeccion(de,k,a,x,y,rot){
 function colocarCaja(n){
   const b=reparto.bins[n];if(!b||!b.items.length)return;
   const r=plan(b.items.map(p=>p.it),[b.model]);
-  if(r.bins.length===1&&!r.unfit.length){hecho();reparto.bins[n]=repartir(r.bins[0]);estado(`Caja ${n+1} colocada automáticamente.`);}
+  if(r.bins.length===1&&!r.unfit.length){hecho();reparto.bins[n]=bajar(repartir(r.bins[0]));estado(`Caja ${n+1} colocada automáticamente.`);}
   else{sel=null;avisoMov=`Caja ${n+1}: los bultos que tiene ahora no caben todos con la colocación automática. La dejo como estaba; pasa alguno a otra caja o al aparcamiento y vuelve a probar.`;}
   renderResultado();
 }
