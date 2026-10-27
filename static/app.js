@@ -203,10 +203,11 @@ function dibujoSeccion(b,i,col,hol){
   const ld=lados(M.intA,M.intH,mg,fc*.85,['ARRIBA','DERECHA','SUELO','IZQUIERDA']);
   return `<svg class="seccion" viewBox="${-mg-ld.bd} ${-ld.bd} ${M.intA+mg+2*ld.bd} ${M.intH+mg+2*ld.bd}" role="img" aria-label="Sección de la caja ${i+1}"><rect x="0" y="0" width="${M.intA}" height="${M.intH}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,k)=>({p,k})).sort((u,v)=>(v.p.off||0)-(u.p.off||0)).map(({p:P,k})=>{
     // P es el bulto entero (con protección); p, lo que se pinta relleno: en una lama girada, el cuerpo, que es más bajo.
+    // Las medidas que se escriben son las de P, con la protección (no las de la parte fina), como en las otras vistas.
     const p=P.medioH?Object.assign({},P,{y:P.y+(P.h-P.medioH)/2,h:P.medioH}):P;
     // Lo que va más al fondo se pinta primero. Un bulto alternado se dibuja con su ancho en el medio; la protección del extremo, en línea de puntos.
     const y=M.intH-p.y-p.h,rw=p.medio||p.w,rx=p.x+(p.w-rw)/2,t=corto(p.it.p),fm=Math.min(fc*.9,rw/5,p.h/5),lin=[[t,1],...(varias(p.it)?[[piezas(p.it),1]]:[]),...(modTxt(p.it)||p.it.m?[[[modTxt(p.it),p.it.m].filter(Boolean).join(' · '),2]]:[]),[`${p.it.L} mm`,0]],f=Math.min(fs,(p.h-fm*1.4)/(lin.length+.2),(rw-fm*1.8)/(Math.max(...lin.map(l=>String(l[0]).length))*.6)),tx=rx+rw/2+fm*.5,ty=y+(p.h-fm*1.4)/2,aire=!apoyado(P,b);
-    return (P.medio||P.medioH?`<rect class="prot" x="${P.x}" y="${M.intH-P.y-P.h}" width="${P.w}" height="${P.h}" vector-effect="non-scaling-stroke"/>`:'')+`<rect class="bulto${aire?' aire':''}${sel&&sel.b===i&&sel.k===k?' sel':''}" data-b="${i}" data-k="${k}" x="${rx}" y="${y}" width="${rw}" height="${p.h}" fill="var(--p${col(p.it)})" ${trazo(p.it,1.5)} vector-effect="non-scaling-stroke"><title>${esc(p.it.p.nombre)} · ${p.it.L} mm${varias(p.it)?' · '+piezas(p.it):''}${p.it.m?' · marcaje '+esc(p.it.m):''}${aire?' · en el aire, sin apoyo':''}</title></rect>${lin.map((l,j)=>`<text${l[1]===2?' class="marca"':''} x="${tx}" y="${ty+(j-(lin.length-1)/2)*f}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)"${l[1]?' font-family="var(--display)" font-weight="700"':''}>${esc(l[0])}</text>`).join('')}<text x="${rx+rw/2}" y="${y+p.h-fm*.7}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${rw-hol}</text><text transform="translate(${rx+fm*.75} ${y+p.h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.h-hol}</text>`;}).join('')}${huecos(b,fc)}${cota(M.intA,ocA,1,M.intH,mg,fc,false)}${cota(M.intH,ocH,1,M.intH,mg,fc,true)}${ld.svg}</svg>`;
+    return (P.medio||P.medioH?`<rect class="prot" x="${P.x}" y="${M.intH-P.y-P.h}" width="${P.w}" height="${P.h}" vector-effect="non-scaling-stroke"/>`:'')+`<rect class="bulto${aire?' aire':''}${sel&&sel.b===i&&sel.k===k?' sel':''}" data-b="${i}" data-k="${k}" x="${rx}" y="${y}" width="${rw}" height="${p.h}" fill="var(--p${col(p.it)})" ${trazo(p.it,1.5)} vector-effect="non-scaling-stroke"><title>${esc(p.it.p.nombre)} · ${p.it.L} mm${varias(p.it)?' · '+piezas(p.it):''}${p.it.m?' · marcaje '+esc(p.it.m):''}${aire?' · en el aire, sin apoyo':''}</title></rect>${lin.map((l,j)=>`<text${l[1]===2?' class="marca"':''} x="${tx}" y="${ty+(j-(lin.length-1)/2)*f}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)"${l[1]?' font-family="var(--display)" font-weight="700"':''}>${esc(l[0])}</text>`).join('')}<text x="${rx+rw/2}" y="${y+p.h-fm*.7}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${P.w-hol}</text><text transform="translate(${rx+fm*.75} ${y+p.h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${P.h-hol}</text>`;}).join('')}${huecos(b,fc)}${cota(M.intA,ocA,1,M.intH,mg,fc,false)}${cota(M.intH,ocH,1,M.intH,mg,fc,true)}${ld.svg}</svg>`;
 }
 // Huecos a lo largo en la vista desde arriba: lo que queda libre detrás y delante de cada bulto, hasta la pared de la caja
 // o hasta el bulto que tenga en su misma calle y a su misma altura. Los bultos apilados que coinciden dan una sola cota.
@@ -249,6 +250,48 @@ function dibujoPlanta(b,i,col){
 // Vista de lado, desde la pared derecha de la caja vista de frente (desde ahí el frente queda a la izquierda, como en la de arriba):
 // largo en horizontal y alto en vertical (el alto va ampliado como el ancho en la de arriba). Lo más cercano a esa pared tapa
 // lo de detrás. Solo para mirar: los bultos no se arrastran aquí.
+// Huecos en la vista de lado: a lo largo, lo libre delante y detrás de cada bulto hasta la pared o el bulto de su misma calle
+// (mismo ancho y misma altura), como en la de arriba; y encima, lo libre hasta el bulto que tenga encima o hasta la tapa,
+// por tramos del largo. Solo los huecos que se ven vacíos en el dibujo; las cotas repetidas salen una vez.
+function huecosLado(b,k,ky,fc){
+  const M=b.model,out=[],vistos=new Set(),MIN=15,sol=(a1,a2,b1,b2)=>a1<b2-.01&&b1<a2-.01;
+  const z=p=>[p.off||0,(p.off||0)+p.it.L];
+  const num_=(x,y,n,ff)=>`<text class="cota libre hueco" x="${x}" y="${y}" font-size="${ff}" text-anchor="middle" dominant-baseline="central">${n}</text>`;
+  for(const p of b.items){
+    const [z1,z2]=z(p),y1=p.y,y2=p.y+p.h,otros=b.items.filter(o=>o!==p);
+    // solo se acotan los huecos que en el dibujo se ven vacíos: si otro bulto (delante o detrás) ocupa ese sitio, la cota lo pisaría
+    const tapa=(a,c,h1,h2)=>otros.some(o=>sol(z(o)[0],z(o)[1],a,c)&&sol(o.y,o.y+o.h,h1,h2));
+    if(b.items.some(o=>o!==p&&o.x>=p.x+p.w-.01&&(o.off||0)<=z1+.01&&z(o)[1]>=z2-.01&&o.y<=y1+.01&&o.y+o.h>=y2-.01)) continue;
+    // a lo largo
+    const calle=b.items.filter(o=>o!==p&&sol(o.x,o.x+o.w,p.x,p.x+p.w)&&sol(o.y,o.y+o.h,y1,y2));
+    const izq=Math.max(0,...calle.filter(o=>z(o)[1]<=z1+.01).map(o=>z(o)[1])),der=Math.min(M.intL,...calle.filter(o=>z(o)[0]>=z2-.01).map(o=>z(o)[0]));
+    const cy=(M.intH-(y1+y2)/2)*ky;
+    for(const [a,c] of [[izq,z1],[z2,der]]){
+      const lib=Math.round(c-a),clave=['L',Math.round(y1),Math.round(a),Math.round(c)].join();
+      if(lib<MIN||vistos.has(clave)||tapa(a,c,y1,y2)) continue;
+      vistos.add(clave);
+      out.push(`<line class="cota hueco" x1="${a*k}" x2="${c*k}" y1="${cy}" y2="${cy}" vector-effect="non-scaling-stroke"/>`+num_((a+c)/2*k,cy,lib,Math.min(fc,lib*k/(String(lib).length*.62))));
+    }
+    // encima, por tramos del largo según lo que tenga encima en su mismo ancho
+    const enc=b.items.filter(o=>o!==p&&o.y>=y2-.01&&sol(o.x,o.x+o.w,p.x,p.x+p.w)&&sol(z(o)[0],z(o)[1],z1,z2));
+    // los cortes salen de lo que tiene encima y de los demás bultos, para quitar solo los tramos que otro tapa
+    const cortes=[...new Set([z1,z2,...otros.flatMap(z).filter(v=>v>z1&&v<z2)])].sort((u,v)=>u-v),tr=[];
+    for(let j=0;j<cortes.length-1;j++){
+      const t={s:cortes[j],e:cortes[j+1]},m=(t.s+t.e)/2,u=tr[tr.length-1];
+      t.g=Math.min(M.intH,...enc.filter(o=>z(o)[0]<m&&m<z(o)[1]).map(o=>o.y));
+      t.tap=tapa(t.s,t.e,y2,t.g);
+      if(u&&u.g===t.g&&u.tap===t.tap) u.e=t.e; else tr.push(t);
+    }
+    for(const t of tr){
+      const lib=Math.round(t.g-y2),clave=['H',Math.round(t.s),Math.round(t.e),Math.round(y2),Math.round(t.g)].join();
+      if(lib<MIN||(t.e-t.s)*k<20||vistos.has(clave)||t.tap) continue;
+      vistos.add(clave);
+      const cx=(t.s+t.e)/2*k,ya=(M.intH-t.g)*ky,yb=(M.intH-y2)*ky;
+      out.push(`<line class="cota hueco" x1="${cx}" x2="${cx}" y1="${ya}" y2="${yb}" vector-effect="non-scaling-stroke"/>`+num_(cx,(ya+yb)/2,lib,Math.min(fc,(yb-ya)*.8)));
+    }
+  }
+  return out.join('');
+}
 function dibujoLateral(b,i,col){
   const M=b.model,W=PW,k=W/M.intL,ky=k*AMPLIA,H=M.intH*ky,mg=42,fc=13;
   const ocL=Math.max(0,...b.items.map(p=>(p.off||0)+p.it.L)),ocH=Math.max(0,...b.items.map(p=>p.y+p.h));
@@ -261,7 +304,7 @@ function dibujoLateral(b,i,col){
     return `<g><title>${esc(p.it.p.nombre)} · ${p.it.L} mm${varias(p.it)?' · '+piezas(p.it):''}${p.it.m?' · marcaje '+esc(p.it.m):''}</title>${g}${rotulo(p,x0,y0,L,h,p.h-num(pedido.holgura),fc)}</g>`;
   };
   const ld=lados(W,H,mg,fc*.85,['ARRIBA','FONDO','SUELO','FRENTE']);
-  return `<svg class="planta" viewBox="${-mg-ld.bd} ${-ld.bd} ${W+mg+2*ld.bd} ${H+mg+2*ld.bd}" role="img" aria-label="Caja ${i+1} vista desde la derecha"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.slice().sort((u,v)=>u.x-v.x).map(pieza).join('')}${cota(M.intL,ocL,k,H,mg,fc,false)}${cota(M.intH,ocH,ky,H,mg,fc,true)}${ld.svg}</svg>`;
+  return `<svg class="planta" viewBox="${-mg-ld.bd} ${-ld.bd} ${W+mg+2*ld.bd} ${H+mg+2*ld.bd}" role="img" aria-label="Caja ${i+1} vista desde la derecha"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.slice().sort((u,v)=>u.x-v.x).map(pieza).join('')}${huecosLado(b,k,ky,fc)}${cota(M.intL,ocL,k,H,mg,fc,false)}${cota(M.intH,ocH,ky,H,mg,fc,true)}${ld.svg}</svg>`;
 }
 function renderResultado(recalcular){
   const el=$('resultado');ultimoResumen='';document.body.classList.remove('con-lupa');
