@@ -85,6 +85,14 @@ const tro=(y,x,t)=>t.split(' ').map((s,i,a)=>({s,y,x:x+a.slice(0,i).join(' ').le
 const c23=leerCabecera([...tro(64.4,262,'PERGOLA PARED PORTERÍA'),...tro(75.2,152,'HOJA DE CORTE'),...tro(76.7,262,'TIPOLOGÍA: MIXTA'),...tro(76.7,451,'COLOR ESTRUC: 7416 TEXT'),...tro(89,262,'DIMENS. PÉRGOLA: 7380x8640 mm'),...tro(89,451,'COLOR LAMAS: 9016'),{s:'CORTE',x:680,y:89.3,w:30},{s:'54007372',x:171,y:94.3,w:40},...tro(101.3,262,'DIMENS. MÓDULO 2 \u2010 3: 6680 x 2640 mm'),{s:'ANG.',x:751,y:101.5,w:20}]);
 assert.deepStrictEqual(c23,{tipologia:'MIXTA',pergola:'7380x8640 mm',colorE:'7416 TEXT',colorL:'9016',modulo:'2-3',dimsModulo:'6680 x 2640 mm',numero:'54007372',nombre:'PERGOLA PARED PORTERÍA'});
 assert.strictEqual(leerCabecera([{s:'DIMENSIONES: 3020 x 5450 mm',x:296,y:91.3,w:120}]).pergola,'3020 x 5450 mm');
+// nº de hoja con la pérgola detrás (varias pérgolas en un pedido): junto, separado por espacios o en trozos sueltos
+const numDe=its=>leerCabecera([{s:'HOJA DE CORTE',x:154,y:75.5,w:80},...its]).numero;
+assert.strictEqual(numDe([{s:'54007673/10',x:160,y:94.6,w:60}]),'54007673/10');
+assert.strictEqual(numDe([{s:'54007673',x:160,y:94.6,w:44},{s:'/10',x:205,y:94.6,w:14}]),'54007673/10');
+assert.strictEqual(numDe([{s:'54007673',x:160,y:94.6,w:44},{s:'/',x:205,y:94.6,w:3},{s:'10',x:209,y:94.6,w:9}]),'54007673/10');
+assert.strictEqual(numDe([{s:'54007673-20',x:160,y:94.6}]),'54007673-20');
+assert.strictEqual(numDe([{s:'54007673',x:160,y:94.6}]),'54007673');
+console.log('nº con pérgola: ok');
 console.log('marcaje: ok');
 
 const base=[{id:'a',nombre:'A',ancho:1},{id:'b',nombre:'B',ancho:2},{id:'c',nombre:'C',ancho:3}];

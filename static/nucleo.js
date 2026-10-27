@@ -41,8 +41,18 @@ function leerCabecera(its){
     if(m){c.modulo=m[1].replace(/[\u2010-\u2015\u2212]/g,'-').replace(/\s+/g,'');c.dimsModulo=limpia(m[2]);break;}
   }
   const hc=its.find(i=>/^HOJA DE CORTE$/i.test(i.s));
-  const n=its.find(i=>/^\d{6,10}$/.test(i.s)&&(!hc||(Math.abs(i.x-hc.x)<80&&i.y>hc.y&&i.y<hc.y+40)));
-  if(n) c.numero=n.s;
+  // Nº de la hoja: 54007673, o con la pérgola detrás cuando el pedido lleva varias (54007673/10, 54007673-20). El sufijo
+  // puede venir en la misma frase o suelto a la derecha, en uno o dos trozos («/» «10»).
+  const NUM=/^(\d{6,10})(?:\s*([\/\-‐-―])\s*(\d{1,3}))?$/,cerca=i=>!hc||(Math.abs(i.x-hc.x)<80&&i.y>hc.y&&i.y<hc.y+40);
+  const n=its.find(i=>NUM.test(i.s)&&cerca(i));
+  if(n){
+    const m=n.s.match(NUM);let suf=m[3]?(m[2]==='/'?'/':'-')+m[3]:'';
+    if(!suf){
+      const der=its.filter(i=>i!==n&&Math.abs(i.y-n.y)<=2.2&&i.x>n.x&&i.x<n.x+(n.w||60)+30).sort((a,b)=>a.x-b.x).map(i=>i.s).join('').replace(/\s+/g,'');
+      const t=der.match(/^([\/\-‐-―])(\d{1,3})(?!\d)/);if(t) suf=(t[1]==='/'?'/':'-')+t[2];
+    }
+    c.numero=m[1]+suf;
+  }
   // el nombre de la pérgola va justo encima de la tipología, en su misma columna
   if(tip){const nom=its.filter(i=>i!==tip&&Math.abs(i.x-tip.x)<4&&i.y<tip.y&&i.y>tip.y-25).sort((a,b)=>b.y-a.y)[0];if(nom)c.nombre=limpia(nom.s);}
   return c;
