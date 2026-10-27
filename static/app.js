@@ -288,8 +288,8 @@ function renderResultado(recalcular){
     const cont=Object.values(g),gs=[...new Set(cont.map(c=>c.p.grupo||''))],gtxt=!cont.length?'Vacía':gs.length>1?'Mezcla':(GRUPOS[gs[0]]||'');
     lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.mod?c.mod+' ':''}${c.p.nombre} ${c.L} mm${num(c.p.uds)>1?' ('+c.pz+' uds)':''}${c.ms.length?' ['+c.ms.join(', ')+']':''}`).join(', '));
     const flot=b.items.filter(p=>!apoyado(p,b));if(flot.length)lineasTxt.push(`  OJO, sin apoyo: ${flot.map(nombreB).join(', ')}`);
-    return `<div class="boxcard${completa&&completa.has(i)?' vista':''}" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><label class="marca-caja"><input type="checkbox" data-marcar="${i}"${marcadas.has(i)?' checked':''}>Seleccionar</label>${cont.length?`<button class="btn small" type="button" data-act="auto-caja" data-i="${i}">Colocación automática</button>`:''}<button class="btn small ghost" type="button" data-act="imprimir-caja" data-i="${i}">Imprimir</button><button class="btn small ghost" type="button" data-act="completa" data-i="${i}">${completa?'Salir de pantalla completa':'Pantalla completa'}</button>${cont.length?'':`<button class="btn small danger" type="button" data-act="quitar-caja" data-i="${i}">Quitar caja</button>`}</div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}${visor(i,'f','De frente · ancho × alto',dibujoSeccion(b,i,col,hol))}${visor(i,'a',`Desde arriba · largo × ancho (ancho ×${AMPLIA})`,dibujoPlanta(b,i,col))}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %${txtPeso(b)}</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col(c)})"></span>${c.n} × ${c.mod?`<b class="mod">${esc(c.mod)}</b> `:''}${esc(c.p.nombre)} · ${c.L} mm${num(c.p.uds)>1?` · ${c.pz} uds`:''}${c.ms.length?` · <b class="marca">${esc(c.ms.join(', '))}</b>`:''}</li>`).join('')}</ul></div>`;
-  }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Para pasar un bulto a una caja que no tienes a la vista, haz clic en él y elige la caja en la barra que sale abajo; también puedes arrastrarlo, y la página se desplaza sola al acercarte al borde. «Pantalla completa» abre una caja en grande; para ver varias a la vez, marca su casilla «Seleccionar» y pulsa «Ver en pantalla completa»: entre ellas se pueden arrastrar bultos. Con los botones − y + de cada dibujo lo reduces o amplías; ampliado, arrastra el fondo del dibujo para moverte por él. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, moverlo a lo largo y a lo ancho, también a otra caja. Si choca con otro o se sale, te aviso y se queda donde estaba. Para girar un bulto: clic derecho encima, o la tecla R mientras lo arrastras. Si te estorba un bulto para recolocar los demás, llévalo al «Aparcamiento» de arriba y devuélvelo después. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
+    return `<div class="boxcard${completa&&completa.has(i)?' vista':''}" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><span class="orden-caja"><button class="btn small ghost" type="button" data-act="mover-caja" data-i="${i}" data-d="-1" aria-label="Subir la caja ${i+1}"${i===0?' disabled':''}>▲ Subir</button><button class="btn small ghost" type="button" data-act="mover-caja" data-i="${i}" data-d="1" aria-label="Bajar la caja ${i+1}"${i===r.bins.length-1?' disabled':''}>▼ Bajar</button></span><label class="marca-caja"><input type="checkbox" data-marcar="${i}"${marcadas.has(i)?' checked':''}>Seleccionar</label>${cont.length?`<button class="btn small" type="button" data-act="auto-caja" data-i="${i}">Colocación automática</button>`:''}<button class="btn small ghost" type="button" data-act="imprimir-caja" data-i="${i}">Imprimir</button><button class="btn small ghost" type="button" data-act="completa" data-i="${i}">${completa?'Salir de pantalla completa':'Pantalla completa'}</button>${cont.length?'':`<button class="btn small danger" type="button" data-act="quitar-caja" data-i="${i}">Quitar caja</button>`}</div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}${visor(i,'f','De frente · ancho × alto',dibujoSeccion(b,i,col,hol))}${visor(i,'a',`Desde arriba · largo × ancho (ancho ×${AMPLIA})`,dibujoPlanta(b,i,col))}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %${txtPeso(b)}</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col(c)})"></span>${c.n} × ${c.mod?`<b class="mod">${esc(c.mod)}</b> `:''}${esc(c.p.nombre)} · ${c.L} mm${num(c.p.uds)>1?` · ${c.pz} uds`:''}${c.ms.length?` · <b class="marca">${esc(c.ms.join(', '))}</b>`:''} <select class="pasar-sel" data-de="${i}" data-g="${esc(c.p.id+'|'+c.L+'|'+c.mod)}" aria-label="Pasar un bulto de ${esc(c.p.nombre)} a otra caja"><option value="">Pasar 1 bulto a…</option>${r.bins.map((o,j)=>j===i?'':`<option value="${j}">Caja ${j+1} · ${esc(o.model.nombre)}</option>`).join('')}<option value="nueva">Caja nueva</option></select></li>`).join('')}</ul></div>`;
+  }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Con «▲ Subir» y «▼ Bajar» cambias una caja de sitio para dejar juntas las que quieras mover bultos entre ellas, y el desplegable «Pasar 1 bulto a…» de cada línea manda un bulto a la caja que elijas. Para pasar un bulto a una caja que no tienes a la vista, haz clic en él y elige la caja en la barra que sale abajo; también puedes arrastrarlo, y la página se desplaza sola al acercarte al borde. «Pantalla completa» abre una caja en grande; para ver varias a la vez, marca su casilla «Seleccionar» y pulsa «Ver en pantalla completa»: entre ellas se pueden arrastrar bultos. Con los botones − y + de cada dibujo lo reduces o amplías; ampliado, arrastra el fondo del dibujo para moverte por él. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; en el de arriba, moverlo a lo largo y a lo ancho, también a otra caja. Si choca con otro o se sale, te aviso y se queda donde estaba. Para girar un bulto: clic derecho encima, o la tecla R mientras lo arrastras. Si te estorba un bulto para recolocar los demás, llévalo al «Aparcamiento» de arriba y devuélvelo después. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
   ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas (${desg}), ${m3.toFixed(2)} m³\nBultos en total: ${nb+r.bins.length} (${nb} dentro + ${r.bins.length} cajas)\n`+lineasTxt.join('\n')+(r.aparcados.length?`\nAPARCADOS, sin caja: ${r.aparcados.map(it=>nombreB({it})).join(', ')}`:'');
   // Barra del bulto seleccionado: siempre a la vista abajo, para pasarlo a cualquier caja sin tener que arrastrar.
   if(sel){
@@ -446,6 +446,22 @@ function colocarCaja(n){
   renderResultado();
 }
 // Soltado sobre una caja pero fuera de su dibujo, o en «Caja nueva»: se busca el primer hueco libre.
+// Cambia una caja de sitio (d=-1 la sube, d=1 la baja). Los números de caja son la posición, así que se arrastran con ella
+// el aumento de sus dibujos, su casilla «Seleccionar», la pantalla completa y el bulto seleccionado.
+function moverCaja(i,d){
+  const j=i+d,B=reparto.bins;
+  if(!B[i]||!B[j]) return;
+  [B[i],B[j]]=[B[j],B[i]];
+  for(const v of ['f','a']){const x=zoom[i+v];zoom[i+v]=zoom[j+v];zoom[j+v]=x;if(zoom[i+v]===undefined)delete zoom[i+v];if(zoom[j+v]===undefined)delete zoom[j+v];}
+  const cambia=n=>n===i?j:n===j?i:n;
+  marcadas=new Set([...marcadas].map(cambia));
+  if(completa)completa=new Set([...completa].map(cambia));
+  const s=sel&&sel.b!=='ap'?{b:cambia(sel.b),k:sel.k}:sel;
+  hecho();sel=s;
+  renderResultado();
+  const c=document.querySelector(`.boxcard[data-caja="${j}"]`);
+  if(c&&c.scrollIntoView)c.scrollIntoView({block:'nearest'});
+}
 function soltarAuto(de,k,a){
   const B=reparto.bins,src=origen(de,k);
   let bin=a==='nueva'?null:B[a];
@@ -777,6 +793,7 @@ document.addEventListener('click',async e=>{
   else if(a==='exportar'){exportar();}
   else if(a==='auto'){renderResultado(true);}
   else if(a==='caja-vacia'){const m=cajas.find(c=>c.id===modeloNuevo);if(m){reparto.bins.push({model:m,free:[],items:[]});hecho();renderResultado();}}
+  else if(a==='mover-caja'){moverCaja(Number(b.dataset.i),Number(b.dataset.d));}
   else if(a==='quitar-caja'){const n=Number(b.dataset.i);if(reparto.bins[n]&&!reparto.bins[n].items.length){reparto.bins.splice(n,1);hecho();renderResultado();}}
   else if(a==='leidas-ok'){const x=document.querySelector('#leidas [data-l=ok]');if(x)x.click();}
   else if(a==='zoom'){cambiarZoom(b.dataset.v,Number(b.dataset.d));}
@@ -817,6 +834,13 @@ document.addEventListener('click',async e=>{
 document.addEventListener('change',e=>{
   if(e.target.dataset&&e.target.dataset.mod!==undefined&&pedido.lineas[e.target.dataset.mod]){pedido.lineas[e.target.dataset.mod].mod=e.target.value.trim();guardarPedido();renderPedido();return;}
   if(e.target.id==='cat-file'){importar(e.target.files[0]);e.target.value='';}if(e.target.id==='modelo-nuevo')modeloNuevo=e.target.value;
+  if(e.target.classList&&e.target.classList.contains('pasar-sel')){
+    const v=e.target.value;if(v==='')return;
+    const de=Number(e.target.dataset.de),g=e.target.dataset.g,bin=reparto.bins[de];
+    const k=bin?bin.items.findIndex(p=>(p.it.p.id+'|'+p.it.L+'|'+modTxt(p.it))===g):-1;
+    if(k<0){renderResultado();return;}
+    const n=v==='nueva'?'nueva':Number(v);soltarAuto(de,k,n);
+    if(!avisoMov)estado(n==='nueva'?'Pasado a una caja nueva.':`Pasado a la caja ${n+1}.`);return;}
   if(e.target.dataset&&e.target.dataset.marcar!==undefined){const n=Number(e.target.dataset.marcar);if(e.target.checked)marcadas.add(n);else marcadas.delete(n);renderResultado();}});
 
 renderTodo();

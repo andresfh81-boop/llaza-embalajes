@@ -214,3 +214,7 @@ dialog#dlg-sol h2{margin:0}
 textarea{font:400 15px/1.45 var(--body);padding:10px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--fg);width:100%;resize:vertical;text-transform:none;letter-spacing:0}
 #sol-aviso{color:var(--accent);font-weight:600;min-height:1.3em}
 @media print{dialog{display:none!important}}
+
+.boxcard .orden-caja{display:inline-flex;gap:6px}
+.boxcard .pasar-sel{font:inherit;font-size:13px;margin-left:6px;max-width:100%;padding:3px 4px}
+@media print{.orden-caja,.pasar-sel{display:none!important}}
