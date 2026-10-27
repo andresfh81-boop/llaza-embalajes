@@ -8,12 +8,21 @@
     {"id": "33004", "ref": "33004", "grupo": "estructura", "nombre": "Pilar", "ancho": 175, "alto": 175, "uds": 1}
   ],
   "cajas": [
-    {"id": "nmv4b8ogkaqjc", "nombre": "C-5000", "tipo": "carton", "intL": 5000, "intA": 790, "intH": 790, "extL": 5100, "extA": 850, "extH": 850},
-    {"id": "nmv4ba963nmdc", "nombre": "C-7000", "tipo": "carton", "intL": 6990, "intA": 790, "intH": 790, "extL": 7000, "extA": 850, "extH": 850},
-    {"id": "mc5000", "nombre": "MC-5000", "tipo": "cerrada", "intL": 5000, "intA": 790, "intH": 790, "extL": 5100, "extA": 850, "extH": 850},
-    {"id": "mc7000", "nombre": "MC-7000", "tipo": "cerrada", "intL": 6990, "intA": 790, "intH": 790, "extL": 7000, "extA": 850, "extH": 850},
-    {"id": "ma5000", "nombre": "MA-5000", "tipo": "abierta", "intL": 5000, "intA": 790, "intH": 790, "extL": 5100, "extA": 850, "extH": 850},
-    {"id": "ma7000", "nombre": "MA-7000", "tipo": "abierta", "intL": 6990, "intA": 790, "intH": 790, "extL": 7000, "extA": 850, "extH": 850}
+    {"id": "ma3000", "nombre": "MA-3000", "tipo": "abierta", "intL": 3000, "intA": 675, "intH": 950, "extL": 3000, "extA": 675, "extH": 950},
+    {"id": "ma4000", "nombre": "MA-4000", "tipo": "abierta", "intL": 4000, "intA": 675, "intH": 950, "extL": 4000, "extA": 675, "extH": 950},
+    {"id": "ma5000", "nombre": "MA-5000", "tipo": "abierta", "intL": 5000, "intA": 675, "intH": 565, "extL": 5000, "extA": 675, "extH": 565},
+    {"id": "ma6000", "nombre": "MA-6000", "tipo": "abierta", "intL": 6000, "intA": 675, "intH": 565, "extL": 6000, "extA": 675, "extH": 565},
+    {"id": "ma7000", "nombre": "MA-7000", "tipo": "abierta", "intL": 7000, "intA": 675, "intH": 565, "extL": 7000, "extA": 675, "extH": 565},
+    {"id": "mc3000", "nombre": "MC-3000", "tipo": "cerrada", "intL": 3000, "intA": 675, "intH": 950, "extL": 3000, "extA": 675, "extH": 950},
+    {"id": "mc4000", "nombre": "MC-4000", "tipo": "cerrada", "intL": 4000, "intA": 675, "intH": 950, "extL": 4000, "extA": 675, "extH": 950},
+    {"id": "mc5000", "nombre": "MC-5000", "tipo": "cerrada", "intL": 5000, "intA": 675, "intH": 565, "extL": 5000, "extA": 675, "extH": 565},
+    {"id": "mc6000", "nombre": "MC-6000", "tipo": "cerrada", "intL": 6000, "intA": 675, "intH": 565, "extL": 6000, "extA": 675, "extH": 565},
+    {"id": "mc7000", "nombre": "MC-7000", "tipo": "cerrada", "intL": 7000, "intA": 675, "intH": 565, "extL": 7000, "extA": 675, "extH": 565},
+    {"id": "c3000", "nombre": "C-3000", "tipo": "carton", "intL": 3000, "intA": 700, "intH": 620, "extL": 3000, "extA": 700, "extH": 620},
+    {"id": "c4000", "nombre": "C-4000", "tipo": "carton", "intL": 4000, "intA": 700, "intH": 620, "extL": 4000, "extA": 700, "extH": 620},
+    {"id": "c5000", "nombre": "C-5000", "tipo": "carton", "intL": 5000, "intA": 700, "intH": 620, "extL": 5000, "extA": 700, "extH": 620},
+    {"id": "c6000", "nombre": "C-6000", "tipo": "carton", "intL": 6000, "intA": 700, "intH": 620, "extL": 6000, "extA": 700, "extH": 620},
+    {"id": "c7000", "nombre": "C-7000", "tipo": "carton", "intL": 7000, "intA": 700, "intH": 620, "extL": 7000, "extA": 700, "extH": 620}
   ],
   "montados": [
     {"ref": "33016", "nombre": "Perfil tapa luz", "en": "la viga"},

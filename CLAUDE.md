@@ -80,13 +80,13 @@ Para verla en local hace falta servirla (abierta como archivo suelto no carga el
 
 ## Limitaciones conocidas
 
-- Cajas del catálogo común: cartón C-5000 y C-7000 (alta de Andrés, 11/10/2026); madera cerrada MC-5000 y MC-7000 y madera abierta MA-5000 y MA-7000 son copias con las mismas medidas, provisionales hasta medir las de madera reales (12/10/2026).
+- Cajas del catálogo común (27/10/2026, medidas dictadas por Andrés, todas interiores): 15 modelos. Madera abierta MA-3000 y MA-4000 (675×950), MA-5000, MA-6000 y MA-7000 (675×565); madera cerrada MC con las mismas medidas; cartón C-3000 a C-7000 (700×620). Sustituyen a las provisionales. **Las medidas exteriores están puestas igual que las interiores** (Andrés no las usa de momento), así que los m³ de transporte salen con el volumen interior; cuando se midan las exteriores reales, cambiarlas en `datos/catalogo.json`.
 - La lectura del PDF está comprobada con una hoja de corte real (módulo 4060×6000, 11/10/2026): leyó bien las 19 líneas. Para repetirlo sin navegador: `node pruebas/leer-pdf.js "hoja.pdf"`. Las hojas reales no se suben al repo (es público).
 - No coloca dos perfiles cortos uno detrás de otro dentro de la misma caja.
 - No tiene peso máximo por caja (el peso se calcula y se enseña, pero no limita).
 
 ## Siguiente paso
 
-1. Dar de alta las cajas reales y subirlas al catálogo común.
+1. Medir las dimensiones exteriores reales de las cajas y ponerlas en el catálogo común.
 
 Ideas para después: límite de peso, etiquetas por caja.
