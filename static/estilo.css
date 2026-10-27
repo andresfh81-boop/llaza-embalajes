@@ -220,3 +220,8 @@ textarea{font:400 15px/1.45 var(--body);padding:10px;border:1px solid var(--line
 @media print{.orden-caja,.pasar-sel{display:none!important}}
 
 .u{text-transform:none;letter-spacing:0}
+
+dialog#dlg-planta{width:min(1100px,calc(100vw - 16px));max-width:none;max-height:calc(100vh - 16px);overflow:auto;border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--panel);color:var(--fg)}
+dialog#dlg-planta::backdrop{background:rgba(0,0,0,.5)}
+dialog#dlg-planta .boxcard{border:0;padding:0}
+dialog#dlg-planta svg{max-height:none}
