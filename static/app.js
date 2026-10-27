@@ -55,9 +55,9 @@ function renderPedido(){
   sel.innerHTML=perfiles.length?perfiles.map(p=>`<option value="${esc(p.id)}">${esc(p.nombre)}${p.ref?' · '+esc(p.ref):''}</option>`).join(''):'<option value="">Sin perfiles en el catálogo</option>';
   if(perfiles.some(p=>p.id===prev)) sel.value=prev;
   const L=pedido.lineas;
-  $('lineas').innerHTML=L.length?`<div class="scroll"><table><thead><tr><th>Perfil</th><th class="n">Largo</th><th class="n">Uds</th><th></th></tr></thead><tbody>${L.map((l,i)=>{
-    const p=perfiles.find(x=>x.id===l.pid);
-    return `<tr><td>${modTxt(l)||(pedido.hojas||[]).length>1?`<input class="modin" data-mod="${i}" value="${esc(l.mod||'')}" aria-label="Módulo"> `:''}${p?esc(p.nombre):'<span class="tag">perfil borrado</span>'}${l.marcas&&l.marcas.length?` <small class="marca">${esc(l.marcas.join(', '))}</small>`:''}</td><td class="n">${l.largo}</td><td class="n">${l.cant}</td><td class="act"><button class="btn small danger" data-act="quitar" data-i="${i}" type="button" aria-label="Quitar línea">Quitar</button></td></tr>`;}).join('')}</tbody></table></div>`
+  $('lineas').innerHTML=L.length?`<div class="scroll"><table><thead><tr><th>Perfil</th><th class="n">Largo</th><th class="n">Uds</th><th class="n">Paquetes</th><th></th></tr></thead><tbody>${L.map((l,i)=>{
+    const p=perfiles.find(x=>x.id===l.pid),paq=p?Math.ceil(num(l.cant)/Math.max(1,num(p.uds))):0;
+    return `<tr><td>${modTxt(l)||(pedido.hojas||[]).length>1?`<input class="modin" data-mod="${i}" value="${esc(l.mod||'')}" aria-label="Módulo"> `:''}${p?esc(p.nombre):'<span class="tag">perfil borrado</span>'}${l.marcas&&l.marcas.length?` <small class="marca">${esc(l.marcas.join(', '))}</small>`:''}</td><td class="n">${l.largo}</td><td class="n">${l.cant}</td><td class="n"><b>${paq||''}</b></td><td class="act"><button class="btn small danger" data-act="quitar" data-i="${i}" type="button" aria-label="Quitar línea">Quitar</button></td></tr>`;}).join('')}</tbody><tfoot><tr><td colspan="3">Total de paquetes</td><td class="n"><b>${L.reduce((s,l)=>{const p=perfiles.find(x=>x.id===l.pid);return s+(p?Math.ceil(num(l.cant)/Math.max(1,num(p.uds))):0);},0)}</b></td><td></td></tr></tfoot></table></div>`
     :'<div class="empty">Añade aquí los perfiles de la hoja de corte: tipo, largo y cantidad.</div>'+(anterior?`<button class="btn ghost" type="button" data-act="recuperar">Recuperar el último pedido${anterior.ref?': '+esc(anterior.ref):''} (${anterior.lineas.length} líneas)</button>`:'');
   renderHojas();
   renderResultado();
