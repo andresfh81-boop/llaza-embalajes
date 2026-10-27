@@ -306,6 +306,19 @@ function dibujoLateral(b,i,col){
   const ld=lados(W,H,mg,fc*.85,['ARRIBA','FONDO','SUELO','FRENTE']);
   return `<svg class="planta" viewBox="${-mg-ld.bd} ${-ld.bd} ${W+mg+2*ld.bd} ${H+mg+2*ld.bd}" role="img" aria-label="Caja ${i+1} vista desde la derecha"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.slice().sort((u,v)=>u.x-v.x).map(pieza).join('')}${huecosLado(b,k,ky,fc)}${cota(M.intL,ocL,k,H,mg,fc,false)}${cota(M.intH,ocH,ky,H,mg,fc,true)}${ld.svg}</svg>`;
 }
+// Bultos de unas líneas de pedido más los de componentes (c = {n, L, A, H}).
+function bultosDe(lineas,c){
+  const items=[];
+  for(const l of lineas){
+    const p=perfiles.find(x=>x.id===l.pid);if(!p)continue;
+    // cada bulto se lleva el marcaje de las piezas que contiene, en el orden de la hoja
+    const u=Math.max(1,num(p.uds)),n=Math.ceil(l.cant/u);
+    for(let i=0;i<n;i++) items.push(bulto(p,l.largo,(l.marcas||[]).slice(i*u,(i+1)*u).join(' '),Math.min(u,l.cant-i*u),l.mod));
+  }
+  const pc={id:'_comp',ref:'',nombre:'Bulto componentes e instrucciones',corto:'Componentes',grupo:'estructura',ancho:c.A,alto:c.H,uds:1};
+  for(let i=0;i<c.n;i++) items.push(bulto(pc,c.L,'',1,''));
+  return items;
+}
 function renderResultado(recalcular){
   const el=$('resultado');ultimoResumen='';document.body.classList.remove('con-lupa');
   const head='<h2>Cajas necesarias</h2>';
@@ -314,21 +327,13 @@ function renderResultado(recalcular){
   const modelos=modelosAct=cajas.filter(c=>c.tipo===pedido.tipo);
   if(!modelos.length){el.innerHTML=head+`<div class="empty">Todavía no hay ninguna caja de tipo <b>${TIPOS[pedido.tipo]}</b>. Dala de alta en la pestaña Cajas con sus medidas interiores y exteriores y aquí aparecerá el reparto.</div>`;return;}
   const pend=leidas.length?`<div class="note pend">${leidas.length} ${leidas.length===1?'línea de las hojas de corte tiene':'líneas de las hojas de corte tienen'} una referencia que no está en el catálogo y no ${leidas.length===1?'está':'están'} en el pedido. Elige su perfil en la columna izquierda y pulsa «Añadir al pedido», o descártalas.</div>`:'';
-  if(!pedido.lineas.length){el.innerHTML=head+(pend||`<div class="empty">Hay ${modelos.length} ${modelos.length===1?'caja':'cajas'} de ${TIPOS[pedido.tipo]} en el catálogo. Añade perfiles al pedido para ver cuántas hacen falta.</div>`);return;}
+  if(!pedido.lineas.length){el.innerHTML=head+(pend||`<div class="empty">El pedido está vacío. Arrastra las hojas de corte o añade los perfiles a mano, y aquí saldrán las cajas que hacen falta y cómo van colocados los bultos (elijo entre ${modelos.length} ${modelos.length===1?'modelo':'modelos'} de caja de ${TIPOS[pedido.tipo].toLowerCase()}).</div>`);return;}
   const hol=num(pedido.holgura),clave=JSON.stringify([{tipo:pedido.tipo,holgura:pedido.holgura,lineas:pedido.lineas,comp:componentes()},modelos,perfiles]);
   if(recalcular||!reparto||clave!==repartoClave){
     const g=recalcular?null:cargarReparto(clave,modelos);
     if(g){reparto=g;repartoManual=repartoGuardado=true;}
     else{
-      const items=[];
-      for(const l of pedido.lineas){
-        const p=perfiles.find(x=>x.id===l.pid);if(!p)continue;
-        // cada bulto se lleva el marcaje de las piezas que contiene, en el orden de la hoja
-        const u=Math.max(1,num(p.uds)),n=Math.ceil(l.cant/u);
-        for(let i=0;i<n;i++) items.push(bulto(p,l.largo,(l.marcas||[]).slice(i*u,(i+1)*u).join(' '),Math.min(u,l.cant-i*u),l.mod));
-      }
-      {const c=componentes(),pc=perfilComp();for(let i=0;i<c.n;i++) items.push(bulto(pc,c.L,'',1,''));}
-      reparto=planGrupos(items,modelos);reparto.aparcados=[];repartoManual=repartoGuardado=false;
+      reparto=planGrupos(bultosDe(pedido.lineas,componentes()),modelos);reparto.aparcados=[];repartoManual=repartoGuardado=false;
       if(recalcular) try{localStorage.removeItem(CLAVE_REP);}catch(e){}
     }
     repartoClave=clave;avisoMov='';sel=null;plantaAbierta=null;
@@ -344,7 +349,7 @@ function renderResultado(recalcular){
   const m3=volBins(r.bins)/1e9;
   const porModelo={};r.bins.forEach(b=>porModelo[b.model.nombre]=(porModelo[b.model.nombre]||0)+1);
   const desg=Object.entries(porModelo).map(([n,c])=>`${c} × ${n}`).join(', ');
-  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length}</b> <span>bultos en total <small>(${nb} dentro + ${r.bins.length} ${r.bins.length===1?'caja':'cajas'})</small></span></div>${r.bins.some(b=>pesoCaja(b).total)?`<div><b>${Math.round(r.bins.reduce((s,b)=>s+pesoCaja(b).total,0))}</b> <span>kg${r.bins.some(b=>pesoCaja(b).faltan||!pesoCaja(b).tara)?' <small>(faltan pesos)</small>':''}</span></div>`:''}<span class="acciones"><button class="btn" type="button" data-act="solicitar">Solicitud de cajas al almacén</button><button class="btn ghost" type="button" data-act="imprimir">Imprimir lista de embalaje</button><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></span></div><div class="sub">${esc(desg)}</div>${leyenda()}`;
+  let html=head+`<div class="totals"><div><b>${r.bins.length}</b> <span>${r.bins.length===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><div><b>${nb+r.bins.length}</b> <span>bultos en total <small>(${nb} dentro + ${r.bins.length} ${r.bins.length===1?'caja':'cajas'})</small></span></div>${r.bins.some(b=>pesoCaja(b).total)?`<div><b>${Math.round(r.bins.reduce((s,b)=>s+pesoCaja(b).total,0))}</b> <span>kg${r.bins.some(b=>pesoCaja(b).faltan||!pesoCaja(b).tara)?' <small>(faltan pesos)</small>':''}</span></div>`:''}<span class="acciones"><button class="btn" type="button" data-act="solicitar">Solicitud de cajas al almacén</button><button class="btn ghost" type="button" data-act="a-prevision">Añadir a la previsión</button><button class="btn ghost" type="button" data-act="imprimir">Imprimir lista de embalaje</button><button class="btn ghost" id="copiar" type="button">Copiar resumen</button></span></div><div class="sub">${esc(desg)}</div>${leyenda()}`;
   // Cuánto se aprovecha: sección ocupada de media y el mínimo de cajas que saldría solo por superficie (cota inferior, no siempre alcanzable).
   const todos=r.bins.flatMap(b=>b.items),secB=todos.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)+r.unfit.reduce((s,it)=>s+it.w*it.h,0),secC=r.bins.reduce((s,b)=>s+b.model.intA*b.model.intH,0),minC=Math.max(1,Math.ceil(secB/Math.max(...modelos.map(m=>m.intA*m.intH))));
   if(secC) html+=`<div class="sub">Sección aprovechada: <b>${Math.round(secB/secC*100)} %</b>. ${r.bins.length<=minC?'Con estas cajas no se puede hacer con menos.':`Solo por superficie cabría en ${minC} ${minC===1?'caja':'cajas'}, pero las piezas no se pueden partir ni encajar sin huecos: es un mínimo teórico, no un fallo.`}</div>`;
@@ -417,12 +422,13 @@ async function solicitarCajas(){
   $('dlg-sol').showModal();$('sol-texto').focus();$('sol-texto').select();
 }
 // Copia un campo de la ventana de solicitud al portapapeles (y lo deja seleccionado, por si el navegador no deja copiar).
-async function copiarSolicitud(id,que){
+async function copiarSolicitud(id,que,av){
+  av=av||'sol-aviso';
   const c=$(id);c.focus();c.select();
-  try{await navigator.clipboard.writeText(c.value);$('sol-aviso').textContent=que+' copiado. Pégalo en el correo con Ctrl+V.';}
+  try{await navigator.clipboard.writeText(c.value);$(av).textContent=que+' copiado. Pégalo en el correo con Ctrl+V.';}
   catch(e){
     let ok=false;try{ok=document.execCommand('copy');}catch(err){}
-    $('sol-aviso').textContent=ok?que+' copiado. Pégalo en el correo con Ctrl+V.':'No he podido copiarlo solo: está seleccionado, pulsa Ctrl+C.';
+    $(av).textContent=ok?que+' copiado. Pégalo en el correo con Ctrl+V.':'No he podido copiarlo solo: está seleccionado, pulsa Ctrl+C.';
   }
 }
 // El mismo texto de la ventana (con lo que se haya retocado en ella), en un PDF para adjuntar.
@@ -697,6 +703,17 @@ function volcarLeidas(){
   guardarPedido();renderLeidas();renderPedido();
   return {ok:ok.length,mont,pend:leidas.length};
 }
+// Lee un PDF de hoja de corte: filas de perfil, letras de texto que trae (pocas = escaneado) y datos de la cabecera.
+async function leerHojaPDF(file){
+  const pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+  const filas=[];let letras=0,cab={};
+  for(let n=1;n<=pdf.numPages;n++){
+    const page=await pdf.getPage(n),vp=page.getViewport({scale:1}),c=await page.getTextContent();
+    const its=c.items.filter(i=>i.str&&i.str.trim()).map(i=>{const p=vp.convertToViewportPoint(i.transform[4],i.transform[5]);return {s:i.str.trim(),x:p[0],y:p[1],w:i.width};});
+    const r=leerPagina(its);filas.push(...r.filas);letras+=r.letras;cab=Object.assign({},r.cab,cab);
+  }
+  return {filas,letras,cab};
+}
 // Lee una o varias hojas de corte (una pérgola grande trae una por módulo o grupo de módulos).
 // Cada hoja se queda con los datos de su cabecera y sus líneas llevan el módulo (M1, M2-3…).
 async function leerPDF(files){
@@ -707,13 +724,7 @@ async function leerPDF(files){
   for(const file of files){
     estado('Leyendo '+file.name+'…');
     try{
-      const pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
-      const filas=[];let letras=0,cab={};
-      for(let n=1;n<=pdf.numPages;n++){
-        const page=await pdf.getPage(n),vp=page.getViewport({scale:1}),c=await page.getTextContent();
-        const its=c.items.filter(i=>i.str&&i.str.trim()).map(i=>{const p=vp.convertToViewportPoint(i.transform[4],i.transform[5]);return {s:i.str.trim(),x:p[0],y:p[1],w:i.width};});
-        const r=leerPagina(its);filas.push(...r.filas);letras+=r.letras;cab=Object.assign({},r.cab,cab);
-      }
+      const {filas,letras,cab}=await leerHojaPDF(file);
       if(!filas.length){malas.push(file.name+(letras<40?' (es una imagen escaneada, sin texto)':' (no tiene líneas de perfiles)'));continue;}
       // si se vuelve a leer la misma hoja, sustituye a la anterior
       const vieja=leidasHojas.find(h=>h.archivo===file.name);
@@ -771,7 +782,7 @@ function renderPerfiles(){
   $('lista-perfiles').innerHTML=perfiles.length?`<table><thead><tr><th>Nombre</th><th>Ref.</th><th>Grupo</th><th class="n">Ancho <span class="u">(mm)</span></th><th class="n">Alto <span class="u">(mm)</span></th><th class="n">Piezas/bulto</th><th class="n">Ancho en medio <span class="u">(mm)</span></th><th class="n">Protección <span class="u">(mm)</span></th><th class="n">kg/m</th><th></th></tr></thead><tbody>${perfiles.map(p=>`<tr><td>${esc(p.nombre)}</td><td>${esc(p.ref)}</td><td>${GRUPOS[p.grupo]||''}</td><td class="n">${num(p.ancho)}</td><td class="n">${num(p.alto)}</td><td class="n">${num(p.uds)||1}</td><td class="n">${num(p.anchoMedio)||''}</td><td class="n">${num(p.capL)||''}</td><td class="n">${Number(p.kgm)>0?String(p.kgm).replace('.',','):''}</td><td class="act">${botones('perfil',p.id)}</td></tr>`).join('')}</tbody></table>`
     :'<div class="empty">Aún no hay perfiles. Guarda aquí la sección de cada perfil ya envuelto.</div>';
 }
-function renderTodo(){renderPedido();renderCajas();renderPerfiles();renderCatalogo();}
+function renderTodo(){renderPedido();renderCajas();renderPerfiles();renderCatalogo();renderPrevision();}
 
 // Catálogo: el común del repo (datos/catalogo.json) más los cambios guardados en este navegador.
 const CLAVE_CAT='catalogo-embalaje';
@@ -822,8 +833,8 @@ async function importar(file){
 document.querySelector('.tabs').addEventListener('click',e=>{
   const b=e.target.closest('[data-tab]');if(!b)return;
   document.querySelectorAll('[data-tab]').forEach(x=>x.setAttribute('aria-selected',x===b));
-  ['pedido','cajas','perfiles'].forEach(t=>$('tab-'+t).hidden=t!==b.dataset.tab);
-  $('cat-bar').hidden=b.dataset.tab==='pedido';
+  ['pedido','cajas','perfiles','prevision'].forEach(t=>$('tab-'+t).hidden=t!==b.dataset.tab);
+  $('cat-bar').hidden=b.dataset.tab==='pedido'||b.dataset.tab==='prevision';
 });
 $('tipos').addEventListener('change',e=>{pedido.tipo=e.target.value;guardarPedido();renderResultado();});
 for(const [id,k] of [['comp-n','n'],['comp-l','L'],['comp-a','A'],['comp-h','H']]) $(id).addEventListener('input',e=>{
@@ -943,6 +954,139 @@ document.addEventListener('change',e=>{
 
 document.addEventListener('close',e=>{if(e.target&&e.target.id==='dlg-planta')plantaAbierta=null;},true);
 document.addEventListener('click',e=>{if(e.target&&e.target.id==='dlg-planta'&&!arrastrado){plantaAbierta=null;renderResultado();}});
+
+// Previsión de cajas (Andrés, 27/10/2026): para anticipar el consumo de embalajes se van juntando pedidos en el navegador
+// (clave prevision-embalaje), desde el pedido de la pestaña Pedido o leyendo varias hojas de corte a la vez (cada número de
+// hoja es un pedido, con el reparto automático). Sale una lista con cliente, nº de pedido y cajas, y el total por modelo,
+// que se guarda en Excel o se manda por correo. Cada tipo de embalaje va en su color, con leyenda.
+const CLAVE_PREV='prevision-embalaje';
+let prevision=[],prevTipo='',prevVaciar=false;
+try{const g=JSON.parse(localStorage.getItem(CLAVE_PREV)||'[]');if(Array.isArray(g))prevision=g;}catch(e){}
+function guardarPrevision(){try{localStorage.setItem(CLAVE_PREV,JSON.stringify(prevision));}catch(e){estado('No se ha podido guardar la previsión en este navegador.');}}
+const tipoTxt=t=>`<b class="t-${esc(t)}">${esc(TIPOS[t]||t)}</b>`;
+// Resumen de un reparto: cajas por modelo, total, m³ (exterior) y bultos que se quedan sin caja.
+function resumenCajas(r){
+  const m=new Map();
+  for(const b of r.bins){const x=m.get(b.model.id)||{id:b.model.id,nombre:b.model.nombre,tipo:b.model.tipo,ext:[b.model.extL,b.model.extA,b.model.extH],n:0};x.n++;m.set(b.model.id,x);}
+  return {cajas:[...m.values()],total:r.bins.length,m3:volBins(r.bins)/1e9,fuera:r.unfit.length+((r.aparcados||[]).length)};
+}
+function calcularPrev(e){
+  const mods=cajas.filter(c=>c.tipo===e.tipo);
+  if(!mods.length){Object.assign(e,{cajas:[],total:0,m3:0,fuera:0,sinCajas:true});return e;}
+  delete e.sinCajas;
+  return Object.assign(e,resumenCajas(planGrupos(bultosDe(e.lineas,e.comp),mods)));
+}
+// Mete un pedido en la previsión; si ya estaba (mismo nº de pedido), lo sustituye.
+function meterPrevision(e){
+  const k=prevision.findIndex(x=>e.numero&&x.numero===e.numero);
+  if(k>=0) prevision[k]=Object.assign(e,{id:prevision[k].id}); else prevision.push(e);
+  return k>=0;
+}
+function aPrevision(){
+  const r=reparto;
+  if(!r||!r.bins.length||!pedido.lineas.length){estado('Todavía no hay cajas calculadas: arrastra las hojas de corte o añade perfiles al pedido.');return;}
+  const h=(pedido.hojas||[])[0]||{};
+  const e=Object.assign({id:nuevoId(),fecha:new Date().toISOString().slice(0,10),numero:h.numero||'',cliente:h.nombre||pedido.ref||'',tipo:pedido.tipo,origen:'pedido',
+    lineas:pedido.lineas.map(l=>({pid:l.pid,largo:l.largo,cant:l.cant})),comp:componentes()},resumenCajas(r));
+  const ya=meterPrevision(e);guardarPrevision();renderPrevision();
+  estado(`${ya?'Pedido sustituido':'Pedido añadido'} en la previsión${e.numero?' ('+e.numero+')':''}: ${e.total} ${e.total===1?'caja':'cajas'}. Está en la pestaña Previsión.`);
+}
+// Varias hojas de corte a la vez: las que tienen el mismo nº de hoja son un solo pedido (una por módulo).
+async function lotePrevision(files){
+  files=[...(files||[])].filter(Boolean);if(!files.length)return;
+  if(!window.pdfjsLib){estado('No se ha podido cargar el lector de PDF. Recarga la página.');return;}
+  if(!base){estado('Espera a que cargue el catálogo y vuelve a soltar las hojas.');return;}
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc='vendor/pdfjs/pdf.worker.min.js';
+  const grupos=new Map(),malas=[];
+  for(const file of files){
+    estado('Leyendo '+file.name+'…');
+    try{
+      const {filas,letras,cab}=await leerHojaPDF(file);
+      if(!filas.length){malas.push(file.name+(letras<40?' (escaneada, sin texto)':' (sin líneas de perfiles)'));continue;}
+      const k=cab.numero||file.name,g=grupos.get(k)||{numero:cab.numero||'',cliente:cab.nombre||file.name.replace(/\.pdf$/i,''),filas:[]};
+      g.filas.push(...filas);grupos.set(k,g);
+    }catch(e){malas.push(file.name+' (no se ha podido leer)');}
+  }
+  let n=0,sust=0;
+  for(const g of grupos.values()){
+    const lineas=[];let sin=0;
+    for(const l of g.filas){
+      const p=perfiles.find(x=>String(x.ref).trim()===l.ref);
+      if(p&&l.largo&&l.cant) lineas.push({pid:p.id,largo:l.largo,cant:l.cant});
+      else if(!p&&!base.montados.find(x=>String(x.ref).trim()===l.ref)) sin++;
+    }
+    const e=calcularPrev({id:nuevoId(),fecha:new Date().toISOString().slice(0,10),numero:g.numero,cliente:g.cliente,tipo:prevTipo||pedido.tipo,origen:'lote',lineas,comp:Object.assign({},componentes(),{n:1}),sinPerfil:sin});
+    if(meterPrevision(e)) sust++;
+    n++;
+  }
+  guardarPrevision();renderPrevision();
+  estado((n?`${n} ${n===1?'pedido añadido':'pedidos añadidos'} a la previsión`+(sust?` (${sust} ya ${sust===1?'estaba y se ha sustituido':'estaban y se han sustituido'})`:'')+'.':'')+(malas.length?` No se ha leído: ${malas.join('; ')}.`:''));
+}
+function totalesPrev(){
+  const m=new Map();
+  for(const e of prevision) for(const c of e.cajas){const x=m.get(c.id)||Object.assign({},c,{n:0});x.n+=c.n;m.set(c.id,x);}
+  const o=Object.keys(TIPOS),ti=t=>o.indexOf(t)<0?9:o.indexOf(t);
+  return [...m.values()].sort((a,b)=>ti(a.tipo)-ti(b.tipo)||String(a.nombre).localeCompare(b.nombre,'es',{numeric:true}));
+}
+const fechaEs=f=>f?f.split('-').reverse().join('/'):'';
+const cajasTxt=e=>e.cajas.map(c=>`${c.n} × ${c.nombre}`).join(', ');
+function renderPrevision(){
+  const el=$('prevision');if(!el)return;
+  if(document.activeElement!==$('prev-tipo')) $('prev-tipo').value=prevTipo||pedido.tipo;
+  const leyenda=`<div class="leyenda"><span class="tag">Tipo de embalaje</span>${Object.keys(TIPOS).map(t=>`<span><i class="sw" style="background:var(--t-${t})"></i>${tipoTxt(t)}</span>`).join('')}</div>`;
+  if(!prevision.length){el.innerHTML=leyenda+'<div class="empty">Todavía no hay pedidos en la previsión. Suelta aquí arriba varias hojas de corte, o calcula un pedido en la pestaña Pedido y pulsa «Añadir a la previsión».</div>';return;}
+  const tot=totalesPrev(),nc=tot.reduce((s,c)=>s+c.n,0),m3=prevision.reduce((s,e)=>s+(e.m3||0),0);
+  el.innerHTML=`<div class="totals"><div><b>${prevision.length}</b> <span>${prevision.length===1?'pedido':'pedidos'}</span></div><div><b>${nc}</b> <span>${nc===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><span class="acciones"><button class="btn" type="button" data-act="prev-correo">Enviar por correo</button><button class="btn ghost" type="button" data-act="prev-excel">Guardar en Excel</button><button class="btn ${prevVaciar?'danger':'ghost'}" type="button" data-act="prev-vaciar">${prevVaciar?'¿Seguro? Pulsa otra vez':'Vaciar previsión'}</button></span></div>${leyenda}
+    <h3>Cajas que hacen falta</h3><div class="scroll"><table><thead><tr><th>Modelo</th><th>Tipo</th><th>Exterior L×A×H <span class="u">(mm)</span></th><th class="n">Cantidad</th></tr></thead><tbody>${tot.map(c=>`<tr><td><b class="t-${esc(c.tipo)}">${esc(c.nombre)}</b></td><td>${tipoTxt(c.tipo)}</td><td>${c.ext.join(' × ')} mm</td><td class="n"><b class="t-${esc(c.tipo)}">${uds(c.n)}</b></td></tr>`).join('')}</tbody></table></div>
+    <h3>Pedidos</h3><div class="scroll"><table class="prev"><thead><tr><th>Fecha</th><th>Nº pedido</th><th>Cliente / pérgola</th><th>Embalaje</th><th>Cajas</th><th class="n">Total</th><th class="n">m³</th><th></th></tr></thead><tbody>${prevision.map((e,i)=>`<tr><td>${fechaEs(e.fecha)}</td><td><input class="prev-in" data-pi="${i}" data-pk="numero" value="${esc(e.numero)}" aria-label="Nº de pedido"></td><td><input class="prev-in ancho" data-pi="${i}" data-pk="cliente" value="${esc(e.cliente)}" aria-label="Cliente"></td><td><select class="prev-in t-${esc(e.tipo)}" data-pi="${i}" data-pk="tipo" aria-label="Tipo de embalaje">${Object.entries(TIPOS).map(([k,t])=>`<option value="${k}"${k===e.tipo?' selected':''}>${t}</option>`).join('')}</select></td><td>${e.sinCajas?`<span class="ojo">No hay cajas de ${esc(TIPOS[e.tipo].toLowerCase())} en el catálogo</span>`:e.cajas.map(c=>`<b class="t-${esc(c.tipo)}">${c.n} × ${esc(c.nombre)}</b>`).join(', ')}${e.fuera?` <span class="ojo">· ${e.fuera} ${e.fuera===1?'bulto no cabe':'bultos no caben'}</span>`:''}${e.sinPerfil?` <span class="ojo">· ${e.sinPerfil} ${e.sinPerfil===1?'línea sin perfil en el catálogo':'líneas sin perfil en el catálogo'}</span>`:''}${e.origen==='pedido'?' <small class="sub">(del pedido, con sus retoques)</small>':''}</td><td class="n">${uds(e.total)}</td><td class="n">${(e.m3||0).toFixed(2)}</td><td class="act"><button class="btn small danger" type="button" data-act="prev-quitar" data-i="${i}">Quitar</button></td></tr>`).join('')}</tbody></table></div>
+    <p class="sub">La previsión se guarda sola en este navegador. Los pedidos leídos de varias hojas usan la colocación automática; los que vienen de la pestaña Pedido guardan las cajas tal como estaban. Si cambias el embalaje de un pedido, se recalcula con la colocación automática.</p>`;
+}
+function excelPrevision(){
+  const tot=totalesPrev(),hoy=new Date().toLocaleDateString('es-ES');
+  const ley=[[],[{v:'Leyenda',s:'neg'}],...Object.keys(TIPOS).map(t=>[{v:TIPOS[t],s:t}])];
+  const pedidos=[[{v:'Previsión de cajas · '+hoy,s:'titulo'}],[],['Fecha','Nº pedido','Cliente / pérgola','Embalaje','Cajas','Total cajas (uds.)','m³'].map(v=>({v,s:'cab'})),
+    ...prevision.map(e=>[fechaEs(e.fecha),e.numero,e.cliente,{v:TIPOS[e.tipo]||e.tipo,s:e.tipo},{v:cajasTxt(e)+(e.fuera?` (${e.fuera} sin caja)`:''),s:e.tipo},e.total,{v:Math.round((e.m3||0)*100)/100,s:'dec'}]),
+    ['','','','','Total',{v:prevision.reduce((s,e)=>s+e.total,0),s:'neg'},{v:Math.round(prevision.reduce((s,e)=>s+(e.m3||0),0)*100)/100,s:'decneg'}],...ley];
+  const totales=[[{v:'Cajas que hacen falta · '+hoy,s:'titulo'}],[],['Modelo','Tipo','Exterior L×A×H (mm)','Cantidad (uds.)'].map(v=>({v,s:'cab'})),
+    ...tot.map(c=>[{v:c.nombre,s:c.tipo},{v:TIPOS[c.tipo]||c.tipo,s:c.tipo},c.ext.join(' × ')+' mm',{v:c.n,s:c.tipo}]),
+    ['','','Total',{v:tot.reduce((s,c)=>s+c.n,0),s:'neg'}],...ley];
+  const nombre=descargar(xlsx([{nombre:'Pedidos',anchos:[12,14,34,16,46,16,10],filas:pedidos},{nombre:'Total por modelo',anchos:[18,18,24,16],filas:totales}]),`Previsión de cajas ${hoy.replace(/\//g,'-')}.xlsx`);
+  return nombre;
+}
+function textoPrevision(){
+  const tot=totalesPrev(),n=prevision.length;
+  const L=['Hola:','',`Previsión de cajas para ${n} ${n===1?'pedido':'pedidos'}:`,'',
+    ...tot.map(c=>`- ${uds(c.n)} de ${c.nombre} (${TIPOS[c.tipo]||c.tipo}), exterior ${c.ext.join(' × ')} mm`),
+    '','Por pedido:',...prevision.map(e=>`- ${[e.numero,e.cliente].filter(Boolean).join(' · ')||'Sin nº'} · ${TIPOS[e.tipo]||e.tipo}: ${cajasTxt(e)||'sin cajas'}`),'','Gracias.'];
+  return {asunto:`Previsión de cajas · ${n} ${n===1?'pedido':'pedidos'}`,cuerpo:L.join('\n')};
+}
+(function(){
+  const d=$('drop-prev');
+  ['dragenter','dragover'].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();d.classList.add('sobre');}));
+  ['dragleave','drop'].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();d.classList.remove('sobre');}));
+  d.addEventListener('drop',e=>lotePrevision(e.dataTransfer&&e.dataTransfer.files));
+  $('pdf-prev').addEventListener('change',e=>{const f=[...e.target.files];e.target.value='';lotePrevision(f);});
+  $('prev-tipo').addEventListener('change',e=>{prevTipo=e.target.value;});
+  $('prevision').addEventListener('change',e=>{
+    const t=e.target,i=Number(t.dataset.pi),x=prevision[i];if(!x||!t.dataset.pk)return;
+    if(t.dataset.pk==='tipo'){x.tipo=t.value;x.origen='lote';calcularPrev(x);} else x[t.dataset.pk]=t.value.trim();
+    guardarPrevision();renderPrevision();
+  });
+  document.addEventListener('click',e=>{
+    const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
+    if(a!=='prev-vaciar'&&prevVaciar){prevVaciar=false;renderPrevision();}
+    if(a==='a-prevision') aPrevision();
+    else if(a==='prev-quitar'){prevision.splice(Number(b.dataset.i),1);guardarPrevision();renderPrevision();}
+    else if(a==='prev-vaciar'){if(prevVaciar){prevision=[];prevVaciar=false;guardarPrevision();estado('Previsión vaciada.');}else prevVaciar=true;renderPrevision();}
+    else if(a==='prev-excel'){const n=excelPrevision();estado(`Descargado «${n}».`);}
+    else if(a==='prev-correo'){const t=textoPrevision();$('prev-asunto').value=t.asunto;$('prev-texto').value=t.cuerpo;$('prev-aviso').textContent='';$('dlg-prev').showModal();}
+    else if(a==='prev-copiar') copiarSolicitud('prev-texto','Texto','prev-aviso');
+    else if(a==='prev-casunto') copiarSolicitud('prev-asunto','Asunto','prev-aviso');
+    else if(a==='prev-abrir'){location.href=`mailto:?subject=${encodeURIComponent($('prev-asunto').value)}&body=${encodeURIComponent($('prev-texto').value)}`;}
+    else if(a==='prev-dexcel'){const n=excelPrevision();$('prev-aviso').textContent=`Descargado «${n}». Adjúntalo al correo.`;}
+    else if(a==='prev-cerrar') $('dlg-prev').close();
+  });
+})();
 
 renderTodo();
 (async()=>{

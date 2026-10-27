@@ -228,3 +228,19 @@ dialog#dlg-planta svg{max-height:none}
 
 text.ladoc{fill:var(--muted);font-family:var(--display);font-weight:700;letter-spacing:.08em}
 .vistas-dlg{display:inline-flex;gap:4px;flex-wrap:wrap}
+
+/* Previsión: un color por tipo de embalaje, el mismo en la leyenda, la tabla y el Excel */
+:root{--t-carton:#9a5a0b;--t-cerrada:#2c7a35;--t-abierta:#7a3db3}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--t-carton:#e3a45a;--t-cerrada:#7fcf87;--t-abierta:#c59bf2}}
+:root[data-theme="dark"]{--t-carton:#e3a45a;--t-cerrada:#7fcf87;--t-abierta:#c59bf2}
+.t-carton{color:var(--t-carton)}.t-cerrada{color:var(--t-cerrada)}.t-abierta{color:var(--t-abierta)}
+select.prev-in{font-weight:700;min-width:11em}
+table.prev input.prev-in{width:9em}table.prev input.prev-in.ancho{width:16em}
+dialog#dlg-prev{width:min(760px,calc(100vw - 24px));border:1px solid var(--line);border-radius:8px;padding:18px;background:var(--panel);color:var(--fg)}
+dialog#dlg-prev[open]{display:flex;flex-direction:column;gap:12px}
+dialog#dlg-prev::backdrop{background:rgba(0,0,0,.5)}
+dialog#dlg-prev h2{margin:0}
+
+.ojo{color:var(--warn);font-weight:600}
+/* El navegador no imprime fondos si no se le pide: sin esto, los cuadritos de color de la leyenda salen en blanco */
+@media print{#imprimir .sw,#imprimir .leyenda,#imprimir .leyenda *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}

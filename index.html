@@ -8,7 +8,7 @@
   <link rel="icon" href="static/favicon.ico">
   <link rel="apple-touch-icon" href="static/icon-180.png">
   <meta name="theme-color" content="#0b5c8a">
-  <link rel="stylesheet" href="static/estilo.css?v=56">
+  <link rel="stylesheet" href="static/estilo.css?v=57">
 </head>
 <body>
 <div class="wrap">
@@ -21,6 +21,7 @@
       <button role="tab" data-tab="pedido" aria-selected="true">Pedido</button>
       <button role="tab" data-tab="cajas" aria-selected="false">Cajas</button>
       <button role="tab" data-tab="perfiles" aria-selected="false">Perfiles</button>
+      <button role="tab" data-tab="prevision" aria-selected="false">Previsión</button>
     </div>
   </header>
   <div id="estado" role="status"></div>
@@ -95,7 +96,31 @@
     <p class="sub">Sección del bulto ya envuelto, en milímetros. Si se envuelven varias piezas juntas (por ejemplo 2 lamas), indica cuántas van en cada bulto. Si el bulto lleva protección solo en los extremos (porexpan), pon el largo de cada protección y el ancho del bulto en el medio: así la app los alterna y caben más por caja. El peso es el de un metro de una sola pieza, con lo que lleve montado; con él la app da el peso de cada caja y reparte la carga con el peso real. El grupo sirve para que la estructura vaya junta en unas cajas y las lamas en otras.</p>
     <div id="lista-perfiles" class="scroll"></div>
   </section>
+
+  <section id="tab-prevision" class="panel" hidden>
+    <h2>Previsión de cajas</h2>
+    <p class="sub">Para saber con tiempo cuántas cajas van a hacer falta: junta aquí los pedidos que vienen y te da la lista por pedido y el total de cada modelo. Se guarda en este navegador.</p>
+    <div class="row">
+      <label>Embalaje para las hojas que sueltes<select id="prev-tipo"><option value="carton">Cartón</option><option value="cerrada">Madera cerrada</option><option value="abierta">Madera abierta</option></select></label>
+    </div>
+    <label class="drop" id="drop-prev"><input type="file" id="pdf-prev" accept="application/pdf,.pdf" multiple>Arrastra aquí varias hojas de corte<small>Cada número de hoja es un pedido (las hojas de los módulos de una misma pérgola se juntan). Se calcula con la colocación automática y se añade a la lista.</small></label>
+    <div id="prevision"></div>
+  </section>
 </div>
+<dialog id="dlg-prev">
+  <h2>Previsión de cajas por correo</h2>
+  <p class="sub">«Abrir en el correo» abre un correo nuevo con el asunto y el texto. El Excel no se adjunta solo: descárgalo y adjúntalo.</p>
+  <label>Asunto<input id="prev-asunto"></label>
+  <label>Texto del correo<textarea id="prev-texto" rows="12"></textarea></label>
+  <div id="prev-aviso" role="status"></div>
+  <div class="acciones">
+    <button class="btn" type="button" data-act="prev-abrir">Abrir en el correo</button>
+    <button class="btn ghost" type="button" data-act="prev-copiar">Copiar texto</button>
+    <button class="btn ghost" type="button" data-act="prev-casunto">Copiar asunto</button>
+    <button class="btn ghost" type="button" data-act="prev-dexcel">Descargar Excel</button>
+    <button class="btn ghost" type="button" data-act="prev-cerrar">Cerrar</button>
+  </div>
+</dialog>
 <dialog id="dlg-sol">
   <h2>Solicitud de cajas al almacén</h2>
   <p class="sub">Copia el asunto y el texto y pégalos en un correo nuevo. Puedes retocar el texto aquí antes de copiarlo.</p>
@@ -112,8 +137,9 @@
 <div id="imprimir"></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script src="static/nucleo.js?v=56"></script>
-<script src="static/pdf.js?v=56"></script>
-<script src="static/app.js?v=56"></script>
+<script src="static/nucleo.js?v=57"></script>
+<script src="static/pdf.js?v=57"></script>
+<script src="static/xlsx.js?v=57"></script>
+<script src="static/app.js?v=57"></script>
 </body>
 </html>
