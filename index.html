@@ -8,7 +8,7 @@
   <link rel="icon" href="static/favicon.ico">
   <link rel="apple-touch-icon" href="static/icon-180.png">
   <meta name="theme-color" content="#0b5c8a">
-  <link rel="stylesheet" href="static/estilo.css?v=50">
+  <link rel="stylesheet" href="static/estilo.css?v=51">
 </head>
 <body>
 <div class="wrap">
@@ -71,9 +71,10 @@
       <label>Ancho exterior <span class="u">(mm)</span><input id="c-ea" type="number" min="1" required></label>
       <label>Alto exterior <span class="u">(mm)</span><input id="c-eh" type="number" min="1" required></label>
       <label>Peso vacía <span class="u">(kg)</span><input id="c-kg" type="number" min="0" step="any"></label>
+      <label>Precio por caja <span class="u">(€)</span><input id="c-precio" type="number" min="0" step="any"></label>
       <button class="btn" id="c-guardar" style="align-self:end">Guardar caja</button>
     </form>
-    <p class="sub">Todas las medidas en milímetros. El peso de la caja vacía se suma al de los perfiles para dar el peso total de cada caja.</p>
+    <p class="sub">Todas las medidas en milímetros. El peso de la caja vacía se suma al de los perfiles para dar el peso total de cada caja. Con el precio de cada caja, la app elige siempre el reparto más barato; mientras no estén todos los precios del tipo, elige la que menos material lleva (la más ajustada).</p>
     <div id="lista-cajas" class="scroll"></div>
   </section>
 
@@ -111,8 +112,8 @@
 <div id="imprimir"></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script src="static/nucleo.js?v=50"></script>
-<script src="static/pdf.js?v=50"></script>
-<script src="static/app.js?v=50"></script>
+<script src="static/nucleo.js?v=51"></script>
+<script src="static/pdf.js?v=51"></script>
+<script src="static/app.js?v=51"></script>
 </body>
 </html>

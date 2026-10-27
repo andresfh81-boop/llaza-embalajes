@@ -134,34 +134,42 @@ function packWith(model,items,cmp){
 }
 function vol(m){return m.extL*m.extA*m.extH;}
 function volBins(bins){return bins.reduce((s,b)=>s+vol(b.model),0);}
-function resto(items,models){
+// Lo que cuesta una caja, para elegir siempre la más barata que sirva (Andrés, 27/10/2026: las cajas valen dinero y no quiere cajas medio vacías).
+// Si todos los modelos del tipo tienen `precio`, se usa el precio. Mientras no lo tengan, el material que lleva: la superficie exterior,
+// que penaliza una caja larga y baja frente a otra más corta y alta con el mismo volumen.
+function superficie(m){return 2*(m.extL*m.extA+m.extL*m.extH+m.extA*m.extH);}
+function costeDe(models){const conPrecio=models.length>0&&models.every(m=>Number(m.precio)>0);return m=>conPrecio?Number(m.precio):superficie(m);}
+function costeBins(bins,coste){return bins.reduce((s,b)=>s+coste(b.model),0);}
+function resto(items,models,coste){
   if(!items.length||!models.length) return {bins:[],unfit:items};
+  coste=coste||costeDe(models);
   let best=null;
   for(const m of models){
     const r=packWith(m,items);
-    const k=[r.unfit.length,volBins(r.bins),r.bins.length];
+    const k=[r.unfit.length,costeBins(r.bins,coste),r.bins.length];
     if(!best||k[0]<best.k[0]||(k[0]===best.k[0]&&(k[1]<best.k[1]||(k[1]===best.k[1]&&k[2]<best.k[2])))) best={k,r,m};
   }
   if(!best.r.unfit.length||!best.r.bins.length) return best.r;
-  const sub=resto(best.r.unfit,models.filter(m=>m!==best.m));
+  const sub=resto(best.r.unfit,models.filter(m=>m!==best.m),coste);
   return {bins:best.r.bins.concat(sub.bins),unfit:sub.unfit};
 }
 function plan(items,models){
   if(!models.length) return {bins:[],unfit:items};
+  const coste=costeDe(models);
   let best=null;
   for(const m of models) for(const cmp of ORDENES){
     const r=packWith(m,items,cmp);
     if(!r.bins.length) continue;
-    const sub=resto(r.unfit,models.filter(x=>x!==m));
+    const sub=resto(r.unfit,models.filter(x=>x!==m),coste);
     const bins=r.bins.concat(sub.bins);
-    const k=[sub.unfit.length,volBins(bins),bins.length];
+    const k=[sub.unfit.length,costeBins(bins,coste),bins.length];
     if(!best||k[0]<best.k[0]||(k[0]===best.k[0]&&(k[1]<best.k[1]||(k[1]===best.k[1]&&k[2]<best.k[2])))) best={k,bins,unfit:sub.unfit};
   }
   if(!best) return {bins:[],unfit:items};
-  const asc=models.slice().sort((a,b)=>vol(a)-vol(b));
+  const asc=models.slice().sort((a,b)=>coste(a)-coste(b));
   best.bins=best.bins.map(b=>{
     for(const m of asc){
-      if(vol(m)>=vol(b.model)) break;
+      if(coste(m)>=coste(b.model)) break;
       const r=packWith(m,b.items.map(p=>p.it));
       if(r.bins.length===1&&!r.unfit.length) return r.bins[0];
     }
@@ -233,14 +241,14 @@ function planGrupos(items,models){
   if(gs.length<2){const r=plan(items,models);r.bins.forEach(repartir);return r;}
   let bins=[],unfit=[];
   for(const g of gs){const r=plan(items.filter(it=>(it.g||'')===g),models);bins=bins.concat(r.bins);unfit=unfit.concat(r.unfit);}
-  const asc=models.slice().sort((a,b)=>vol(a)-vol(b)),de=b=>[...new Set(b.items.map(p=>p.it.g||''))].sort().join();
+  const coste=costeDe(models),asc=models.slice().sort((a,b)=>coste(a)-coste(b)),de=b=>[...new Set(b.items.map(p=>p.it.g||''))].sort().join();
   for(let seguir=true;seguir;){
     seguir=false;
     for(let i=0;i<bins.length&&!seguir;i++) for(let j=i+1;j<bins.length&&!seguir;j++){
       if(de(bins[i])===de(bins[j])) continue;
       const its=bins[i].items.concat(bins[j].items).map(p=>p.it);
       for(const m of asc){
-        if(vol(m)>=vol(bins[i].model)+vol(bins[j].model)) break;
+        if(coste(m)>=coste(bins[i].model)+coste(bins[j].model)) break;
         const r=packWith(m,its);
         if(r.bins.length===1&&!r.unfit.length){bins[i]=r.bins[0];bins.splice(j,1);seguir=true;break;}
       }
@@ -261,4 +269,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={repartir,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,vol,volBins,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={repartir,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,vol,volBins,superficie,costeDe,aplicar,diferencia};

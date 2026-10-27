@@ -48,7 +48,7 @@ Para verla en local hace falta servirla (abierta como archivo suelto no carga el
 - Encaje 2D en la sección interior de la caja (MaxRects, abajo-izquierda, con giro de 90°).
 - **No garantiza el óptimo**: es una colocación por reglas (heurística). `plan` prueba cada modelo de caja con cuatro órdenes de colocación (`ORDENES`: por sección, alto, ancho y lado mayor) y se queda con el mejor. En pantalla sale la sección aprovechada y el mínimo de cajas por superficie, que es una cota inferior y no siempre se puede alcanzar.
 - **Girar a mano**: clic derecho en un bulto del dibujo de frente lo gira 90° en el sitio (`girarBulto`); la tecla R mientras se arrastra gira lo que se lleva. Los bultos con protección en los extremos también se giran a mano: su parte estrecha pasa del ancho (`medio`) al alto (`medioH`). El reparto automático no los gira.
-- Prueba cada modelo de caja del tipo elegido, se queda con el reparto de menos volumen exterior y después intenta bajar cada caja a un modelo más pequeño.
+- Prueba cada modelo de caja del tipo elegido, se queda con el reparto que **cuesta menos** y después intenta bajar cada caja a un modelo más barato (cambiado el 27/10/2026: antes elegía por volumen exterior y sacaba cajas largas medio vacías, p. ej. una MA-5000 para lamas de 2255 mm, porque su volumen salía casi igual al de una MA-3000; Andrés: las cajas valen dinero). El coste (`costeDe` en `nucleo.js`) es el `precio` de la caja si **todos** los modelos del tipo lo tienen (campo «Precio (€)» en la pestaña Cajas, vacío en el catálogo común) y, mientras no, la superficie exterior (`superficie`), que es el material que lleva. Orden de preferencia: sin bultos fuera, menor coste total, menos cajas.
 - **Carga repartida a lo largo** (`repartir` en `nucleo.js`; pedido por Andrés, 12/10/2026, porque salía todo pegado a un extremo): al terminar el reparto, en cada caja los bultos se van poniendo a un extremo o al otro, de abajo arriba y del más largo al más corto, eligiendo el lado que deja el peso más centrado (con el peso real de cada bulto si todos los de la caja tienen `kgm` en el catálogo; si falta alguno, se estima por volumen: largo × sección). Lo de encima no pierde su apoyo y las filas de lamas alternadas se mueven en bloque.
 - **Por grupos** (`planGrupos`): cada perfil tiene `grupo` («estructura» o «lamas»). La estructura va junta en sus cajas y las lamas en las suyas (pedido por Andrés, 11/10/2026: «preferiblemente»). Solo se juntan dos cajas de grupos distintos cuando caben en una sola y así sobra una; esa caja sale marcada «Mezcla».
 - Los bultos con protección en los extremos no se giran (si no, en la vista desde arriba salían sin protección).
@@ -95,5 +95,6 @@ Para verla en local hace falta servirla (abierta como archivo suelto no carga el
 ## Siguiente paso
 
 1. Medir las dimensiones exteriores reales de las cajas y ponerlas en el catálogo común.
+2. Pedir a Andrés el precio de cada caja y rellenarlo en el catálogo común (hoy se elige por material).
 
 Ideas para después: límite de peso, etiquetas por caja.

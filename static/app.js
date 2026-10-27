@@ -681,7 +681,7 @@ function botones(tipo,id){
 }
 function renderCajas(){
   $('c-guardar').textContent=editCaja?'Guardar cambios':'Guardar caja';
-  $('lista-cajas').innerHTML=cajas.length?`<table><thead><tr><th>Nombre</th><th>Tipo</th><th class="n">Interior L×A×H <span class="u">(mm)</span></th><th class="n">Exterior L×A×H <span class="u">(mm)</span></th><th class="n">m³</th><th class="n">Vacía (kg)</th><th></th></tr></thead><tbody>${cajas.map(c=>`<tr><td>${esc(c.nombre)}</td><td>${TIPOS[c.tipo]||''}</td><td class="n">${num(c.intL)}×${num(c.intA)}×${num(c.intH)}</td><td class="n">${num(c.extL)}×${num(c.extA)}×${num(c.extH)}</td><td class="n">${(vol(c)/1e9).toFixed(3)}</td><td class="n">${Number(c.kg)>0?String(c.kg).replace('.',','):''}</td><td class="act">${botones('caja',c.id)}</td></tr>`).join('')}</tbody></table>`
+  $('lista-cajas').innerHTML=cajas.length?`<table><thead><tr><th>Nombre</th><th>Tipo</th><th class="n">Interior L×A×H <span class="u">(mm)</span></th><th class="n">Exterior L×A×H <span class="u">(mm)</span></th><th class="n">m³</th><th class="n">Vacía <span class="u">(kg)</span></th><th class="n">Precio <span class="u">(€)</span></th><th></th></tr></thead><tbody>${cajas.map(c=>`<tr><td>${esc(c.nombre)}</td><td>${TIPOS[c.tipo]||''}</td><td class="n">${num(c.intL)}×${num(c.intA)}×${num(c.intH)}</td><td class="n">${num(c.extL)}×${num(c.extA)}×${num(c.extH)}</td><td class="n">${(vol(c)/1e9).toFixed(3)}</td><td class="n">${Number(c.kg)>0?String(c.kg).replace('.',','):''}</td><td class="n">${Number(c.precio)>0?String(c.precio).replace('.',','):''}</td><td class="act">${botones('caja',c.id)}</td></tr>`).join('')}</tbody></table>`
     :'<div class="empty">Aún no hay cajas. Mide cada modelo por dentro y por fuera y guárdalo con el formulario de arriba.</div>';
 }
 function renderPerfiles(){
@@ -762,6 +762,7 @@ $('f-caja').addEventListener('submit',e=>{
   e.preventDefault();
   const d={nombre:$('c-nombre').value.trim(),tipo:$('c-tipo').value,intL:num($('c-il').value),intA:num($('c-ia').value),intH:num($('c-ih').value),extL:num($('c-el').value),extA:num($('c-ea').value),extH:num($('c-eh').value)};
   if(Number($('c-kg').value)>0) d.kg=Math.round(Number($('c-kg').value)*10)/10;
+  if(Number($('c-precio').value)>0) d.precio=Math.round(Number($('c-precio').value)*100)/100;
   if(d.extL<d.intL||d.extA<d.intA||d.extH<d.intH){estado('Revisa las medidas: el exterior no puede ser menor que el interior.');return;}
   if(!base){estado('No se puede guardar: catálogo no disponible.');return;}
   poner(cajas,editCaja,d);editCaja=null;e.target.reset();guardarCatalogo();
@@ -835,7 +836,7 @@ document.addEventListener('click',async e=>{
   else if(a==='borrar-perfil'){confirmar=null;perfiles=perfiles.filter(x=>x.id!==id);guardarCatalogo();}
   else if(a==='editar-caja'){
     const c=cajas.find(x=>x.id===id);if(!c)return;editCaja=id;
-    $('c-nombre').value=c.nombre;$('c-tipo').value=c.tipo;$('c-il').value=c.intL;$('c-ia').value=c.intA;$('c-ih').value=c.intH;$('c-el').value=c.extL;$('c-ea').value=c.extA;$('c-eh').value=c.extH;$('c-kg').value=c.kg||'';
+    $('c-nombre').value=c.nombre;$('c-tipo').value=c.tipo;$('c-il').value=c.intL;$('c-ia').value=c.intA;$('c-ih').value=c.intH;$('c-el').value=c.extL;$('c-ea').value=c.extA;$('c-eh').value=c.extH;$('c-kg').value=c.kg||'';$('c-precio').value=c.precio||'';
     renderCajas();$('c-nombre').focus();
   }
   else if(a==='editar-perfil'){
