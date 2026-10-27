@@ -71,10 +71,10 @@ let reparto=null,repartoClave='',repartoManual=false,repartoGuardado=false,aviso
 const PASOS=[.3,.4,.5,.6,.7,.8,.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,2.2,2.4,2.6,2.8,3,3.25,3.5,3.75,4];
 let zoom={},arrastrado=false;
 // Cajas a pantalla completa (conjunto de números, o null), cajas marcadas con su casilla para verlas juntas, y bulto seleccionado con un clic ({b: caja, k: posición}) para pasarlo a otra caja con la barra de abajo.
-let completa=null,marcadas=new Set(),sel=null,plantaAbierta=null,vistaDlg='a'; // plantaAbierta: caja cuya vista desde arriba (vistaDlg 'a') o de lado ('l') está abierta en la ventana
+let completa=null,marcadas=new Set(),sel=null,plantaAbierta=null,vistaDlg='a'; // plantaAbierta: caja abierta en la ventana; vistaDlg: la vista que enseña (VISTAS_DLG)
 function visor(i,vista,titulo,svg){
   const id=i+vista,z=(zoom[id]||{}).z||1;
-  return `<div class="vcab"><span class="tag">${titulo}</span><span class="zbot"><button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="-1" aria-label="Reducir"${z<=PASOS[0]?' disabled':''}>−</button><b>${Math.round(z*100)} %</b><button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="1" aria-label="Ampliar"${z>=PASOS[PASOS.length-1]?' disabled':''}>+</button>${z!==1?`<button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="0">Normal</button>`:''}</span></div><div class="visor" data-v="${id}"><div style="${completa&&completa.has(i)&&vista==='f'?`width:min(${z*100}%,${z*78}vh);margin:0 auto`:`width:${z*100}%`}">${svg}</div></div>`;
+  return `<div class="vcab"><span class="tag">${titulo}</span><span class="zbot"><button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="-1" aria-label="Reducir"${z<=PASOS[0]?' disabled':''}>−</button><b>${Math.round(z*100)} %</b><button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="1" aria-label="Ampliar"${z>=PASOS[PASOS.length-1]?' disabled':''}>+</button>${z!==1?`<button class="btn small ghost" type="button" data-act="zoom" data-v="${id}" data-d="0">Normal</button>`:''}</span></div><div class="visor" data-v="${id}"><div style="${vista==='F'||completa&&completa.has(i)&&vista==='f'?`width:min(${z*100}%,${z*78}vh);margin:0 auto`:`width:${z*100}%`}">${svg}</div></div>`;
 }
 // Cambia el aumento de un dibujo manteniendo a la vista el mismo punto central.
 function cambiarZoom(id,d){
@@ -182,15 +182,31 @@ function huecos(b,fc){
   }
   return out.join('');
 }
+// Rótulo de un bulto en las vistas de arriba y de lado: nombre en el centro, largo abajo y la otra medida (ancho o alto, sin holgura)
+// girada a la izquierda, como en el dibujo de frente. Si no caben las medidas, el largo va con el nombre.
+function rotulo(p,x0,y0,L,h,cruz,fc){
+  const fm=Math.min(fc*.9,h/3.4,L/3),med=fm>=5,t=corto(p.it.p);
+  const txt=`${modTxt(p.it)?modTxt(p.it)+' · ':''}${t}${varias(p.it)?' · '+piezas(p.it):''}${p.it.m?' '+p.it.m:''}${med?'':' · '+p.it.L}`;
+  const hh=med?h-fm*1.5:h,ll=med?L-fm*3:L,f=Math.min(fc,hh*.7,ll*.92/(txt.length*.58));
+  return (f>=5?`<text x="${x0+L/2}" y="${y0+hh/2}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(txt)}</text>`:'')+(med?`<text x="${x0+L/2}" y="${y0+h-fm*.75}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.it.L}</text><text transform="translate(${x0+fm*.8} ${y0+h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${Math.round(cruz)}</text>`:'');
+}
+// Nombre de cada lado de la caja, por fuera del dibujo (arriba, derecha, abajo, izquierda), para saber desde dónde se mira.
+// El frente está donde empieza el largo (a la izquierda en las vistas de arriba y de lado) y la izquierda, donde empieza el ancho.
+// Devuelve el margen que añade al viewBox (bd) y los textos; W×H es el interior dibujado y mg el margen de las cotas.
+function lados(W,H,mg,f,[ar,de,ab,iz]){
+  const bd=f*1.9,t=(x,y,r,n)=>`<text class="ladoc" font-size="${f}" text-anchor="middle" dominant-baseline="central" transform="translate(${x} ${y})${r?` rotate(${r})`:''}">${n}</text>`;
+  return {bd,svg:t(W/2,-bd/2,0,ar)+t(W+bd/2,H/2,90,de)+t(W/2,H+mg+bd/2,0,ab)+t(-mg-bd/2,H/2,-90,iz)};
+}
 function dibujoSeccion(b,i,col,hol){
   const M=b.model,mx=Math.max(M.intA,M.intH),fs=mx/14,mg=mx*.17,fc=mx/21;
   const ocA=Math.max(0,...b.items.map(p=>p.x+p.w)),ocH=Math.max(0,...b.items.map(p=>p.y+p.h));
-  return `<svg class="seccion" viewBox="${-mg} -2 ${M.intA+mg+2} ${M.intH+mg+2}" role="img" aria-label="Sección de la caja ${i+1}"><rect x="0" y="0" width="${M.intA}" height="${M.intH}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,k)=>({p,k})).sort((u,v)=>(v.p.off||0)-(u.p.off||0)).map(({p:P,k})=>{
+  const ld=lados(M.intA,M.intH,mg,fc*.85,['ARRIBA','DERECHA','SUELO','IZQUIERDA']);
+  return `<svg class="seccion" viewBox="${-mg-ld.bd} ${-ld.bd} ${M.intA+mg+2*ld.bd} ${M.intH+mg+2*ld.bd}" role="img" aria-label="Sección de la caja ${i+1}"><rect x="0" y="0" width="${M.intA}" height="${M.intH}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,k)=>({p,k})).sort((u,v)=>(v.p.off||0)-(u.p.off||0)).map(({p:P,k})=>{
     // P es el bulto entero (con protección); p, lo que se pinta relleno: en una lama girada, el cuerpo, que es más bajo.
     const p=P.medioH?Object.assign({},P,{y:P.y+(P.h-P.medioH)/2,h:P.medioH}):P;
     // Lo que va más al fondo se pinta primero. Un bulto alternado se dibuja con su ancho en el medio; la protección del extremo, en línea de puntos.
     const y=M.intH-p.y-p.h,rw=p.medio||p.w,rx=p.x+(p.w-rw)/2,t=corto(p.it.p),fm=Math.min(fc*.9,rw/5,p.h/5),lin=[[t,1],...(varias(p.it)?[[piezas(p.it),1]]:[]),...(modTxt(p.it)||p.it.m?[[[modTxt(p.it),p.it.m].filter(Boolean).join(' · '),2]]:[]),[`${p.it.L} mm`,0]],f=Math.min(fs,(p.h-fm*1.4)/(lin.length+.2),(rw-fm*1.8)/(Math.max(...lin.map(l=>String(l[0]).length))*.6)),tx=rx+rw/2+fm*.5,ty=y+(p.h-fm*1.4)/2,aire=!apoyado(P,b);
-    return (P.medio||P.medioH?`<rect class="prot" x="${P.x}" y="${M.intH-P.y-P.h}" width="${P.w}" height="${P.h}" vector-effect="non-scaling-stroke"/>`:'')+`<rect class="bulto${aire?' aire':''}${sel&&sel.b===i&&sel.k===k?' sel':''}" data-b="${i}" data-k="${k}" x="${rx}" y="${y}" width="${rw}" height="${p.h}" fill="var(--p${col(p.it)})" ${trazo(p.it,1.5)} vector-effect="non-scaling-stroke"><title>${esc(p.it.p.nombre)} · ${p.it.L} mm${varias(p.it)?' · '+piezas(p.it):''}${p.it.m?' · marcaje '+esc(p.it.m):''}${aire?' · en el aire, sin apoyo':''}</title></rect>${lin.map((l,j)=>`<text${l[1]===2?' class="marca"':''} x="${tx}" y="${ty+(j-(lin.length-1)/2)*f}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)"${l[1]?' font-family="var(--display)" font-weight="700"':''}>${esc(l[0])}</text>`).join('')}<text x="${rx+rw/2}" y="${y+p.h-fm*.7}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${rw-hol}</text><text transform="translate(${rx+fm*.75} ${y+p.h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.h-hol}</text>`;}).join('')}${huecos(b,fc)}${cota(M.intA,ocA,1,M.intH,mg,fc,false)}${cota(M.intH,ocH,1,M.intH,mg,fc,true)}</svg>`;
+    return (P.medio||P.medioH?`<rect class="prot" x="${P.x}" y="${M.intH-P.y-P.h}" width="${P.w}" height="${P.h}" vector-effect="non-scaling-stroke"/>`:'')+`<rect class="bulto${aire?' aire':''}${sel&&sel.b===i&&sel.k===k?' sel':''}" data-b="${i}" data-k="${k}" x="${rx}" y="${y}" width="${rw}" height="${p.h}" fill="var(--p${col(p.it)})" ${trazo(p.it,1.5)} vector-effect="non-scaling-stroke"><title>${esc(p.it.p.nombre)} · ${p.it.L} mm${varias(p.it)?' · '+piezas(p.it):''}${p.it.m?' · marcaje '+esc(p.it.m):''}${aire?' · en el aire, sin apoyo':''}</title></rect>${lin.map((l,j)=>`<text${l[1]===2?' class="marca"':''} x="${tx}" y="${ty+(j-(lin.length-1)/2)*f}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)"${l[1]?' font-family="var(--display)" font-weight="700"':''}>${esc(l[0])}</text>`).join('')}<text x="${rx+rw/2}" y="${y+p.h-fm*.7}" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${rw-hol}</text><text transform="translate(${rx+fm*.75} ${y+p.h/2}) rotate(-90)" font-size="${fm}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)">${p.h-hol}</text>`;}).join('')}${huecos(b,fc)}${cota(M.intA,ocA,1,M.intH,mg,fc,false)}${cota(M.intH,ocH,1,M.intH,mg,fc,true)}${ld.svg}</svg>`;
 }
 // Huecos a lo largo en la vista desde arriba: lo que queda libre detrás y delante de cada bulto, hasta la pared de la caja
 // o hasta el bulto que tenga en su misma calle y a su misma altura. Los bultos apilados que coinciden dan una sola cota.
@@ -225,26 +241,27 @@ function dibujoPlanta(b,i,col){
     let g;
     if(p.medio){const l=Math.min(p.it.cap.l,p.it.L/2)*k,hm=p.medio*ky;g=`<rect x="${x0}" y="${y0+(h-hm)/2}" width="${L}" height="${hm}" ${c}/><rect x="${x0}" y="${y0}" width="${l}" height="${h}" ${c}/><rect x="${x0+L-l}" y="${y0}" width="${l}" height="${h}" ${c}/>`;}
     else g=`<rect x="${x0}" y="${y0}" width="${L}" height="${h}" ${c}/>`;
-    return g+(h>=fc*1.1?`<text x="${x0+L/2}" y="${y0+h/2}" font-size="${Math.min(fc,h*.7)}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${modTxt(p.it)?esc(modTxt(p.it))+' · ':''}${esc(t)}${varias(p.it)?' · '+piezas(p.it):''}${p.it.m?' '+esc(p.it.m):''} · ${p.it.L}</text>`:'');
+    return g+rotulo(p,x0,y0,L,h,p.w-num(pedido.holgura),fc);
   };
-  return `<svg class="planta" viewBox="${-mg} -2 ${W+mg+2} ${H+mg+2}" role="img" aria-label="Caja ${i+1} vista desde arriba"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,n)=>({p,n})).sort((u,v)=>u.p.y-v.p.y).map(({p,n})=>pieza(p,n)).join('')}${huecosPlanta(b,k,ky,fc)}${cota(M.intL,ocL,k,H,mg,fc,false)}${cotaA}</svg>`;
+  const ld=lados(W,H,mg,fc*.85,['IZQUIERDA','FONDO','DERECHA','FRENTE']);
+  return `<svg class="planta" viewBox="${-mg-ld.bd} ${-ld.bd} ${W+mg+2*ld.bd} ${H+mg+2*ld.bd}" role="img" aria-label="Caja ${i+1} vista desde arriba"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.map((p,n)=>({p,n})).sort((u,v)=>u.p.y-v.p.y).map(({p,n})=>pieza(p,n)).join('')}${huecosPlanta(b,k,ky,fc)}${cota(M.intL,ocL,k,H,mg,fc,false)}${cotaA}${ld.svg}</svg>`;
 }
-// Vista de lado, desde la pared izquierda de la caja vista de frente: largo en horizontal y alto en vertical (el alto va ampliado
-// como el ancho en la de arriba). Lo más cercano a esa pared tapa lo de detrás. Solo para mirar: los bultos no se arrastran aquí.
+// Vista de lado, desde la pared derecha de la caja vista de frente (desde ahí el frente queda a la izquierda, como en la de arriba):
+// largo en horizontal y alto en vertical (el alto va ampliado como el ancho en la de arriba). Lo más cercano a esa pared tapa
+// lo de detrás. Solo para mirar: los bultos no se arrastran aquí.
 function dibujoLateral(b,i,col){
   const M=b.model,W=PW,k=W/M.intL,ky=k*AMPLIA,H=M.intH*ky,mg=42,fc=13;
   const ocL=Math.max(0,...b.items.map(p=>(p.off||0)+p.it.L)),ocH=Math.max(0,...b.items.map(p=>p.y+p.h));
   const pieza=p=>{
-    const c=`class="lado" fill="var(--p${col(p.it)})" ${trazo(p.it,1)} vector-effect="non-scaling-stroke"`,x0=(p.off||0)*k,L=p.it.L*k,y0=(M.intH-p.y-p.h)*ky,h=p.h*ky,t=corto(p.it.p);
+    const c=`class="lado" fill="var(--p${col(p.it)})" ${trazo(p.it,1)} vector-effect="non-scaling-stroke"`,x0=(p.off||0)*k,L=p.it.L*k,y0=(M.intH-p.y-p.h)*ky,h=p.h*ky;
     let g;
     // lama girada con protección: el cuerpo es más bajo y los extremos llevan el alto entero
     if(p.medioH){const l=Math.min(p.it.cap.l,p.it.L/2)*k,hm=p.medioH*ky;g=`<rect x="${x0}" y="${y0+(h-hm)/2}" width="${L}" height="${hm}" ${c}/><rect x="${x0}" y="${y0}" width="${l}" height="${h}" ${c}/><rect x="${x0+L-l}" y="${y0}" width="${l}" height="${h}" ${c}/>`;}
     else g=`<rect x="${x0}" y="${y0}" width="${L}" height="${h}" ${c}/>`;
-    // el rótulo se encoge para no salirse de un bulto corto
-    const txt=`${modTxt(p.it)?modTxt(p.it)+' · ':''}${t}${varias(p.it)?' · '+piezas(p.it):''}${p.it.m?' '+p.it.m:''} · ${p.it.L}`,f=Math.min(fc,h*.7,L*.92/(txt.length*.58));
-    return `<g><title>${esc(p.it.p.nombre)} · ${p.it.L} mm${varias(p.it)?' · '+piezas(p.it):''}${p.it.m?' · marcaje '+esc(p.it.m):''}</title>${g}${f>=6?`<text x="${x0+L/2}" y="${y0+h/2}" font-size="${f}" text-anchor="middle" dominant-baseline="central" fill="var(--pfg)" font-family="var(--display)" font-weight="600">${esc(txt)}</text>`:''}</g>`;
+    return `<g><title>${esc(p.it.p.nombre)} · ${p.it.L} mm${varias(p.it)?' · '+piezas(p.it):''}${p.it.m?' · marcaje '+esc(p.it.m):''}</title>${g}${rotulo(p,x0,y0,L,h,p.h-num(pedido.holgura),fc)}</g>`;
   };
-  return `<svg class="planta" viewBox="${-mg} -2 ${W+mg+2} ${H+mg+2}" role="img" aria-label="Caja ${i+1} vista de lado"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.slice().sort((u,v)=>v.x-u.x).map(pieza).join('')}${cota(M.intL,ocL,k,H,mg,fc,false)}${cota(M.intH,ocH,ky,H,mg,fc,true)}</svg>`;
+  const ld=lados(W,H,mg,fc*.85,['ARRIBA','FONDO','SUELO','FRENTE']);
+  return `<svg class="planta" viewBox="${-mg-ld.bd} ${-ld.bd} ${W+mg+2*ld.bd} ${H+mg+2*ld.bd}" role="img" aria-label="Caja ${i+1} vista desde la derecha"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.slice().sort((u,v)=>u.x-v.x).map(pieza).join('')}${cota(M.intL,ocL,k,H,mg,fc,false)}${cota(M.intH,ocH,ky,H,mg,fc,true)}${ld.svg}</svg>`;
 }
 function renderResultado(recalcular){
   const el=$('resultado');ultimoResumen='';document.body.classList.remove('con-lupa');
@@ -307,7 +324,7 @@ function renderResultado(recalcular){
     lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.mod?c.mod+' ':''}${c.p.nombre} ${c.L} mm${num(c.p.uds)>1?' ('+c.pz+' ud.)':''}${c.ms.length?' ['+c.ms.join(', ')+']':''}`).join(', '));
     const flot=b.items.filter(p=>!apoyado(p,b));if(flot.length)lineasTxt.push(`  OJO, sin apoyo: ${flot.map(nombreB).join(', ')}`);
     return `<div class="boxcard${completa&&completa.has(i)?' vista':''}" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><span class="orden-caja"><button class="btn small ghost" type="button" data-act="mover-caja" data-i="${i}" data-d="-1" aria-label="Subir la caja ${i+1}"${i===0?' disabled':''}>▲ Subir</button><button class="btn small ghost" type="button" data-act="mover-caja" data-i="${i}" data-d="1" aria-label="Bajar la caja ${i+1}"${i===r.bins.length-1?' disabled':''}>▼ Bajar</button></span><label class="marca-caja"><input type="checkbox" data-marcar="${i}"${marcadas.has(i)?' checked':''}>Seleccionar</label>${cont.length?`<button class="btn small" type="button" data-act="auto-caja" data-i="${i}">Colocación automática</button>`:''}<button class="btn small ghost" type="button" data-act="imprimir-caja" data-i="${i}">Imprimir</button><button class="btn small ghost" type="button" data-act="completa" data-i="${i}">${completa?'Salir de pantalla completa':'Pantalla completa'}</button>${cont.length?'':`<button class="btn small danger" type="button" data-act="quitar-caja" data-i="${i}">Quitar caja</button>`}</div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}${visor(i,'f','De frente · ancho × alto',dibujoSeccion(b,i,col,hol))}<div><button class="btn small ghost" type="button" data-act="ver-planta" data-i="${i}">Ver desde arriba</button> <button class="btn small ghost" type="button" data-act="ver-lado" data-i="${i}">Ver de lado</button></div><div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %${txtPeso(b)}</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col(c)})"></span>${c.n} × ${c.mod?`<b class="mod">${esc(c.mod)}</b> `:''}${esc(c.p.nombre)} · ${c.L} mm${num(c.p.uds)>1?` · ${c.pz} ud.`:''}${c.ms.length?` · <b class="marca">${esc(c.ms.join(', '))}</b>`:''} <select class="pasar-sel" data-de="${i}" data-g="${esc(c.p.id+'|'+c.L+'|'+c.mod)}" aria-label="Pasar un bulto de ${esc(c.p.nombre)} a otra caja"><option value="">Pasar 1 bulto a…</option>${r.bins.map((o,j)=>j===i?'':`<option value="${j}">Caja ${j+1} · ${esc(o.model.nombre)}</option>`).join('')}<option value="nueva">Caja nueva</option></select></li>`).join('')}</ul></div>`;
-  }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Con «▲ Subir» y «▼ Bajar» cambias una caja de sitio para dejar juntas las que quieras mover bultos entre ellas, y el desplegable «Pasar 1 bulto a…» de cada línea manda un bulto a la caja que elijas. Para pasar un bulto a una caja que no tienes a la vista, haz clic en él y elige la caja en la barra que sale abajo; también puedes arrastrarlo, y la página se desplaza sola al acercarte al borde. «Pantalla completa» abre una caja en grande; para ver varias a la vez, marca su casilla «Seleccionar» y pulsa «Ver en pantalla completa»: entre ellas se pueden arrastrar bultos. Con los botones − y + de cada dibujo lo reduces o amplías; ampliado, arrastra el fondo del dibujo para moverte por él. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; la vista desde arriba se abre con «Ver desde arriba» en una ventana, y en ella se mueve un bulto a lo largo y a lo ancho. «Ver de lado» abre en otra ventana la caja vista de lado (largo × alto), solo para mirar. Si choca con otro o se sale, te aviso y se queda donde estaba. Para girar un bulto: clic derecho encima, o la tecla R mientras lo arrastras. Si te estorba un bulto para recolocar los demás, llévalo al «Aparcamiento» de arriba y devuélvelo después. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
+  }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Con «▲ Subir» y «▼ Bajar» cambias una caja de sitio para dejar juntas las que quieras mover bultos entre ellas, y el desplegable «Pasar 1 bulto a…» de cada línea manda un bulto a la caja que elijas. Para pasar un bulto a una caja que no tienes a la vista, haz clic en él y elige la caja en la barra que sale abajo; también puedes arrastrarlo, y la página se desplaza sola al acercarte al borde. «Pantalla completa» abre una caja en grande; para ver varias a la vez, marca su casilla «Seleccionar» y pulsa «Ver en pantalla completa»: entre ellas se pueden arrastrar bultos. Con los botones − y + de cada dibujo lo reduces o amplías; ampliado, arrastra el fondo del dibujo para moverte por él. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; la vista desde arriba se abre con «Ver desde arriba» en una ventana, y en ella se mueve un bulto a lo largo y a lo ancho. «Ver de lado» abre la caja vista desde la derecha (largo × alto), solo para mirar; en la ventana se cambia de vista con sus botones. Alrededor de cada dibujo pone qué lado de la caja es. Si choca con otro o se sale, te aviso y se queda donde estaba. Para girar un bulto: clic derecho encima, o la tecla R mientras lo arrastras. Si te estorba un bulto para recolocar los demás, llévalo al «Aparcamiento» de arriba y devuélvelo después. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
   ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas (${desg}), ${m3.toFixed(2)} m³\nBultos en total: ${nb+r.bins.length} (${nb} dentro + ${r.bins.length} cajas)\n`+lineasTxt.join('\n')+(r.aparcados.length?`\nAPARCADOS, sin caja: ${r.aparcados.map(it=>nombreB({it})).join(', ')}`:'');
   // Barra del bulto seleccionado: siempre a la vista abajo, para pasarlo a cualquier caja sin tener que arrastrar.
   if(sel){
@@ -325,9 +342,12 @@ function renderResultado(recalcular){
 
 // Vista desde arriba de una caja en una ventana (a petición, para ahorrar espacio en pantalla). Cuelga de #resultado para que
 // arrastrar y ampliar funcionen igual que en el dibujo de frente; el data-caja hace que soltar un bulto aquí cuente para esa caja.
+// Vistas de la ventana, cambiables con sus botones. La de frente usa la clave de aumento 'F' para no compartir recuadro con la de la tarjeta.
+const VISTAS_DLG={f:'De frente',a:'Desde arriba',l:'Desde la derecha'};
 function dialogoPlanta(i,col){
-  const b=reparto.bins[i],M=b.model,lado=vistaDlg==='l';
-  return `<dialog id="dlg-planta"><div class="boxcard" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1} · ${lado?'de lado':'desde arriba'}</span><h3>${esc(M.nombre)}</h3></div><button class="btn small" type="button" data-act="cerrar-planta">Cerrar</button></div>${lado?visor(i,'l',`Largo × alto (alto ×${AMPLIA})`,dibujoLateral(b,i,col)):visor(i,'a',`Largo × ancho (ancho ×${AMPLIA})`,dibujoPlanta(b,i,col))}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm${txtPeso(b)}</div></div></dialog>`;
+  const b=reparto.bins[i],M=b.model,v=vistaDlg;
+  const dib=v==='f'?visor(i,'F','Ancho × alto',dibujoSeccion(b,i,col,num(pedido.holgura))):v==='l'?visor(i,'l',`Largo × alto (alto ×${AMPLIA})`,dibujoLateral(b,i,col)):visor(i,'a',`Largo × ancho (ancho ×${AMPLIA})`,dibujoPlanta(b,i,col));
+  return `<dialog id="dlg-planta"><div class="boxcard" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1} · ${VISTAS_DLG[v].toLowerCase()}</span><h3>${esc(M.nombre)}</h3></div><span class="vistas-dlg" role="group" aria-label="Vista">${Object.entries(VISTAS_DLG).map(([k,t])=>`<button class="btn small${k===v?'':' ghost'}" type="button" data-act="vista-dlg" data-v="${k}" aria-pressed="${k===v}">${t}</button>`).join('')}</span><button class="btn small" type="button" data-act="cerrar-planta">Cerrar</button></div>${dib}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm${txtPeso(b)}</div></div></dialog>`;
 }
 
 // Solicitud de cajas al almacén: la app sirve para pedir las cajas por anticipado, antes de fabricar la pérgola.
@@ -481,7 +501,7 @@ function moverCaja(i,d){
   const j=i+d,B=reparto.bins;
   if(!B[i]||!B[j]) return;
   [B[i],B[j]]=[B[j],B[i]];
-  for(const v of ['f','a','l']){const x=zoom[i+v];zoom[i+v]=zoom[j+v];zoom[j+v]=x;if(zoom[i+v]===undefined)delete zoom[i+v];if(zoom[j+v]===undefined)delete zoom[j+v];}
+  for(const v of ['f','F','a','l']){const x=zoom[i+v];zoom[i+v]=zoom[j+v];zoom[j+v]=x;if(zoom[i+v]===undefined)delete zoom[i+v];if(zoom[j+v]===undefined)delete zoom[j+v];}
   const cambia=n=>n===i?j:n===j?i:n;
   marcadas=new Set([...marcadas].map(cambia));
   if(completa)completa=new Set([...completa].map(cambia));
@@ -825,6 +845,7 @@ document.addEventListener('click',async e=>{
   else if(a==='caja-vacia'){const m=cajas.find(c=>c.id===modeloNuevo);if(m){reparto.bins.push({model:m,free:[],items:[]});hecho();renderResultado();}}
   else if(a==='ver-planta'||a==='ver-lado'){plantaAbierta=Number(b.dataset.i);vistaDlg=a==='ver-lado'?'l':'a';renderResultado();}
   else if(a==='cerrar-planta'){plantaAbierta=null;renderResultado();}
+  else if(a==='vista-dlg'){vistaDlg=b.dataset.v;renderResultado();}
   else if(a==='mover-caja'){moverCaja(Number(b.dataset.i),Number(b.dataset.d));}
   else if(a==='quitar-caja'){const n=Number(b.dataset.i);if(reparto.bins[n]&&!reparto.bins[n].items.length){reparto.bins.splice(n,1);hecho();renderResultado();}}
   else if(a==='leidas-ok'){const x=document.querySelector('#leidas [data-l=ok]');if(x)x.click();}

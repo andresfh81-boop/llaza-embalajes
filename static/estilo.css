@@ -225,3 +225,6 @@ dialog#dlg-planta{width:min(1100px,calc(100vw - 16px));max-width:none;max-height
 dialog#dlg-planta::backdrop{background:rgba(0,0,0,.5)}
 dialog#dlg-planta .boxcard{border:0;padding:0}
 dialog#dlg-planta svg{max-height:none}
+
+text.ladoc{fill:var(--muted);font-family:var(--display);font-weight:700;letter-spacing:.08em}
+.vistas-dlg{display:inline-flex;gap:4px;flex-wrap:wrap}
