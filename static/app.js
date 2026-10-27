@@ -1075,12 +1075,15 @@ function renderPrevision(){
 function excelPrevision(){
   const tot=totalesPrev(),hoy=new Date().toLocaleDateString('es-ES');
   const ley=[[],[{v:'Leyenda',s:'neg'}],...Object.keys(TIPOS).map(t=>[{v:TIPOS[t],s:t}])];
+  const tablaTot=[['Modelo','Tipo','Exterior L×A×H (mm)','Cantidad (uds.)'].map(v=>({v,s:'cab'})),
+    ...tot.map(c=>[{v:c.nombre,s:c.tipo},{v:TIPOS[c.tipo]||c.tipo,s:c.tipo},c.ext.join(' × ')+' mm',{v:c.n,s:c.tipo}]),
+    ['','','Total',{v:tot.reduce((s,c)=>s+c.n,0),s:'neg'}]];
   const pedidos=[[{v:'Previsión de cajas · '+hoy,s:'titulo'}],[],['Fecha','Nº pedido','Cliente / pérgola','Embalaje','Cajas','Total cajas (uds.)','m³','Envío compartido'].map(v=>({v,s:'cab'})),
     ...prevision.map(e=>[fechaEs(e.fecha),e.numero,e.cliente,{v:TIPOS[e.tipo]||e.tipo,s:e.tipo},{v:cajasTxt(e)+(e.fuera?` (${e.fuera} sin caja)`:''),s:e.tipo},e.total,{v:Math.round((e.m3||0)*100)/100,s:'dec'},e.partes?`Sí, ${e.partes.length} pedidos en las mismas cajas`:'']),
-    ['','','','','Total',{v:prevision.reduce((s,e)=>s+e.total,0),s:'neg'},{v:Math.round(prevision.reduce((s,e)=>s+(e.m3||0),0)*100)/100,s:'decneg'}],...ley];
-  const totales=[[{v:'Cajas que hacen falta · '+hoy,s:'titulo'}],[],['Modelo','Tipo','Exterior L×A×H (mm)','Cantidad (uds.)'].map(v=>({v,s:'cab'})),
-    ...tot.map(c=>[{v:c.nombre,s:c.tipo},{v:TIPOS[c.tipo]||c.tipo,s:c.tipo},c.ext.join(' × ')+' mm',{v:c.n,s:c.tipo}]),
-    ['','','Total',{v:tot.reduce((s,c)=>s+c.n,0),s:'neg'}],...ley];
+    ['','','','','Total',{v:prevision.reduce((s,e)=>s+e.total,0),s:'neg'},{v:Math.round(prevision.reduce((s,e)=>s+(e.m3||0),0)*100)/100,s:'decneg'}],
+    // los totales por modelo van también debajo de los pedidos, para verlos sin cambiar de hoja (Andrés, 27/10/2026)
+    [],[{v:'Cajas que hacen falta',s:'titulo'}],...tablaTot,...ley];
+  const totales=[[{v:'Cajas que hacen falta · '+hoy,s:'titulo'}],[],...tablaTot,...ley];
   const nombre=descargar(xlsx([{nombre:'Pedidos',anchos:[12,22,40,16,46,16,10,30],filas:pedidos},{nombre:'Total por modelo',anchos:[18,18,24,16],filas:totales}]),`Previsión de cajas ${hoy.replace(/\//g,'-')}.xlsx`);
   return nombre;
 }
