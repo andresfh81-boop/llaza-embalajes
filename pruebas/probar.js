@@ -96,7 +96,11 @@ assert.deepStrictEqual(datosPlano('PLANO.pdf','Altura Paso Pilar: 2600 mm Pilare
 assert.strictEqual(datosPlano('PLANO.pdf','Pilares: 3 Unidades Tipo: INGLETE Altura Paso Pilar: 2500 mm').nPilares,3);
 assert.strictEqual(datosPlano('presupuesto.pdf','Total 1200 €'),null);
 // Plano cliente con texto (54007676-10): medidas, módulos y «H PILAR» con la altura debajo. Sus cotas no son filas de perfil.
-assert.deepStrictEqual(datosPlano('54007676-10_3000x4900_TESTA.pdf','ELYA PARED PORTERIA PRP 4900 (Ancho) 1 MODULOS 2 PILARES 4900x3000 H Total: 3020 mm 3000 (Proyección) H PILAR P2 H PILAR P1 3020 mm 3020 mm PIE REGULABLE'),{numero:'54007676-10',proy:3000,ancho:4900,tipologia:'TESTA',modulos:1,pilares:[3020,3020]});
+assert.deepStrictEqual(datosPlano('54007676-10_3000x4900_TESTA.pdf','ELYA PARED PORTERIA PRP 4900 (Ancho) 1 MODULOS 2 PILARES 4900x3000 H Total: 3020 mm 3000 (Proyección) H PILAR P2 H PILAR P1 3020 mm 3020 mm PIE REGULABLE'),{numero:'54007676-10',proy:3000,ancho:4900,tipologia:'TESTA',modulos:1,hTotal:3020,nPilares:2,pilares:[3020,3020]});
+// Dos módulos (hoja 54007594, 10500 × 4000 mm, 6 pilares de 2720): mismas piezas que la hoja de corte.
+assert.strictEqual(k(piezasPlano({tipologia:'TESTA',ancho:10500,proy:4000,modulos:2,pilares:Array(6).fill(2720)})),k([{ref:'33017',largo:5025,cant:4},{ref:'33007',largo:3700,cant:3},{ref:'33004',largo:2710,cant:6},{ref:'33006',largo:5025,cant:4},{ref:'33006',largo:3700,cant:4},{ref:'33000',largo:3771,cant:4},{ref:'33000',largo:3795,cant:52}]));
+// Sin módulos ni pilares en el plano: calcula igual y dice qué ha supuesto.
+assert.deepStrictEqual(piezasPlano({tipologia:'TESTA',ancho:4000,proy:4000}).supuestos,['1 módulo','4 pilares de 2900 mm de alto']);
 assert.deepStrictEqual(parseHoja(['2720 mm 2720 mm 2720 mm','2710 mm P3: 2748 mm 2754']),[]);
 console.log('plano cliente: ok');
 // Cabecera de la hoja: número, nombre, tipología, medidas, módulo (también "2-3" con guion raro) y colores.

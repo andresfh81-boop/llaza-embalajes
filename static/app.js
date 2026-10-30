@@ -378,7 +378,7 @@ function renderResultado(recalcular){
   const todos=r.bins.flatMap(b=>b.items),secB=todos.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)+r.unfit.reduce((s,it)=>s+it.w*it.h,0),secC=r.bins.reduce((s,b)=>s+b.model.intA*b.model.intH,0),minC=Math.max(1,Math.ceil(secB/Math.max(...modelos.map(m=>m.intA*m.intH))));
   if(secC) html+=`<div class="sub">Sección aprovechada: <b>${Math.round(secB/secC*100)} %</b>. ${r.bins.length<=minC?'Con estas cajas no se puede hacer con menos.':`Solo por superficie cabría en ${minC} ${minC===1?'caja':'cajas'}, pero las piezas no se pueden partir ni encajar sin huecos: es un mínimo teórico, no un fallo.`}</div>`;
   html+=pend;
-  if((pedido.hojas||[]).some(h=>h.plano)) html+=`<div class="note">Estimación desde el plano cliente: los largos y el nº de lamas salen de las reglas de las hojas de corte, no de la hoja de este pedido. Cuando la tengas, cárgala y sustituye a la estimación.</div>`;
+  if((pedido.hojas||[]).some(h=>h.plano)) html+=`<div class="note">Estimación desde el plano cliente: los largos y el nº de lamas salen de las reglas de las hojas de corte, no de la hoja de este pedido.${(pedido.hojas.find(h=>h.plano).supuestos||[]).length?' Supuesto, porque el plano no lo trae: <b>'+esc(pedido.hojas.find(h=>h.plano).supuestos.join(', '))+'</b>; si lo sabes, corrígelo en «Calcular desde el plano cliente».':''} Cuando tengas la hoja de corte, cárgala y sustituye a la estimación.</div>`;
   if(r.aparcados.length) html+=`<div class="note">${r.aparcados.length} ${r.aparcados.length===1?'bulto aparcado':'bultos aparcados'}: no ${r.aparcados.length===1?'está':'están'} en ninguna caja. Vuelve a ${r.aparcados.length===1?'meterlo':'meterlos'} antes de dar el reparto por bueno.</div>`;
   if(marcadas.size) html+=`<div class="manual">${marcadas.size} ${marcadas.size===1?'caja seleccionada':'cajas seleccionadas'}. <button class="btn small" type="button" data-act="ver-marcadas">Ver en pantalla completa</button> <button class="btn small ghost" type="button" data-act="desmarcar">Quitar selección</button></div>`;
   if(avisoMov) html+=`<div class="note" role="alert">${esc(avisoMov)}</div>`;
@@ -721,41 +721,33 @@ function renderLeidas(){
 // Estimación desde el plano cliente (sin hoja de corte): las piezas salen de piezasPlano (nucleo.js) y entran en el pedido
 // como una hoja más, marcada «plano». Al cargar después una hoja de corte de verdad, la estimación se quita.
 function quitarPlano(){const ids=(pedido.hojas||[]).filter(h=>h.plano).map(h=>h.id);if(!ids.length)return false;pedido.lineas=pedido.lineas.filter(l=>!ids.includes(l.hoja));pedido.hojas=pedido.hojas.filter(h=>!h.plano);return true;}
-function lamasSegunAncho(){$('pl-lamas').placeholder=num($('pl-ancho').value)>700?'Auto: '+lamasPlano(num($('pl-ancho').value)):'Auto';}
+function lamasSegunAncho(){const a=num($('pl-ancho').value);$('pl-lamas').placeholder=a>700?'Auto: '+lamasPlano(a,num($('pl-mod').value)||1,num($('pl-proy').value)):'Auto';}
+// Calcula siempre: lo que falta (módulos, pilares, su altura) se supone con lo que dicen las obras reales y se avisa.
+// planoLeido guarda lo que trae el PDF y no tiene casilla (H total, nº de pilares).
+let planoLeido={};
 function calcularPlano(){
   const tip=$('pl-tip').value,ancho=num($('pl-ancho').value),proy=num($('pl-proy').value),mods=num($('pl-mod').value),numero=$('pl-num').value.trim();
   const alturas=($('pl-pil').value.match(/\d+(?:[.,]\d+)?/g)||[]).map(x=>Math.round(parseFloat(x.replace(',','.')))).filter(h=>h>=1000&&h<=6000);
-  if(mods!==1){estado('Con más de un módulo las piezas no siguen las mismas reglas: para esa pérgola hace falta la hoja de corte.');return;}
-  if(!alturas.length){estado('Escribe la altura de cada pilar tal como viene en el plano («H PILAR P1…»), en mm y separadas por comas.');return;}
-  const piezas=piezasPlano({tipologia:tip,ancho,proy,pilares:alturas,lamas:num($('pl-lamas').value)});
-  if(!piezas.length){estado('Revisa el ancho y la proyección del plano.');return;}
+  if(ancho<=700||proy<=700){estado('Falta el ancho y la proyección: vienen en el plano que firma el cliente (en el nombre, «nº_PROYECCIÓNxANCHO_TESTA.pdf», y en el dibujo).');$('plano').open=true;$(ancho<=700?'pl-ancho':'pl-proy').focus();return;}
+  const piezas=piezasPlano({tipologia:tip,ancho,proy,modulos:mods,pilares:alturas,lamas:num($('pl-lamas').value),hTotal:planoLeido.hTotal,nPilares:planoLeido.nPilares});
   quitarPlano();
-  const hoja={id:nuevoId(),archivo:'Plano cliente',plano:true,mod:'',numero,nombre:'Estimación desde el plano cliente',tipologia:tip,pergola:`ancho ${ancho} mm × proyección ${proy} mm`};
+  const hoja={id:nuevoId(),archivo:'Plano cliente',plano:true,mod:'',numero,nombre:'Estimación desde el plano cliente',tipologia:tip,pergola:`ancho ${ancho} mm × proyección ${proy} mm${mods>1?' · '+mods+' módulos':''}`,supuestos:piezas.supuestos};
   const sin=[];
   for(const l of piezas){const p=perfiles.find(x=>String(x.ref).trim()===l.ref);if(!p){sin.push(l.desc);continue;}pedido.lineas.push({pid:p.id,largo:l.largo,cant:l.cant,marcas:[],mod:'',hoja:hoja.id,ped:numero});}
   pedido.hojas=(pedido.hojas||[]).concat(hoja);
   refAuto();guardarPedido();renderPedido();
   const nl=piezas.find(l=>l.desc==='LAMA');
-  estado(`Estimación desde el plano: ${piezas.length} líneas al pedido, ${nl?nl.cant:0} ud. de lama de ${nl?nl.largo:0} mm.`+(sin.length?` Sin perfil en el catálogo: ${sin.join(', ')}.`:'')+(pedido.destino?'':' Elige el destino de la pérgola para calcular las cajas.'));
+  estado(`Estimación desde el plano: ${piezas.length} líneas al pedido, ${nl?nl.cant:0} ud. de lama de ${nl?nl.largo:0} mm.`+(piezas.supuestos.length?` Supuesto: ${piezas.supuestos.join(', ')}.`:'')+(sin.length?` Sin perfil en el catálogo: ${sin.join(', ')}.`:'')+(pedido.destino?'':' Elige el destino de la pérgola para calcular las cajas.'));
 }
-// Rellena el formulario del plano con lo leído y calcula si ya está todo; si falta algo, lo dice y deja el cursor ahí.
+// Rellena el formulario con lo leído del plano y calcula; si no hay medidas (solo la ficha), las pide.
 function rellenarPlano(d,malas){
-  $('plano').open=true;
-  if(d.tipologia&&d.tipologia!=='MIXTA') $('pl-tip').value=d.tipologia;
-  if(d.modulos) $('pl-mod').value=d.modulos;
-  if(d.ancho){$('pl-ancho').value=d.ancho;lamasSegunAncho();}
-  if(d.proy) $('pl-proy').value=d.proy;
-  if(d.pilares) $('pl-pil').value=d.pilares.join(', ');
-  if(d.lamas) $('pl-lamas').value=d.lamas;
-  if(d.numero) $('pl-num').value=d.numero;
-  const falta=[];
-  if(!num($('pl-ancho').value)||!num($('pl-proy').value)) falta.push('el ancho y la proyección (vienen en el plano que firma el cliente, «nº_PROYECCIÓNxANCHO_TESTA.pdf»)');
-  if(!$('pl-pil').value.trim()) falta.push(`la altura de cada pilar («H PILAR» del plano${d.nPilares?', '+d.nPilares+' pilares':''})`);
+  $('plano').open=true;planoLeido={hTotal:d.hTotal,nPilares:d.nPilares};
+  $('pl-tip').value=d.tipologia==='INGLETE'?'INGLETE':'TESTA';
+  $('pl-mod').value=d.modulos||'';$('pl-ancho').value=d.ancho||'';$('pl-proy').value=d.proy||'';
+  $('pl-pil').value=d.pilares?d.pilares.join(', '):'';$('pl-lamas').value=d.lamas||'';$('pl-num').value=d.numero||'';
+  lamasSegunAncho();
   const leido=`Leído ${d.archivos.join(' y ')}`+(malas.length?` (no se ha leído: ${malas.join('; ')})`:'');
-  if(d.tipologia==='MIXTA'||(d.modulos||num($('pl-mod').value))>1){estado(`${leido}. Es una pérgola ${d.modulos>1?'de '+d.modulos+' módulos':'mixta'}: con el plano solo se calculan las de un módulo, TESTA o INGLETE. Para esta hace falta la hoja de corte.`);return;}
-  if(!falta.length){calcularPlano();estado(leido+'. '+$('estado').textContent);}
-  else{estado(`${leido}. Falta ${falta.join(' y ')}. Complétalo en «Calcular desde el plano cliente» y pulsa «Calcular desde el plano».`);
-    const v=[['pl-ancho'],['pl-proy'],['pl-pil']].map(x=>$(x[0])).find(x=>!x.value.trim());$('plano').scrollIntoView({block:'start',behavior:'smooth'});if(v)v.focus({preventScroll:true});}
+  calcularPlano();estado(leido+'. '+$('estado').textContent);
 }
 function volcarLeidas(){
   const ok=leidas.filter(l=>l.pid&&l.largo&&l.cant),mont=leidas.filter(l=>!l.pid&&l.montado).length;
@@ -818,6 +810,8 @@ async function leerPDF(files){
   ['dragleave','drop'].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();d.classList.remove('sobre');}));
   d.addEventListener('drop',e=>leerPDF(e.dataTransfer&&e.dataTransfer.files));
   ['dragover','drop'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault()));
+  // Soltar los PDF en cualquier sitio de la pestaña Pedido vale igual que en el recuadro (Andrés los soltaba fuera y no pasaba nada).
+  document.addEventListener('drop',e=>{if($('tab-pedido').hidden||e.target.closest('#drop,#drop-prev')||!e.dataTransfer||!e.dataTransfer.files.length)return;leerPDF(e.dataTransfer.files);});
   $('pdf').addEventListener('change',e=>{const f=[...e.target.files];e.target.value='';leerPDF(f);});
   $('leidas').addEventListener('change',e=>{
     const t=e.target,i=Number(t.dataset.i);if(!t.dataset.k||!leidas[i])return;
@@ -923,9 +917,10 @@ function destinoDeLugar(txt){
 $('tipos').addEventListener('change',e=>elegirDestino(e.target.value));
 $('f-plano').addEventListener('submit',e=>{e.preventDefault();calcularPlano();});
 $('pl-ancho').addEventListener('input',lamasSegunAncho);
+$('pl-mod').addEventListener('input',lamasSegunAncho);
 $('lugar').addEventListener('input',e=>{
   pedido.lugar=e.target.value.trim();
-  if(!pedido.destino||pedido.destinoAuto){const d=destinoDeLugar(pedido.lugar);if(d){if(d!==pedido.destino)elegirDestino(d,true);}else if(pedido.destinoAuto){pedido.destino='';pedido.destinoAuto=false;renderPedido();}}
+  if(!pedido.destino||pedido.destinoAuto){const d=destinoDeLugar(pedido.lugar);if(d){if(d!==pedido.destino)elegirDestino(d,true);}else if(pedido.destinoAuto){pedido.destino='';pedido.destinoAuto=false;planoLeido={};renderPedido();}}
   guardarPedido();renderHojas();
 });
 for(const [id,k] of [['comp-n','n'],['comp-l','L'],['comp-a','A'],['comp-h','H']]) $(id).addEventListener('input',e=>{
@@ -941,7 +936,7 @@ $('f-linea').addEventListener('submit',e=>{
   if(!pid||!largo||!cant)return;
   pedido.lineas.push({pid,largo,cant,marcas:$('l-marcas').value.split(',').map(x=>x.trim()).filter(Boolean)});$('l-marcas').value='';guardarPedido();renderPedido();
 });
-$('vaciar').addEventListener('click',()=>{pedido.comp=null;pedido.lineas=[];pedido.hojas=[];pedido.ref='';pedido.destino='';pedido.destinoAuto=false;pedido.lugar='';$('lugar').value='';leidas=[];leidasHojas=[];guardarPedido();renderLeidas();renderPedido();estado('Pantalla limpia: puedes empezar otro pedido.');});
+$('vaciar').addEventListener('click',()=>{pedido.comp=null;pedido.lineas=[];pedido.hojas=[];pedido.ref='';pedido.destino='';pedido.destinoAuto=false;planoLeido={};pedido.lugar='';$('lugar').value='';leidas=[];leidasHojas=[];guardarPedido();renderLeidas();renderPedido();estado('Pantalla limpia: puedes empezar otro pedido.');});
 $('f-caja').addEventListener('submit',e=>{
   e.preventDefault();
   const d={nombre:$('c-nombre').value.trim(),tipo:$('c-tipo').value,intL:num($('c-il').value),intA:num($('c-ia').value),intH:num($('c-ih').value),extL:num($('c-el').value),extA:num($('c-ea').value),extH:num($('c-eh').value)};

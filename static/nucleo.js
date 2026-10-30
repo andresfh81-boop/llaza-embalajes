@@ -106,24 +106,40 @@ function leerPagina(its){
   return {filas,letras,cab:leerCabecera(its)};
 }
 // Piezas de la pérgola a partir del plano cliente (ancho y proyección como los rotula el plano, alturas de pilar en mm).
-// Solo las que van en caja; lo montado en otro perfil no hace falta. Reglas sacadas de 12 hojas de corte reales de un módulo
-// (30/10/2026): las lamas van a lo largo de la proyección y su número sale del ancho, a unos 182 mm cada una.
-// TESTA: vigas y canal a la medida − 300 mm; con menos de 4 pilares (a pared) lleva además trozos de pilar de 216 mm hasta 4.
-// INGLETE: vigas a la medida entera y canal 134 mm (ancho) y 138 mm (proyección) más corto. Pilar = altura del plano − 10 mm.
-function lamasPlano(ancho){return Math.max(0,Math.floor((ancho-538)/182));}
+// Solo las que van en caja; lo montado en otro perfil no hace falta. Reglas sacadas de las hojas de corte reales (30/10/2026):
+// las lamas van a lo largo de la proyección y en cada módulo caben (viga − 238) / 182 lamas.
+// Los módulos van en una rejilla: nA a lo ancho y nP filas a lo largo de la proyección. Una lama no pasa de unos 4300 mm
+// (proyección de 4500 en las obras), así que con más de PROY_MAX de proyección se reparten en filas; si no, todos a lo ancho.
+// TESTA: viga de cada módulo = (ancho − 300 − 150 × (nA − 1)) / nA (54007594: 2 módulos de 10500 → 5025), 2 por módulo;
+// proyección de cada fila = (proyección − 150 × (nP − 1)) / nP; vigas grandes (proyección de la fila − 300), nA + 1 por fila;
+// canal = viga del módulo y proyección de la fila − 300, 2 de cada por módulo; pilares (nA + 1) × (nP + 1) y, si van menos
+// (a pared), trozos de 216 mm hasta ese número. INGLETE de un módulo: vigas a la medida entera y canal 134 mm (ancho) y
+// 138 mm (proyección) más corto; con más módulos, como TESTA (no hay hojas para comprobarlo). MIXTA, como TESTA.
+// Pilar = altura del plano − 10 mm. Lo que no se sabe se supone y se devuelve en out.supuestos: 1 módulo y pilares de
+// PILAR_SUPUESTO de alto (mediana de las obras). Con 3 módulos (54007372, mixta) da 84 lamas por 78 de la hoja.
+const PILAR_SUPUESTO=2900,PROY_MAX=4600;
+function rejilla(ancho,proy,modulos){const nP=proy>PROY_MAX?Math.ceil(proy/PROY_MAX):1;return {nP,nA:Math.max(1,Math.round(Math.max(1,modulos||1)/nP))};}
+function lamasPlano(ancho,modulos,proy){const {nA,nP}=rejilla(ancho,proy||0,modulos),v=(ancho-300-150*(nA-1))/nA;return Math.max(0,Math.floor((v-238)/182))*Math.max(nP,Math.round(modulos||1));}
 function piezasPlano(d){
-  const A=Math.round(d.ancho),P=Math.round(d.proy),alt=(d.pilares||[]).map(Math.round).filter(h=>h>10),ing=d.tipologia==='INGLETE';
-  if(!(A>600&&P>600)) return [];
+  const A=Math.round(d.ancho),P=Math.round(d.proy),sup=[];
   const out=[],add=(ref,desc,largo,cant)=>{if(cant>0&&largo>0)out.push({ref,desc,largo:Math.ceil(largo),cant});};
+  out.supuestos=sup;
+  if(!(A>600&&P>600)) return out;
+  const {nA,nP}=rejilla(A,P,d.modulos),M=Math.max(nP,Math.round(d.modulos||1),nA*(nP>1?1:1)),ing=d.tipologia==='INGLETE'&&M===1;
+  if(!d.modulos) sup.push('1 módulo');
+  if(nP>1) sup.push(`los módulos repartidos en ${nP} filas a lo largo de la proyección (${P} mm no caben en una lama)`);
+  const nPil=nP>1?M+nP+1:M*2+2;let alt=(d.pilares||[]).map(Math.round).filter(h=>h>500);
+  if(!alt.length){alt=Array(d.nPilares||nPil).fill(Math.round(d.hTotal||PILAR_SUPUESTO));sup.push(`${alt.length} pilares de ${alt[0]} mm de alto`+(d.hTotal?' (la H total del plano)':''));}
+  const v=(A-300-150*(nA-1))/nA,pm=(P-150*(nP-1))/nP;
   if(ing){add('33017','VIGA',A,2);add('33017','VIGA',P,2);}
-  else{add('33017','VIGA',A-300,2);add('33007','VIGA GRANDE',P-300,2);}
+  else{add('33017','VIGA',v,2*M);add('33007','VIGA GRANDE',pm-300,M+nP);}
   const pil={};alt.forEach(h=>pil[h-10]=(pil[h-10]||0)+1);
   Object.keys(pil).forEach(l=>add('33004','PILAR',Number(l),pil[l]));
-  if(!ing&&alt.length&&alt.length<4) add('33004','PILAR',216,4-alt.length);
+  if(!ing&&alt.length<nPil) add('33004','PILAR',216,nPil-alt.length);
   if(ing){add('33006','CANAL',A-134,2);add('33006','CANAL',P-138,2);}
-  else{add('33006','CANAL',A-300,2);add('33006','CANAL',P-300,2);}
-  add('33000','MEDIA LAMA',P-229.5,2);
-  add('33000','LAMA',P-205.5,d.lamas>0?Math.round(d.lamas):lamasPlano(A));
+  else{add('33006','CANAL',v,2*M);add('33006','CANAL',pm-300,2*M);}
+  add('33000','MEDIA LAMA',pm-229.5,2*M);
+  add('33000','LAMA',pm-205.5,d.lamas>0?Math.round(d.lamas):lamasPlano(A,d.modulos,P));
   return out;
 }
 // Datos para piezasPlano sacados de un PDF que no es hoja de corte: del nombre del plano cliente escaneado
@@ -139,6 +155,8 @@ function datosPlano(nombre,texto){
   let m=t.match(/(\d{3,5})\s*\(Ancho\)/i);if(m)d.ancho=+m[1];
   if((m=t.match(/(\d{3,5})\s*\(Proyecci[óo]n\)/i)))d.proy=+m[1];
   if((m=t.match(/\b(\d+)\s*M[ÓO]DULOS\b/i)))d.modulos=+m[1];
+  if((m=t.match(/H Total:\s*(\d{3,4})\s*mm/i)))d.hTotal=+m[1];
+  if((m=t.match(/\b(\d+)\s*PILARES\b/)))d.nPilares=+m[1];
   const hp=[];
   for(const g of t.matchAll(/((?:H PILAR P\d+\s*)+)((?:\d{3,4}\s*mm\s*)+)/gi)){
     const ps=[...g[1].matchAll(/P(\d+)/gi)].map(x=>+x[1]),hs=[...g[2].matchAll(/(\d{3,4})\s*mm/gi)].map(x=>+x[1]);

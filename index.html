@@ -8,7 +8,7 @@
   <link rel="icon" href="static/favicon.ico">
   <link rel="apple-touch-icon" href="static/icon-180.png">
   <meta name="theme-color" content="#0b5c8a">
-  <link rel="stylesheet" href="static/estilo.css?v=65">
+  <link rel="stylesheet" href="static/estilo.css?v=67">
 </head>
 <body>
 <div class="wrap">
@@ -41,13 +41,13 @@
       </fieldset>
       <label class="drop" id="drop"><input type="file" id="pdf" accept="application/pdf,.pdf" multiple>Arrastra aquí las hojas de corte<small>Una o varias a la vez, en PDF, o pulsa para elegirlas. Sin hoja de corte, suelta el plano cliente y la ficha de fabricación. Se añaden al pedido y se calculan las cajas al momento. Lee los datos de la pérgola, el módulo y, de cada perfil, referencia, largo, cantidad y marcaje.</small></label>
       <details class="plano" id="plano"><summary>Sin hoja de corte: calcular desde el plano cliente</summary>
-        <p class="sub">Suelta el plano que firma el cliente («nº_PROYECCIÓNxANCHO_TESTA.pdf») y la ficha de fabricación («PLANO.pdf») en la zona de las hojas de corte y se rellena solo; o copia aquí los datos a mano. Los largos y el nº de lamas salen de las reglas de las hojas de corte: es una estimación para pedir las cajas con tiempo. Solo pérgolas de un módulo, TESTA o INGLETE. Cuando llegue la hoja de corte, cárgala y sustituye a la estimación.</p>
+        <p class="sub">Suelta el plano que firma el cliente («nº_PROYECCIÓNxANCHO_TESTA.pdf») y la ficha de fabricación («PLANO.pdf») en la zona de las hojas de corte y se rellena solo; o copia aquí los datos a mano. Los largos y el nº de lamas salen de las reglas de las hojas de corte: es una estimación para pedir las cajas con tiempo. Calcula siempre: lo que el plano no trae (módulos, pilares) se supone y se avisa. Cuando llegue la hoja de corte, cárgala y sustituye a la estimación.</p>
         <form id="f-plano" class="row">
           <label>Tipología<select id="pl-tip"><option value="TESTA">TESTA</option><option value="INGLETE">INGLETE</option></select></label>
-          <label>Módulos<input id="pl-mod" type="number" min="1" step="1" value="1" required></label>
+          <label>Módulos<input id="pl-mod" type="number" min="1" step="1" placeholder="1"></label>
           <label>Ancho <span class="u">(mm)</span><input id="pl-ancho" type="number" min="700" step="1" required></label>
           <label>Proyección <span class="u">(mm)</span><input id="pl-proy" type="number" min="700" step="1" required></label>
-          <label style="grid-column:1/-1">Altura de cada pilar, «H PILAR» <span class="u">(mm)</span><input id="pl-pil" inputmode="numeric" placeholder="2764, 2815, 2758, 2720" required></label>
+          <label style="grid-column:1/-1">Altura de cada pilar, «H PILAR» <span class="u">(mm)</span><input id="pl-pil" inputmode="numeric" placeholder="Si no viene, se suponen de 2900 mm"></label>
           <label>Nº de lamas <span class="u">(ud.)</span><input id="pl-lamas" type="number" min="1" step="1" placeholder="Auto"></label>
           <label>Nº de pedido<input id="pl-num" placeholder="54007677"></label>
           <button class="btn" style="grid-column:1/-1">Calcular desde el plano</button>
@@ -153,9 +153,9 @@
 <div id="imprimir"></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script src="static/nucleo.js?v=65"></script>
-<script src="static/pdf.js?v=65"></script>
-<script src="static/xlsx.js?v=65"></script>
-<script src="static/app.js?v=65"></script>
+<script src="static/nucleo.js?v=67"></script>
+<script src="static/pdf.js?v=67"></script>
+<script src="static/xlsx.js?v=67"></script>
+<script src="static/app.js?v=67"></script>
 </body>
 </html>
