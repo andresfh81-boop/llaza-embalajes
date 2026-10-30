@@ -100,7 +100,7 @@ assert.deepStrictEqual(datosPlano('54007676-10_3000x4900_TESTA.pdf','ELYA PARED 
 // Dos módulos (hoja 54007594, 10500 × 4000 mm, 6 pilares de 2720): mismas piezas que la hoja de corte.
 assert.strictEqual(k(piezasPlano({tipologia:'TESTA',ancho:10500,proy:4000,modulos:2,pilares:Array(6).fill(2720)})),k([{ref:'33017',largo:5025,cant:4},{ref:'33007',largo:3700,cant:3},{ref:'33004',largo:2710,cant:6},{ref:'33006',largo:5025,cant:4},{ref:'33006',largo:3700,cant:4},{ref:'33000',largo:3771,cant:4},{ref:'33000',largo:3795,cant:52}]));
 // Sin módulos ni pilares en el plano: calcula igual y dice qué ha supuesto.
-assert.deepStrictEqual(piezasPlano({tipologia:'TESTA',ancho:4000,proy:4000}).supuestos,['1 módulo','4 pilares de 2900 mm de alto']);
+assert.deepStrictEqual(piezasPlano({tipologia:'TESTA',ancho:4000,proy:4000}).supuestos,['1 módulo','4 pilares (no se ha leído cuántos) de 2900 mm de alto']);
 assert.deepStrictEqual(parseHoja(['2720 mm 2720 mm 2720 mm','2710 mm P3: 2748 mm 2754']),[]);
 console.log('plano cliente: ok');
 // Cabecera de la hoja: número, nombre, tipología, medidas, módulo (también "2-3" con guion raro) y colores.

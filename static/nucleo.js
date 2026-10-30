@@ -129,7 +129,10 @@ function piezasPlano(d){
   if(!d.modulos) sup.push('1 módulo');
   if(nP>1) sup.push(`los módulos repartidos en ${nP} filas a lo largo de la proyección (${P} mm no caben en una lama)`);
   const nPil=nP>1?M+nP+1:M*2+2;let alt=(d.pilares||[]).map(Math.round).filter(h=>h>500);
-  if(!alt.length){alt=Array(d.nPilares||nPil).fill(Math.round(d.hTotal||PILAR_SUPUESTO));sup.push(`${alt.length} pilares de ${alt[0]} mm de alto`+(d.hTotal?' (la H total del plano)':''));}
+  if(!alt.length){ // sin la altura de cada pilar: todos a la H total del plano (la del más alto) o, si no viene, PILAR_SUPUESTO
+    alt=Array(d.nPilares||nPil).fill(Math.round(d.hTotal||PILAR_SUPUESTO));
+    if(!d.nPilares||!d.hTotal) sup.push(`${alt.length} pilares`+(d.nPilares?'':' (no se ha leído cuántos)')+` de ${alt[0]} mm de alto`+(d.hTotal?' (la H total del plano)':''));
+  }
   const v=(A-300-150*(nA-1))/nA,pm=(P-150*(nP-1))/nP;
   if(ing){add('33017','VIGA',A,2);add('33017','VIGA',P,2);}
   else{add('33017','VIGA',v,2*M);add('33007','VIGA GRANDE',pm-300,M+nP);}
@@ -147,18 +150,26 @@ function piezasPlano(d){
 // tipo, módulos, nº de lamas, pilares y su altura. La ficha da la altura cortada de cada pilar («P1: 2754 mm») o solo la
 // «Altura Paso Pilar»; en TESTA el pilar cortado mide el paso + 210 mm (comprobado en 54007677 y 54007678).
 // Las alturas se devuelven como en el plano cliente («H PILAR», 10 mm más que el corte). null si no hay nada de plano.
-function datosPlano(nombre,texto){
+function datosPlano(nombre,texto,op){
   const d={},t=String(texto||'').replace(/\s+/g,' ');
   const f=(String(nombre||'')+' '+t).match(/(\d{6,10}(?:[-\/]\d{1,3})?)_(\d{3,5})\s*x\s*(\d{3,5})_(TESTA|INGLETE|MIXTA)/i);
   if(f){d.numero=f[1];d.proy=+f[2];d.ancho=+f[3];d.tipologia=f[4].toUpperCase();}
-  // plano cliente con texto: «4900 (Ancho)», «3000 (Proyección)», «1 MODULOS», «2 PILARES» y «H PILAR P1» con su altura debajo
-  let m=t.match(/(\d{3,5})\s*\(Ancho\)/i);if(m)d.ancho=+m[1];
-  if((m=t.match(/(\d{3,5})\s*\(Proyecci[óo]n\)/i)))d.proy=+m[1];
-  if((m=t.match(/\b(\d+)\s*M[ÓO]DULOS\b/i)))d.modulos=+m[1];
-  if((m=t.match(/H Total:\s*(\d{3,4})\s*mm/i)))d.hTotal=+m[1];
-  if((m=t.match(/\b(\d+)\s*PILARES\b/)))d.nPilares=+m[1];
+  // plano cliente con texto o leído con OCR (op.ocr), en español o en el idioma del cliente: «4900 (Ancho)», «3000 (Proyección)»,
+  // «1 MODULOS», «2 PILARES», «H Total: 3020 mm» y «H PILAR P1» con su altura debajo. Si no se lee la H total, H libre + 220 mm
+  // (así en todas las obras: 2595 → 2815, 3000 → 3220, 2600 → 2820). Con OCR no se usan las alturas sueltas («28165 mm»).
+  // las medidas, mejor del nombre del archivo: el rótulo «(Ancho)» del dibujo no siempre va del mismo lado (54007638)
+  let m=!f&&t.match(/(\d{3,5})\s*\(\s*(?:Ancho|Width|Largeur|Breite|Larghezza)/i);if(m)d.ancho=+m[1];
+  if(!f&&(m=t.match(/(\d{3,5})\s*\(\s*(?:Proyecci[óo]n|Projection|Saillie|Ausfall|Tiefe|Sporgenza|Profondit)/i)))d.proy=+m[1];
+  if((m=t.match(/\b(\d{1,2})\s*M[ÓO]DUL(?:OS|O|ES|E|I|EN)\b/i)))d.modulos=+m[1];
+  if((m=t.match(/\bH\s*(?:Total|Totale|Gesamt)\s*[:;.]?\s*(\d{4})\s*mm/i)))d.hTotal=+m[1];
+  else if((m=t.match(/\bH\s*(?:Libre|Free|Libero|Frei|Lichte)\s*[:;.]?\s*(\d{4})\s*m/i)))d.hTotal=+m[1]+220;
+  // nº de pilares; el OCR a veces lee el 4 como «A» («APILLARS»). Si no se lee, por el modelo: a pared, módulos + 1
+  // (2 en uno de un módulo); autoportante, 2 × (módulos + 1)
+  if((m=t.match(/(?:\b|[^A-Z])(\d{1,2}|A)\s*(?:PILARES|PILLARS|PILIERS|PILASTRI|POSTS|PFOSTEN|S[ÄA]ULEN)\b/i)))d.nPilares=m[1].toUpperCase()==='A'?4:+m[1];
+  else if(/\b(?:PARED|WALL|MURAL|WAND|PARETE)\b/i.test(t))d.nPilares=(d.modulos||1)+1;
+  else if(op&&op.ocr&&/AUTOPORTANT|FREE\s*STANDING|FREISTEHEND/i.test(t))d.nPilares=2*((d.modulos||1)+1);
   const hp=[];
-  for(const g of t.matchAll(/((?:H PILAR P\d+\s*)+)((?:\d{3,4}\s*mm\s*)+)/gi)){
+  if(!(op&&op.ocr)) for(const g of t.matchAll(/((?:H PILAR P\d+\s*)+)((?:\d{3,4}\s*mm\s*)+)/gi)){
     const ps=[...g[1].matchAll(/P(\d+)/gi)].map(x=>+x[1]),hs=[...g[2].matchAll(/(\d{3,4})\s*mm/gi)].map(x=>+x[1]);
     if(ps.length===hs.length) ps.forEach((p,i)=>hp[p-1]=hs[i]);
   }

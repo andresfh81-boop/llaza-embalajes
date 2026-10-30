@@ -774,6 +774,39 @@ async function leerHojaPDF(file){
 }
 // Lee una o varias hojas de corte (una pérgola grande trae una por módulo o grupo de módulos).
 // Cada hoja se queda con los datos de su cabecera y sus líneas llevan el módulo (M1, M2-3…).
+// OCR del plano cliente escaneado (tesseract.js en vendor/tesseract, sin internet; se carga solo la primera vez que hace falta).
+// Se lee la primera página a 2,5 aumentos; el dibujo puede venir tumbado, así que se prueba derecho y girado 90° a cada lado
+// y se queda la lectura con más palabras del cajetín (modelo, pilares, módulos, H total…). Comprobado en Node con las 11 obras.
+let ocrWorker=null;
+const absUrl=p=>new URL(p,location.href).href;
+async function cargarOCR(){
+  if(!window.Tesseract) await new Promise((ok,ko)=>{const s=document.createElement('script');s.src='vendor/tesseract/tesseract.min.js';s.onload=ok;s.onerror=ko;document.head.appendChild(s);});
+  if(!ocrWorker) ocrWorker=await window.Tesseract.createWorker('spa',1,{workerPath:absUrl('vendor/tesseract/worker.min.js'),corePath:absUrl('vendor/tesseract/core'),langPath:absUrl('vendor/tesseract/lang'),gzip:true});
+  return ocrWorker;
+}
+const puntosCajetin=t=>(String(t).match(/MODEL|PILAR|PILLAR|ESCALA|SCALE|FECHA|DATE|MODUL|H Total|H Libre|H Free|Ancho|Width|Proyecci|Projection/gi)||[]).length;
+function girarLienzo(c,grados){
+  const g=document.createElement('canvas');g.width=c.height;g.height=c.width;
+  const x=g.getContext('2d');x.translate(g.width/2,g.height/2);x.rotate(grados*Math.PI/180);x.drawImage(c,-c.width/2,-c.height/2);return g;
+}
+async function ocrPlano(file){
+  const pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise,page=await pdf.getPage(1),vp=page.getViewport({scale:2.5});
+  const c=document.createElement('canvas');c.width=Math.round(vp.width);c.height=Math.round(vp.height);
+  const cx=c.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,c.width,c.height);
+  await page.render({canvasContext:cx,viewport:vp,intent:'print'}).promise; // «print»: no espera al refresco de pantalla (con la ventana oculta se quedaba parado)
+  { // en gris lee mejor (con color leía «CAPILLARS» y no veía la «H Free»)
+    const im=cx.getImageData(0,0,c.width,c.height),px=im.data;
+    for(let k=0;k<px.length;k+=4){const g=0.299*px[k]+0.587*px[k+1]+0.114*px[k+2];px[k]=px[k+1]=px[k+2]=g;}
+    cx.putImageData(im,0,0);
+  }
+  const w=await cargarOCR();let mejor='';
+  for(const g of [0,90,-90]){
+    const t=(await w.recognize(g?girarLienzo(c,g):c)).data.text;
+    if(puntosCajetin(t)>puntosCajetin(mejor)) mejor=t;
+    if(puntosCajetin(mejor)>=4) break;
+  }
+  return mejor;
+}
 async function leerPDF(files){
   files=[...(files||[])].filter(Boolean);if(!files.length)return;
   if(!window.pdfjsLib){estado('No se ha podido cargar el lector de PDF. Recarga la página.');return;}
@@ -784,7 +817,12 @@ async function leerPDF(files){
     try{
       const {filas,letras,cab,texto}=await leerHojaPDF(file);
       // Plano cliente (escaneado: los datos salen del nombre) o ficha de fabricación: rellenan «Calcular desde el plano cliente».
-      const dp=!filas.length&&datosPlano(file.name,texto);
+      let dp=!filas.length&&datosPlano(file.name,texto);
+      // plano escaneado (o con texto pero sin los datos del cajetín): se lee con OCR
+      if(!filas.length&&(dp||letras<40)&&!/PILARES|PILLARS|H\s*Total/i.test(texto)){
+        estado('Leyendo el plano escaneado '+file.name+' (tarda unos segundos; la primera vez, algo más)…');
+        try{const o=await ocrPlano(file);dp=datosPlano(file.name,texto+' '+o,{ocr:true})||dp;}catch(e){console.error(e);}
+      }
       if(dp){plano=Object.assign(plano||{},dp,{archivos:((plano&&plano.archivos)||[]).concat(file.name)});continue;}
       if(!filas.length){malas.push(file.name+(letras<40?' (es una imagen escaneada, sin texto; si es el plano cliente, copia sus datos en «Calcular desde el plano cliente»)':' (no tiene líneas de perfiles)'));continue;}
       // si se vuelve a leer la misma hoja, sustituye a la anterior
