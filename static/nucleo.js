@@ -69,15 +69,18 @@ function leerPagina(its){
     f.forEach(r=>r.its.sort((a,b)=>a.x-b.x));
     return f;
   };
-  const filas=[],sinLargo=[],soloLargo=[];let letras=0;
+  const filas=[],sinLargo=[],soloLargo=[],sumas=[];let letras=0;
   for(const f of agrupa(its.filter(i=>!esMarca(i)))){
     const t=f.its.map(i=>i.s).join(' ');letras+=t.length;
     const p=parseHoja([t])[0];
     if(p){filas.push(Object.assign(p,{y:f.y,marcas:[]}));continue;}
     const n=t.replace(/[‐-―−]/g,'-').replace(/\s+/g,' ').trim();
     if(/^\d{2,5}(?:[.,]\d+)?\s*mm\b/.test(n)) soloLargo.push({y:f.y,t:n});
+    else if(/^\(\s*\d+(?:\s*\+\s*\d+)+\s*\)/.test(n)) sumas.push({y:f.y,n:n.match(/^\([^)]*/)[0].match(/\d+/g).reduce((s,x)=>s+parseInt(x,10),0)});
     else{const r=n.match(/^(\d{4,6})\s+([A-Za-zÁÉÍÓÚÑáéíóúñ]{2}.*)$/);if(r&&!/\bmm\b/.test(n))sinLargo.push({y:f.y,ref:r[1],desc:r[2].split(' ').filter(w=>!/º|°/.test(w)).join(' ')});}
   }
+  // Con varios módulos, la cantidad de lamas puede ir en la fila de debajo como suma, «(26+26)», y la fila de la lama sin cantidad.
+  for(const f of filas) if(f.dudosa){const q=sumas.find(x=>Math.abs(x.y-f.y)<=15);if(q){f.cant=q.n;f.dudosa=false;}}
   // Perfiles con varios largos (pilares, canal, tapas): la referencia y el nombre van en una fila sin largo y cada largo,
   // con su cantidad, en filas sueltas encima y debajo. Cada largo va con la referencia más cercana sin pasar por otra fila completa.
   const completas=filas.slice();
@@ -100,6 +103,27 @@ function leerPagina(its){
     if(fila) fila.marcas.push(t);
   }
   return {filas,letras,cab:leerCabecera(its)};
+}
+// Piezas de la pérgola a partir del plano cliente (ancho y proyección como los rotula el plano, alturas de pilar en mm).
+// Solo las que van en caja; lo montado en otro perfil no hace falta. Reglas sacadas de 12 hojas de corte reales de un módulo
+// (30/10/2026): las lamas van a lo largo de la proyección y su número sale del ancho, a unos 182 mm cada una.
+// TESTA: vigas y canal a la medida − 300 mm; con menos de 4 pilares (a pared) lleva además trozos de pilar de 216 mm hasta 4.
+// INGLETE: vigas a la medida entera y canal 134 mm (ancho) y 138 mm (proyección) más corto. Pilar = altura del plano − 10 mm.
+function lamasPlano(ancho){return Math.max(0,Math.floor((ancho-538)/182));}
+function piezasPlano(d){
+  const A=Math.round(d.ancho),P=Math.round(d.proy),alt=(d.pilares||[]).map(Math.round).filter(h=>h>10),ing=d.tipologia==='INGLETE';
+  if(!(A>600&&P>600)) return [];
+  const out=[],add=(ref,desc,largo,cant)=>{if(cant>0&&largo>0)out.push({ref,desc,largo:Math.ceil(largo),cant});};
+  if(ing){add('33017','VIGA',A,2);add('33017','VIGA',P,2);}
+  else{add('33017','VIGA',A-300,2);add('33007','VIGA GRANDE',P-300,2);}
+  const pil={};alt.forEach(h=>pil[h-10]=(pil[h-10]||0)+1);
+  Object.keys(pil).forEach(l=>add('33004','PILAR',Number(l),pil[l]));
+  if(!ing&&alt.length&&alt.length<4) add('33004','PILAR',216,4-alt.length);
+  if(ing){add('33006','CANAL',A-134,2);add('33006','CANAL',P-138,2);}
+  else{add('33006','CANAL',A-300,2);add('33006','CANAL',P-300,2);}
+  add('33000','MEDIA LAMA',P-229.5,2);
+  add('33000','LAMA',P-205.5,d.lamas>0?Math.round(d.lamas):lamasPlano(A));
+  return out;
 }
 function newBin(model){return {model, free:[{x:0,y:0,w:model.intA,h:model.intH}], items:[]};}
 function tryPlace(bin,it){
@@ -349,4 +373,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={repartir,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={repartir,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};

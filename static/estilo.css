@@ -252,3 +252,8 @@ fieldset.destino legend{font:600 12px var(--body);letter-spacing:.05em;text-tran
 fieldset.destino.falta{border-color:var(--warn);background:var(--warn-bg)}
 fieldset.destino.falta legend{color:var(--warn)}
 .falta-destino .btn{margin:6px 6px 0 0}
+/* Cálculo desde el plano cliente (estimación sin hoja de corte) */
+details.plano{border:1px solid var(--line);border-radius:4px;padding:8px 10px}
+details.plano summary{cursor:pointer;font-weight:600;color:var(--accent)}
+details.plano[open] summary{margin-bottom:6px}
+details.plano .sub{margin:0 0 8px}

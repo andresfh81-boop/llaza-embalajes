@@ -1,6 +1,6 @@
 // node pruebas/probar.js  — comprueba el encaje, la lectura de filas de la hoja de corte y la mezcla del catálogo
 const assert=require('assert'),path=require('path');
-const {repartir,apoyado:apoy,packWith:packWithSolo,leerPagina,leerCabecera,plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
+const {repartir,piezasPlano,apoyado:apoy,packWith:packWithSolo,leerPagina,leerCabecera,plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
 const G={nombre:'G',intL:6000,intA:600,intH:400,extL:6100,extA:660,extH:460};
 const S={nombre:'S',intL:4000,intA:300,intH:300,extL:4080,extA:350,extH:350};
 const mk=(n,w,h,L)=>Array.from({length:n},()=>({p:{nombre:w+'x'+h},w,h,L}));
@@ -82,6 +82,14 @@ const pv=leerPagina([t(108,1055,'MARCAJE'),t(108,1123,'CHECK'),...fila(162,'3300
   t(210,157,'33004'),t(210,250,'PILAR'),t(210,451,'90º/90º'),t(219,354,'2748 mm'),t(219,529,'1'),t(219,1068,'P3'),
   t(288,354,'3700 mm'),t(288,451,'90º/90º'),t(288,529,'2'),t(306,157,'33006'),t(306,250,'CANAL'),t(321,354,'3700 mm'),t(321,451,'90º/90º'),t(321,529,'2')]);
 assert.deepStrictEqual(pv.filas.map(f=>[f.ref,f.desc,f.largo,f.cant,f.marcas.join('|')]),[['33007','VIGA GRANDE',3700,2,''],['33004','PILAR',2754,1,'P1'],['33004','PILAR',2805,1,'P2'],['33004','PILAR',2748,1,'P3'],['33006','CANAL',3700,2,''],['33006','CANAL',3700,2,'']]);
+// Cantidad de lamas en la fila de debajo como suma (hoja 54007594, dos módulos): «(26+26) n/2:» = 52.
+assert.strictEqual(leerPagina([t(108,1015,'MARCAJE'),t(108,1123,'CHECK'),t(513.6,195,'33000'),t(513.6,277,'LAMA'),t(513.6,375,'3794,5 mm'),t(513.6,464,'90º/90º'),t(523.7,519,'(26+26)'),t(523.6,566,'n/2:')]).filas[0].cant,52);
+// Piezas desde el plano cliente, comparadas con las hojas de corte reales 54007677 (autoportante) y 54007678 (a pared, 2 pilares).
+const k=ls=>ls.map(l=>l.ref+'/'+l.largo+'x'+l.cant).sort().join(' ');
+assert.strictEqual(k(piezasPlano({tipologia:'TESTA',ancho:4000,proy:4000,pilares:[2764,2815,2758,2720]})),k([{ref:'33017',largo:3700,cant:2},{ref:'33007',largo:3700,cant:2},{ref:'33004',largo:2754,cant:1},{ref:'33004',largo:2805,cant:1},{ref:'33004',largo:2748,cant:1},{ref:'33004',largo:2710,cant:1},{ref:'33006',largo:3700,cant:2},{ref:'33006',largo:3700,cant:2},{ref:'33000',largo:3771,cant:2},{ref:'33000',largo:3795,cant:19}]));
+assert.strictEqual(k(piezasPlano({tipologia:'TESTA',ancho:5350,proy:3500,pilares:[2820,2820]})),k([{ref:'33017',largo:5050,cant:2},{ref:'33007',largo:3200,cant:2},{ref:'33004',largo:2810,cant:2},{ref:'33004',largo:216,cant:2},{ref:'33006',largo:5050,cant:2},{ref:'33006',largo:3200,cant:2},{ref:'33000',largo:3271,cant:2},{ref:'33000',largo:3295,cant:26}]));
+assert.strictEqual(piezasPlano({tipologia:'INGLETE',ancho:6960,proy:3500,pilares:[2502,2502,2502]}).find(l=>l.desc==='LAMA').cant,35);
+console.log('plano cliente: ok');
 // Cabecera de la hoja: número, nombre, tipología, medidas, módulo (también "2-3" con guion raro) y colores.
 const cabe=m=>leerCabecera([{s:'PERGOLA PARED PORTERÍA',x:264,y:64.9},{s:'HOJA DE CORTE',x:154,y:75.5},{s:'TIPOLOGÍA: MIXTA',x:264,y:77},{s:'COLOR ESTRUC: 7416 TEXT',x:444,y:77},{s:'DIMENS. PÉRGOLA: 7380x8640 mm',x:264,y:89.2},{s:'COLOR LAMAS: 9016',x:444,y:89.2},{s:'54007372',x:172,y:94.6},{s:m,x:264,y:101.3},{s:'33017',x:157,y:142.4}]);
 assert.deepStrictEqual(cabe('DIMENS. MÓDULO 2\u20103: 6680 x 2640 mm'),{tipologia:'MIXTA',pergola:'7380x8640 mm',colorE:'7416 TEXT',colorL:'9016',modulo:'2-3',dimsModulo:'6680 x 2640 mm',numero:'54007372',nombre:'PERGOLA PARED PORTERÍA'});

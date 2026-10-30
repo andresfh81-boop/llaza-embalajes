@@ -376,6 +376,7 @@ function renderResultado(recalcular){
   const todos=r.bins.flatMap(b=>b.items),secB=todos.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)+r.unfit.reduce((s,it)=>s+it.w*it.h,0),secC=r.bins.reduce((s,b)=>s+b.model.intA*b.model.intH,0),minC=Math.max(1,Math.ceil(secB/Math.max(...modelos.map(m=>m.intA*m.intH))));
   if(secC) html+=`<div class="sub">Sección aprovechada: <b>${Math.round(secB/secC*100)} %</b>. ${r.bins.length<=minC?'Con estas cajas no se puede hacer con menos.':`Solo por superficie cabría en ${minC} ${minC===1?'caja':'cajas'}, pero las piezas no se pueden partir ni encajar sin huecos: es un mínimo teórico, no un fallo.`}</div>`;
   html+=pend;
+  if((pedido.hojas||[]).some(h=>h.plano)) html+=`<div class="note">Estimación desde el plano cliente: los largos y el nº de lamas salen de las reglas de las hojas de corte, no de la hoja de este pedido. Cuando la tengas, cárgala y sustituye a la estimación.</div>`;
   if(r.aparcados.length) html+=`<div class="note">${r.aparcados.length} ${r.aparcados.length===1?'bulto aparcado':'bultos aparcados'}: no ${r.aparcados.length===1?'está':'están'} en ninguna caja. Vuelve a ${r.aparcados.length===1?'meterlo':'meterlos'} antes de dar el reparto por bueno.</div>`;
   if(marcadas.size) html+=`<div class="manual">${marcadas.size} ${marcadas.size===1?'caja seleccionada':'cajas seleccionadas'}. <button class="btn small" type="button" data-act="ver-marcadas">Ver en pantalla completa</button> <button class="btn small ghost" type="button" data-act="desmarcar">Quitar selección</button></div>`;
   if(avisoMov) html+=`<div class="note" role="alert">${esc(avisoMov)}</div>`;
@@ -715,8 +716,29 @@ function renderLeidas(){
 }
 // Pasa al pedido lo leído que tiene perfil y deja a la vista solo las líneas con una referencia que no está en el catálogo.
 // Si una hoja ya estaba en el pedido (mismo archivo), sus líneas anteriores se sustituyen.
+// Estimación desde el plano cliente (sin hoja de corte): las piezas salen de piezasPlano (nucleo.js) y entran en el pedido
+// como una hoja más, marcada «plano». Al cargar después una hoja de corte de verdad, la estimación se quita.
+function quitarPlano(){const ids=(pedido.hojas||[]).filter(h=>h.plano).map(h=>h.id);if(!ids.length)return false;pedido.lineas=pedido.lineas.filter(l=>!ids.includes(l.hoja));pedido.hojas=pedido.hojas.filter(h=>!h.plano);return true;}
+function lamasSegunAncho(){$('pl-lamas').placeholder=num($('pl-ancho').value)>700?'Auto: '+lamasPlano(num($('pl-ancho').value)):'Auto';}
+function calcularPlano(){
+  const tip=$('pl-tip').value,ancho=num($('pl-ancho').value),proy=num($('pl-proy').value),mods=num($('pl-mod').value),numero=$('pl-num').value.trim();
+  const alturas=($('pl-pil').value.match(/\d+(?:[.,]\d+)?/g)||[]).map(x=>Math.round(parseFloat(x.replace(',','.')))).filter(h=>h>=1000&&h<=6000);
+  if(mods!==1){estado('Con más de un módulo las piezas no siguen las mismas reglas: para esa pérgola hace falta la hoja de corte.');return;}
+  if(!alturas.length){estado('Escribe la altura de cada pilar tal como viene en el plano («H PILAR P1…»), en mm y separadas por comas.');return;}
+  const piezas=piezasPlano({tipologia:tip,ancho,proy,pilares:alturas,lamas:num($('pl-lamas').value)});
+  if(!piezas.length){estado('Revisa el ancho y la proyección del plano.');return;}
+  quitarPlano();
+  const hoja={id:nuevoId(),archivo:'Plano cliente',plano:true,mod:'',numero,nombre:'Estimación desde el plano cliente',tipologia:tip,pergola:`ancho ${ancho} mm × proyección ${proy} mm`};
+  const sin=[];
+  for(const l of piezas){const p=perfiles.find(x=>String(x.ref).trim()===l.ref);if(!p){sin.push(l.desc);continue;}pedido.lineas.push({pid:p.id,largo:l.largo,cant:l.cant,marcas:[],mod:'',hoja:hoja.id,ped:numero});}
+  pedido.hojas=(pedido.hojas||[]).concat(hoja);
+  refAuto();guardarPedido();renderPedido();
+  const nl=piezas.find(l=>l.desc==='LAMA');
+  estado(`Estimación desde el plano: ${piezas.length} líneas al pedido, ${nl?nl.cant:0} ud. de lama de ${nl?nl.largo:0} mm.`+(sin.length?` Sin perfil en el catálogo: ${sin.join(', ')}.`:'')+(pedido.destino?'':' Elige el destino de la pérgola para calcular las cajas.'));
+}
 function volcarLeidas(){
   const ok=leidas.filter(l=>l.pid&&l.largo&&l.cant),mont=leidas.filter(l=>!l.pid&&l.montado).length;
+  if(ok.length) quitarPlano();
   for(const v of (pedido.hojas||[]).filter(h=>leidasHojas.some(n=>n.archivo===h.archivo&&n.id!==h.id))) pedido.lineas=pedido.lineas.filter(l=>l.hoja!==v.id);
   ok.forEach(l=>pedido.lineas.push({pid:l.pid,largo:l.largo,cant:l.cant,marcas:l.marcas||[],mod:l.mod||'',hoja:l.hoja,ped:(leidasHojas.find(h=>h.id===l.hoja)||{}).numero||''}));
   pedido.hojas=(pedido.hojas||[]).filter(h=>!leidasHojas.some(n=>n.archivo===h.archivo)).concat(leidasHojas);
@@ -748,7 +770,7 @@ async function leerPDF(files){
     estado('Leyendo '+file.name+'…');
     try{
       const {filas,letras,cab}=await leerHojaPDF(file);
-      if(!filas.length){malas.push(file.name+(letras<40?' (es una imagen escaneada, sin texto)':' (no tiene líneas de perfiles)'));continue;}
+      if(!filas.length){malas.push(file.name+(letras<40?' (es una imagen escaneada, sin texto; si es el plano cliente, copia sus datos en «Calcular desde el plano cliente»)':' (no tiene líneas de perfiles)'));continue;}
       // si se vuelve a leer la misma hoja, sustituye a la anterior
       const vieja=leidasHojas.find(h=>h.archivo===file.name);
       if(vieja){leidas=leidas.filter(l=>l.hoja!==vieja.id);leidasHojas=leidasHojas.filter(h=>h!==vieja);}
@@ -861,6 +883,8 @@ document.querySelector('.tabs').addEventListener('click',e=>{
 });
 function elegirDestino(t){if(!TIPOS[t])return;pedido.tipo=pedido.destino=t;guardarPedido();renderPedido();}
 $('tipos').addEventListener('change',e=>elegirDestino(e.target.value));
+$('f-plano').addEventListener('submit',e=>{e.preventDefault();calcularPlano();});
+$('pl-ancho').addEventListener('input',lamasSegunAncho);
 $('lugar').addEventListener('input',e=>{pedido.lugar=e.target.value.trim();guardarPedido();renderHojas();});
 for(const [id,k] of [['comp-n','n'],['comp-l','L'],['comp-a','A'],['comp-h','H']]) $(id).addEventListener('input',e=>{
   componentes();pedido.comp[k]=num(e.target.value);
