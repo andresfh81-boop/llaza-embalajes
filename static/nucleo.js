@@ -125,6 +125,28 @@ function piezasPlano(d){
   add('33000','LAMA',P-205.5,d.lamas>0?Math.round(d.lamas):lamasPlano(A));
   return out;
 }
+// Datos para piezasPlano sacados de un PDF que no es hoja de corte: del nombre del plano cliente escaneado
+// («54007677_4000x4000_TESTA.pdf» = nº, proyección × ancho, tipología) y del texto de la ficha de fabricación (PLANO.pdf):
+// tipo, módulos, nº de lamas, pilares y su altura. La ficha da la altura cortada de cada pilar («P1: 2754 mm») o solo la
+// «Altura Paso Pilar»; en TESTA el pilar cortado mide el paso + 210 mm (comprobado en 54007677 y 54007678).
+// Las alturas se devuelven como en el plano cliente («H PILAR», 10 mm más que el corte). null si no hay nada de plano.
+function datosPlano(nombre,texto){
+  const d={},t=String(texto||'').replace(/\s+/g,' ');
+  const f=(String(nombre||'')+' '+t).match(/(\d{6,10}(?:[-\/]\d{1,3})?)_(\d{3,5})\s*x\s*(\d{3,5})_(TESTA|INGLETE|MIXTA)/i);
+  if(f){d.numero=f[1];d.proy=+f[2];d.ancho=+f[3];d.tipologia=f[4].toUpperCase();}
+  let m=t.match(/\bTipo:\s*(TESTA|INGLETE|MIXTA)/i);if(m)d.tipologia=m[1].toUpperCase();
+  if((m=t.match(/M[óo]dulos:\s*(\d+)/i)))d.modulos=+m[1];
+  if((m=t.match(/N[º°o]\.?\s*Lamas:\s*(\d+)/i)))d.lamas=+m[1];
+  const n=(m=t.match(/Pilares:\s*(\d+)/i))?+m[1]:0,cortes=[];
+  for(const p of t.matchAll(/\bP(\d{1,2})\s*:\s*(\d{3,4})\s*mm/g)) cortes[+p[1]-1]=+p[2];
+  if(cortes.filter(Boolean).length) d.pilares=cortes.filter(Boolean).map(c=>c+10);
+  else if(n&&d.tipologia==='TESTA'&&(m=t.match(/Altura Paso Pilar:\s*([\d\/\s]+)mm/i))){
+    const pasos=m[1].split('/').map(x=>parseInt(x,10)).filter(x=>x>500);
+    if(pasos.length) d.pilares=Array.from({length:n},(_,i)=>(pasos[i]||pasos[pasos.length-1])+220);
+  }
+  if(n&&!d.pilares) d.nPilares=n;
+  return Object.keys(d).length?d:null;
+}
 function newBin(model){return {model, free:[{x:0,y:0,w:model.intA,h:model.intH}], items:[]};}
 function tryPlace(bin,it){
   if(it.L>bin.model.intL) return false;
@@ -373,4 +395,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={repartir,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={repartir,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};

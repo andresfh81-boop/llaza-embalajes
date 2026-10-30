@@ -8,7 +8,7 @@
   <link rel="icon" href="static/favicon.ico">
   <link rel="apple-touch-icon" href="static/icon-180.png">
   <meta name="theme-color" content="#0b5c8a">
-  <link rel="stylesheet" href="static/estilo.css?v=62">
+  <link rel="stylesheet" href="static/estilo.css?v=63">
 </head>
 <body>
 <div class="wrap">
@@ -31,16 +31,17 @@
     <div class="panel">
       <div class="cab-pedido"><h2>Pedido</h2><button class="btn danger" id="vaciar" type="button">Limpiar pantalla</button></div>
       <fieldset class="destino" id="destino"><legend>Destino de la pérgola</legend>
+        <label>País o ciudad<input id="lugar" placeholder="Francia, Mallorca, Madrid…" autocomplete="off"></label>
+        <small id="lugar-nota" class="sub">Al escribirlo se elige solo el embalaje (salimos de Alcover, Tarragona).</small>
         <div class="seg" id="tipos">
           <label><input type="radio" name="tipo" id="tipo-carton" value="carton">Envío local <small>cartón</small></label>
           <label><input type="radio" name="tipo" id="tipo-cerrada" value="cerrada">Exportación marítima <small>madera cerrada</small></label>
           <label><input type="radio" name="tipo" id="tipo-abierta" value="abierta">Exportación terrestre <small>madera abierta</small></label>
         </div>
-        <label>Lugar (opcional)<input id="lugar" placeholder="Ciudad, país"></label>
       </fieldset>
-      <label class="drop" id="drop"><input type="file" id="pdf" accept="application/pdf,.pdf" multiple>Arrastra aquí las hojas de corte<small>Una o varias a la vez, en PDF, o pulsa para elegirlas. Se añaden al pedido y se calculan las cajas al momento. Lee los datos de la pérgola, el módulo y, de cada perfil, referencia, largo, cantidad y marcaje.</small></label>
+      <label class="drop" id="drop"><input type="file" id="pdf" accept="application/pdf,.pdf" multiple>Arrastra aquí las hojas de corte<small>Una o varias a la vez, en PDF, o pulsa para elegirlas. Sin hoja de corte, suelta el plano cliente y la ficha de fabricación. Se añaden al pedido y se calculan las cajas al momento. Lee los datos de la pérgola, el módulo y, de cada perfil, referencia, largo, cantidad y marcaje.</small></label>
       <details class="plano" id="plano"><summary>Sin hoja de corte: calcular desde el plano cliente</summary>
-        <p class="sub">Copia los datos del plano que firma el cliente (el PDF «nº_ANCHOxPROYECCIÓN_TESTA»). Los largos y el nº de lamas salen de las reglas de las hojas de corte: es una estimación para pedir las cajas con tiempo. Solo pérgolas de un módulo, TESTA o INGLETE. Cuando llegue la hoja de corte, cárgala y sustituye a la estimación.</p>
+        <p class="sub">Suelta el plano que firma el cliente («nº_PROYECCIÓNxANCHO_TESTA.pdf») y la ficha de fabricación («PLANO.pdf») en la zona de las hojas de corte y se rellena solo; o copia aquí los datos a mano. Los largos y el nº de lamas salen de las reglas de las hojas de corte: es una estimación para pedir las cajas con tiempo. Solo pérgolas de un módulo, TESTA o INGLETE. Cuando llegue la hoja de corte, cárgala y sustituye a la estimación.</p>
         <form id="f-plano" class="row">
           <label>Tipología<select id="pl-tip"><option value="TESTA">TESTA</option><option value="INGLETE">INGLETE</option></select></label>
           <label>Módulos<input id="pl-mod" type="number" min="1" step="1" value="1" required></label>
@@ -152,9 +153,9 @@
 <div id="imprimir"></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script src="static/nucleo.js?v=62"></script>
-<script src="static/pdf.js?v=62"></script>
-<script src="static/xlsx.js?v=62"></script>
-<script src="static/app.js?v=62"></script>
+<script src="static/nucleo.js?v=63"></script>
+<script src="static/pdf.js?v=63"></script>
+<script src="static/xlsx.js?v=63"></script>
+<script src="static/app.js?v=63"></script>
 </body>
 </html>

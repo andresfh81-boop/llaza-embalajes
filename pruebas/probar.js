@@ -1,6 +1,6 @@
 // node pruebas/probar.js  — comprueba el encaje, la lectura de filas de la hoja de corte y la mezcla del catálogo
 const assert=require('assert'),path=require('path');
-const {repartir,piezasPlano,apoyado:apoy,packWith:packWithSolo,leerPagina,leerCabecera,plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
+const {repartir,datosPlano,piezasPlano,apoyado:apoy,packWith:packWithSolo,leerPagina,leerCabecera,plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
 const G={nombre:'G',intL:6000,intA:600,intH:400,extL:6100,extA:660,extH:460};
 const S={nombre:'S',intL:4000,intA:300,intH:300,extL:4080,extA:350,extH:350};
 const mk=(n,w,h,L)=>Array.from({length:n},()=>({p:{nombre:w+'x'+h},w,h,L}));
@@ -89,6 +89,12 @@ const k=ls=>ls.map(l=>l.ref+'/'+l.largo+'x'+l.cant).sort().join(' ');
 assert.strictEqual(k(piezasPlano({tipologia:'TESTA',ancho:4000,proy:4000,pilares:[2764,2815,2758,2720]})),k([{ref:'33017',largo:3700,cant:2},{ref:'33007',largo:3700,cant:2},{ref:'33004',largo:2754,cant:1},{ref:'33004',largo:2805,cant:1},{ref:'33004',largo:2748,cant:1},{ref:'33004',largo:2710,cant:1},{ref:'33006',largo:3700,cant:2},{ref:'33006',largo:3700,cant:2},{ref:'33000',largo:3771,cant:2},{ref:'33000',largo:3795,cant:19}]));
 assert.strictEqual(k(piezasPlano({tipologia:'TESTA',ancho:5350,proy:3500,pilares:[2820,2820]})),k([{ref:'33017',largo:5050,cant:2},{ref:'33007',largo:3200,cant:2},{ref:'33004',largo:2810,cant:2},{ref:'33004',largo:216,cant:2},{ref:'33006',largo:5050,cant:2},{ref:'33006',largo:3200,cant:2},{ref:'33000',largo:3271,cant:2},{ref:'33000',largo:3295,cant:26}]));
 assert.strictEqual(piezasPlano({tipologia:'INGLETE',ancho:6960,proy:3500,pilares:[2502,2502,2502]}).find(l=>l.desc==='LAMA').cant,35);
+// Datos del plano: del nombre del plano cliente escaneado y del texto de la ficha de fabricación (PLANO.pdf).
+assert.deepStrictEqual(datosPlano('54007678_3500x5350_TESTA.pdf',''),{numero:'54007678',proy:3500,ancho:5350,tipologia:'TESTA'});
+assert.deepStrictEqual(datosPlano('PLANO.pdf','Altura Paso Pilar: 2544/2595/2538/2500/ mm Pilares: 4 Unidades Nº Lamas: 19 Unidades Tipo: TESTA Módulos: 1 P4: 2710 mm P3: 2748 mm P2: 2805 mm P1: 2754 mm Altura Pilares:'),{tipologia:'TESTA',modulos:1,lamas:19,pilares:[2764,2815,2758,2720]});
+assert.deepStrictEqual(datosPlano('PLANO.pdf','Altura Paso Pilar: 2600 mm Pilares: 2 Unidades Nº Lamas: 26 Unidades Tipo: TESTA Módulos: 1').pilares,[2820,2820]);
+assert.strictEqual(datosPlano('PLANO.pdf','Pilares: 3 Unidades Tipo: INGLETE Altura Paso Pilar: 2500 mm').nPilares,3);
+assert.strictEqual(datosPlano('presupuesto.pdf','Total 1200 €'),null);
 console.log('plano cliente: ok');
 // Cabecera de la hoja: número, nombre, tipología, medidas, módulo (también "2-3" con guion raro) y colores.
 const cabe=m=>leerCabecera([{s:'PERGOLA PARED PORTERÍA',x:264,y:64.9},{s:'HOJA DE CORTE',x:154,y:75.5},{s:'TIPOLOGÍA: MIXTA',x:264,y:77},{s:'COLOR ESTRUC: 7416 TEXT',x:444,y:77},{s:'DIMENS. PÉRGOLA: 7380x8640 mm',x:264,y:89.2},{s:'COLOR LAMAS: 9016',x:444,y:89.2},{s:'54007372',x:172,y:94.6},{s:m,x:264,y:101.3},{s:'33017',x:157,y:142.4}]);

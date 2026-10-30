@@ -56,6 +56,8 @@ function renderPedido(){
   document.querySelectorAll('#tipos input').forEach(x=>x.checked=x.value===pedido.destino);
   $('destino').classList.toggle('falta',!pedido.destino&&pedido.lineas.length>0);
   if(document.activeElement!==$('lugar')) $('lugar').value=pedido.lugar||'';
+  $('lugar-nota').textContent=pedido.destino&&pedido.destinoAuto?`Elegido por el lugar: ${DESTINOS[pedido.destino].toLowerCase()} (${TIPOS[pedido.destino].toLowerCase()}). Si va de otra forma, cámbialo abajo.`
+    :pedido.lugar&&!pedido.destino?'No reconozco ese lugar: elige el embalaje abajo.':'Al escribirlo se elige solo el embalaje (salimos de Alcover, Tarragona).';
   if(document.activeElement!==$('holgura')) $('holgura').value=pedido.holgura;
   if(document.activeElement!==$('ref-pedido')) $('ref-pedido').value=pedido.ref||'';
   const sel=$('l-perfil'),prev=sel.value;
@@ -349,7 +351,7 @@ function renderResultado(recalcular){
   if(!modelos.length){el.innerHTML=head+`<div class="empty">Todavía no hay ninguna caja de tipo <b>${TIPOS[pedido.tipo]}</b>. Dala de alta en la pestaña Cajas con sus medidas interiores y exteriores y aquí aparecerá el reparto.</div>`;return;}
   const pend=leidas.length?`<div class="note pend">${leidas.length} ${leidas.length===1?'línea de las hojas de corte tiene':'líneas de las hojas de corte tienen'} una referencia que no está en el catálogo y no ${leidas.length===1?'está':'están'} en el pedido. Elige su perfil en la columna izquierda y pulsa «Añadir al pedido», o descártalas.</div>`:'';
   if(!pedido.lineas.length){el.innerHTML=head+(pend||`<div class="empty">El pedido está vacío. Arrastra las hojas de corte o añade los perfiles a mano, y aquí saldrán las cajas que hacen falta y cómo van colocados los bultos (elijo entre ${modelos.length} ${modelos.length===1?'modelo':'modelos'} de caja de ${TIPOS[pedido.tipo].toLowerCase()}).</div>`);return;}
-  if(!pedido.destino){el.innerHTML=head+pend+`<div class="note falta-destino" role="alert">Falta el destino de la pérgola: según dónde vaya, se embala en cartón, madera cerrada o madera abierta.<br>${Object.keys(DESTINOS).map(t=>`<button class="btn small" type="button" data-act="destino" data-t="${t}">${DESTINOS[t]} · ${TIPOS[t].toLowerCase()}</button>`).join('')}</div>`;return;}
+  if(!pedido.destino){el.innerHTML=head+pend+`<div class="note falta-destino" role="alert">Falta el destino de la pérgola: escribe el país o la ciudad en «Destino de la pérgola» y se elige solo el embalaje, o elígelo aquí.<br>${Object.keys(DESTINOS).map(t=>`<button class="btn small" type="button" data-act="destino" data-t="${t}">${DESTINOS[t]} · ${TIPOS[t].toLowerCase()}</button>`).join('')}</div>`;return;}
   const hol=num(pedido.holgura),clave=JSON.stringify([{tipo:pedido.tipo,holgura:pedido.holgura,lineas:pedido.lineas,comp:componentes()},modelos,perfiles]);
   if(recalcular||!reparto||clave!==repartoClave){
     const g=recalcular?null:cargarReparto(clave,modelos);
@@ -736,6 +738,25 @@ function calcularPlano(){
   const nl=piezas.find(l=>l.desc==='LAMA');
   estado(`Estimación desde el plano: ${piezas.length} líneas al pedido, ${nl?nl.cant:0} ud. de lama de ${nl?nl.largo:0} mm.`+(sin.length?` Sin perfil en el catálogo: ${sin.join(', ')}.`:'')+(pedido.destino?'':' Elige el destino de la pérgola para calcular las cajas.'));
 }
+// Rellena el formulario del plano con lo leído y calcula si ya está todo; si falta algo, lo dice y deja el cursor ahí.
+function rellenarPlano(d,malas){
+  $('plano').open=true;
+  if(d.tipologia&&d.tipologia!=='MIXTA') $('pl-tip').value=d.tipologia;
+  if(d.modulos) $('pl-mod').value=d.modulos;
+  if(d.ancho){$('pl-ancho').value=d.ancho;lamasSegunAncho();}
+  if(d.proy) $('pl-proy').value=d.proy;
+  if(d.pilares) $('pl-pil').value=d.pilares.join(', ');
+  if(d.lamas) $('pl-lamas').value=d.lamas;
+  if(d.numero) $('pl-num').value=d.numero;
+  const falta=[];
+  if(d.tipologia==='MIXTA'||(d.modulos||num($('pl-mod').value))>1) falta.push('es de varios módulos o mixta: para esa pérgola hace falta la hoja de corte');
+  if(!num($('pl-ancho').value)||!num($('pl-proy').value)) falta.push('el ancho y la proyección (vienen en el plano que firma el cliente, «nº_PROYECCIÓNxANCHO_TESTA.pdf»)');
+  if(!$('pl-pil').value.trim()) falta.push(`la altura de cada pilar («H PILAR» del plano${d.nPilares?', '+d.nPilares+' pilares':''})`);
+  const leido=`Leído ${d.archivos.join(' y ')}`+(malas.length?` (no se ha leído: ${malas.join('; ')})`:'');
+  if(!falta.length){calcularPlano();estado(leido+'. '+$('estado').textContent);}
+  else{estado(`${leido}. Falta ${falta.join(' y ')}. Complétalo en «Calcular desde el plano cliente» y pulsa «Calcular desde el plano».`);
+    const v=[['pl-ancho'],['pl-proy'],['pl-pil']].map(x=>$(x[0])).find(x=>!x.value.trim());$('plano').scrollIntoView({block:'start',behavior:'smooth'});if(v)v.focus({preventScroll:true});}
+}
 function volcarLeidas(){
   const ok=leidas.filter(l=>l.pid&&l.largo&&l.cant),mont=leidas.filter(l=>!l.pid&&l.montado).length;
   if(ok.length) quitarPlano();
@@ -751,13 +772,13 @@ function volcarLeidas(){
 // Lee un PDF de hoja de corte: filas de perfil, letras de texto que trae (pocas = escaneado) y datos de la cabecera.
 async function leerHojaPDF(file){
   const pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
-  const filas=[];let letras=0,cab={};
+  const filas=[],textos=[];let letras=0,cab={};
   for(let n=1;n<=pdf.numPages;n++){
     const page=await pdf.getPage(n),vp=page.getViewport({scale:1}),c=await page.getTextContent();
     const its=c.items.filter(i=>i.str&&i.str.trim()).map(i=>{const p=vp.convertToViewportPoint(i.transform[4],i.transform[5]);return {s:i.str.trim(),x:p[0],y:p[1],w:i.width};});
-    const r=leerPagina(its);filas.push(...r.filas);letras+=r.letras;cab=Object.assign({},r.cab,cab);
+    const r=leerPagina(its);filas.push(...r.filas);letras+=r.letras;cab=Object.assign({},r.cab,cab);textos.push(...its.map(i=>i.s));
   }
-  return {filas,letras,cab};
+  return {filas,letras,cab,texto:textos.join(' ')};
 }
 // Lee una o varias hojas de corte (una pérgola grande trae una por módulo o grupo de módulos).
 // Cada hoja se queda con los datos de su cabecera y sus líneas llevan el módulo (M1, M2-3…).
@@ -765,11 +786,14 @@ async function leerPDF(files){
   files=[...(files||[])].filter(Boolean);if(!files.length)return;
   if(!window.pdfjsLib){estado('No se ha podido cargar el lector de PDF. Recarga la página.');return;}
   window.pdfjsLib.GlobalWorkerOptions.workerSrc='vendor/pdfjs/pdf.worker.min.js';
-  const malas=[];let nuevas=0;
+  const malas=[];let nuevas=0,plano=null;
   for(const file of files){
     estado('Leyendo '+file.name+'…');
     try{
-      const {filas,letras,cab}=await leerHojaPDF(file);
+      const {filas,letras,cab,texto}=await leerHojaPDF(file);
+      // Plano cliente (escaneado: los datos salen del nombre) o ficha de fabricación: rellenan «Calcular desde el plano cliente».
+      const dp=!filas.length&&datosPlano(file.name,texto);
+      if(dp){plano=Object.assign(plano||{},dp,{archivos:((plano&&plano.archivos)||[]).concat(file.name)});continue;}
       if(!filas.length){malas.push(file.name+(letras<40?' (es una imagen escaneada, sin texto; si es el plano cliente, copia sus datos en «Calcular desde el plano cliente»)':' (no tiene líneas de perfiles)'));continue;}
       // si se vuelve a leer la misma hoja, sustituye a la anterior
       const vieja=leidasHojas.find(h=>h.archivo===file.name);
@@ -783,6 +807,7 @@ async function leerPDF(files){
       nuevas+=filas.length;
     }catch(e){malas.push(file.name+' (no se ha podido leer)');}
   }
+  if(plano&&!nuevas){rellenarPlano(plano,malas);return;}
   const nh=leidasHojas.length,r=nuevas?volcarLeidas():{ok:0,mont:0,pend:0};
   if(!nuevas) renderLeidas();
   estado((nuevas?`${r.ok} líneas de ${nh} ${nh===1?'hoja':'hojas'} añadidas al pedido`+(r.mont?`; ${r.mont} van montadas en otro perfil`:'')+(r.pend?`; ${r.pend} sin perfil, revísalas debajo`:'')+'.'+(pedido.destino?'':' Elige el destino de la pérgola para calcular las cajas.'):'')+(malas.length?` No se ha leído: ${malas.join('; ')}.`:''));
@@ -881,11 +906,28 @@ document.querySelector('.tabs').addEventListener('click',e=>{
   ['pedido','cajas','perfiles','prevision'].forEach(t=>$('tab-'+t).hidden=t!==b.dataset.tab);
   $('cat-bar').hidden=b.dataset.tab==='pedido'||b.dataset.tab==='prevision';
 });
-function elegirDestino(t){if(!TIPOS[t])return;pedido.tipo=pedido.destino=t;guardarPedido();renderPedido();}
+function elegirDestino(t,auto){if(!TIPOS[t])return;pedido.tipo=pedido.destino=t;pedido.destinoAuto=!!auto;guardarPedido();renderPedido();}
+// El lugar escrito elige el destino cuando se reconoce y nadie lo ha elegido a mano (pedido.destinoAuto): España peninsular
+// en cartón; islas, Ceuta, Melilla y fuera de Europa por mar; la Europa continental por carretera. Si no se reconoce, no elige.
+const LUGARES={
+  cerrada:'baleares,balears,mallorca,menorca,ibiza,eivissa,formentera,canarias,tenerife,gran canaria,lanzarote,fuerteventura,la palma,la gomera,el hierro,ceuta,melilla,reino unido,inglaterra,uk,escocia,gales,irlanda,islandia,malta,chipre,estados unidos,eeuu,usa,canada,mexico,brasil,argentina,chile,peru,colombia,uruguay,panama,republica dominicana,puerto rico,marruecos,argelia,tunez,egipto,sudafrica,emiratos,dubai,qatar,arabia saudi,israel,turquia,china,japon,india,australia,nueva zelanda',
+  abierta:'francia,france,portugal,andorra,monaco,alemania,germany,italia,italy,belgica,holanda,paises bajos,luxemburgo,suiza,austria,polonia,chequia,republica checa,eslovaquia,hungria,eslovenia,croacia,rumania,bulgaria,dinamarca,suecia,noruega,finlandia,lituania,letonia,estonia,grecia',
+  carton:'espana,spain,andalucia,aragon,asturias,cantabria,cataluna,catalunya,galicia,navarra,la rioja,murcia,extremadura,madrid,barcelona,valencia,sevilla,malaga,cordoba,granada,jaen,almeria,cadiz,huelva,zaragoza,huesca,teruel,oviedo,gijon,santander,bilbao,vizcaya,bizkaia,alava,araba,vitoria,guipuzcoa,gipuzkoa,donostia,san sebastian,pamplona,logrono,burgos,leon,palencia,valladolid,zamora,salamanca,segovia,avila,soria,caceres,badajoz,toledo,ciudad real,cuenca,guadalajara,albacete,alicante,castellon,tarragona,lleida,lerida,girona,gerona,a coruna,coruna,lugo,ourense,orense,pontevedra,vigo,santiago de compostela'
+};
+function destinoDeLugar(txt){
+  const t=' '+String(txt||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]+/g,' ').trim()+' ';
+  // islas y ciudades por mar primero: «Palma de Mallorca, España» va en madera cerrada, no en cartón
+  for(const k of ['cerrada','abierta','carton']) if(LUGARES[k].split(',').some(n=>t.includes(' '+n+' '))) return k;
+  return '';
+}
 $('tipos').addEventListener('change',e=>elegirDestino(e.target.value));
 $('f-plano').addEventListener('submit',e=>{e.preventDefault();calcularPlano();});
 $('pl-ancho').addEventListener('input',lamasSegunAncho);
-$('lugar').addEventListener('input',e=>{pedido.lugar=e.target.value.trim();guardarPedido();renderHojas();});
+$('lugar').addEventListener('input',e=>{
+  pedido.lugar=e.target.value.trim();
+  if(!pedido.destino||pedido.destinoAuto){const d=destinoDeLugar(pedido.lugar);if(d){if(d!==pedido.destino)elegirDestino(d,true);}else if(pedido.destinoAuto){pedido.destino='';pedido.destinoAuto=false;renderPedido();}}
+  guardarPedido();renderHojas();
+});
 for(const [id,k] of [['comp-n','n'],['comp-l','L'],['comp-a','A'],['comp-h','H']]) $(id).addEventListener('input',e=>{
   componentes();pedido.comp[k]=num(e.target.value);
   try{localStorage.setItem('componentes-embalaje',JSON.stringify({L:pedido.comp.L,A:pedido.comp.A,H:pedido.comp.H}));}catch(err){}
@@ -899,7 +941,7 @@ $('f-linea').addEventListener('submit',e=>{
   if(!pid||!largo||!cant)return;
   pedido.lineas.push({pid,largo,cant,marcas:$('l-marcas').value.split(',').map(x=>x.trim()).filter(Boolean)});$('l-marcas').value='';guardarPedido();renderPedido();
 });
-$('vaciar').addEventListener('click',()=>{pedido.comp=null;pedido.lineas=[];pedido.hojas=[];pedido.ref='';pedido.destino='';pedido.lugar='';$('lugar').value='';leidas=[];leidasHojas=[];guardarPedido();renderLeidas();renderPedido();estado('Pantalla limpia: puedes empezar otro pedido.');});
+$('vaciar').addEventListener('click',()=>{pedido.comp=null;pedido.lineas=[];pedido.hojas=[];pedido.ref='';pedido.destino='';pedido.destinoAuto=false;pedido.lugar='';$('lugar').value='';leidas=[];leidasHojas=[];guardarPedido();renderLeidas();renderPedido();estado('Pantalla limpia: puedes empezar otro pedido.');});
 $('f-caja').addEventListener('submit',e=>{
   e.preventDefault();
   const d={nombre:$('c-nombre').value.trim(),tipo:$('c-tipo').value,intL:num($('c-il').value),intA:num($('c-ia').value),intH:num($('c-ih').value),extL:num($('c-el').value),extA:num($('c-ea').value),extH:num($('c-eh').value)};
