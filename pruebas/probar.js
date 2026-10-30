@@ -95,6 +95,9 @@ assert.deepStrictEqual(datosPlano('PLANO.pdf','Altura Paso Pilar: 2544/2595/2538
 assert.deepStrictEqual(datosPlano('PLANO.pdf','Altura Paso Pilar: 2600 mm Pilares: 2 Unidades Nº Lamas: 26 Unidades Tipo: TESTA Módulos: 1').pilares,[2820,2820]);
 assert.strictEqual(datosPlano('PLANO.pdf','Pilares: 3 Unidades Tipo: INGLETE Altura Paso Pilar: 2500 mm').nPilares,3);
 assert.strictEqual(datosPlano('presupuesto.pdf','Total 1200 €'),null);
+// Plano cliente con texto (54007676-10): medidas, módulos y «H PILAR» con la altura debajo. Sus cotas no son filas de perfil.
+assert.deepStrictEqual(datosPlano('54007676-10_3000x4900_TESTA.pdf','ELYA PARED PORTERIA PRP 4900 (Ancho) 1 MODULOS 2 PILARES 4900x3000 H Total: 3020 mm 3000 (Proyección) H PILAR P2 H PILAR P1 3020 mm 3020 mm PIE REGULABLE'),{numero:'54007676-10',proy:3000,ancho:4900,tipologia:'TESTA',modulos:1,pilares:[3020,3020]});
+assert.deepStrictEqual(parseHoja(['2720 mm 2720 mm 2720 mm','2710 mm P3: 2748 mm 2754']),[]);
 console.log('plano cliente: ok');
 // Cabecera de la hoja: número, nombre, tipología, medidas, módulo (también "2-3" con guion raro) y colores.
 const cabe=m=>leerCabecera([{s:'PERGOLA PARED PORTERÍA',x:264,y:64.9},{s:'HOJA DE CORTE',x:154,y:75.5},{s:'TIPOLOGÍA: MIXTA',x:264,y:77},{s:'COLOR ESTRUC: 7416 TEXT',x:444,y:77},{s:'DIMENS. PÉRGOLA: 7380x8640 mm',x:264,y:89.2},{s:'COLOR LAMAS: 9016',x:444,y:89.2},{s:'54007372',x:172,y:94.6},{s:m,x:264,y:101.3},{s:'33017',x:157,y:142.4}]);

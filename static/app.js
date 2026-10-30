@@ -749,10 +749,10 @@ function rellenarPlano(d,malas){
   if(d.lamas) $('pl-lamas').value=d.lamas;
   if(d.numero) $('pl-num').value=d.numero;
   const falta=[];
-  if(d.tipologia==='MIXTA'||(d.modulos||num($('pl-mod').value))>1) falta.push('es de varios módulos o mixta: para esa pérgola hace falta la hoja de corte');
   if(!num($('pl-ancho').value)||!num($('pl-proy').value)) falta.push('el ancho y la proyección (vienen en el plano que firma el cliente, «nº_PROYECCIÓNxANCHO_TESTA.pdf»)');
   if(!$('pl-pil').value.trim()) falta.push(`la altura de cada pilar («H PILAR» del plano${d.nPilares?', '+d.nPilares+' pilares':''})`);
   const leido=`Leído ${d.archivos.join(' y ')}`+(malas.length?` (no se ha leído: ${malas.join('; ')})`:'');
+  if(d.tipologia==='MIXTA'||(d.modulos||num($('pl-mod').value))>1){estado(`${leido}. Es una pérgola ${d.modulos>1?'de '+d.modulos+' módulos':'mixta'}: con el plano solo se calculan las de un módulo, TESTA o INGLETE. Para esta hace falta la hoja de corte.`);return;}
   if(!falta.length){calcularPlano();estado(leido+'. '+$('estado').textContent);}
   else{estado(`${leido}. Falta ${falta.join(' y ')}. Complétalo en «Calcular desde el plano cliente» y pulsa «Calcular desde el plano».`);
     const v=[['pl-ancho'],['pl-proy'],['pl-pil']].map(x=>$(x[0])).find(x=>!x.value.trim());$('plano').scrollIntoView({block:'start',behavior:'smooth'});if(v)v.focus({preventScroll:true});}

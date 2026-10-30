@@ -3,7 +3,8 @@ function parseHoja(lineas){
   const out=[];
   for(const raw of lineas){
     const t=String(raw).replace(/[‐-―−]/g,'-').replace(/ /g,' ').replace(/\s+/g,' ').trim();
-    const m=t.match(/(?:^|\s)(\d{4,6})\s+([A-Za-zÁÉÍÓÚÑáéíóúñ]{2}.*?)\s+(\d{2,5}(?:[.,]\d+)?)\s*mm\b(.*)$/);
+    // la referencia no puede ir seguida de «mm»: en los planos «2720 mm 2720 mm» son cotas, no un perfil
+    const m=t.match(/(?:^|\s)(\d{4,6})\s+(?!mm\b)([A-Za-zÁÉÍÓÚÑáéíóúñ]{2}.*?)\s+(\d{2,5}(?:[.,]\d+)?)\s*mm\b(.*)$/);
     if(!m) continue;
     const q=m[4].match(/(?<![\w\-.,º°\/+])\d+(?:\s*\+\s*\d+)*(?![\w\-.,º°\/+])/g);
     const cant=q?q[q.length-1].match(/\d+/g).reduce((s,n)=>s+parseInt(n,10),0):0;
@@ -134,13 +135,23 @@ function datosPlano(nombre,texto){
   const d={},t=String(texto||'').replace(/\s+/g,' ');
   const f=(String(nombre||'')+' '+t).match(/(\d{6,10}(?:[-\/]\d{1,3})?)_(\d{3,5})\s*x\s*(\d{3,5})_(TESTA|INGLETE|MIXTA)/i);
   if(f){d.numero=f[1];d.proy=+f[2];d.ancho=+f[3];d.tipologia=f[4].toUpperCase();}
-  let m=t.match(/\bTipo:\s*(TESTA|INGLETE|MIXTA)/i);if(m)d.tipologia=m[1].toUpperCase();
+  // plano cliente con texto: «4900 (Ancho)», «3000 (Proyección)», «1 MODULOS», «2 PILARES» y «H PILAR P1» con su altura debajo
+  let m=t.match(/(\d{3,5})\s*\(Ancho\)/i);if(m)d.ancho=+m[1];
+  if((m=t.match(/(\d{3,5})\s*\(Proyecci[óo]n\)/i)))d.proy=+m[1];
+  if((m=t.match(/\b(\d+)\s*M[ÓO]DULOS\b/i)))d.modulos=+m[1];
+  const hp=[];
+  for(const g of t.matchAll(/((?:H PILAR P\d+\s*)+)((?:\d{3,4}\s*mm\s*)+)/gi)){
+    const ps=[...g[1].matchAll(/P(\d+)/gi)].map(x=>+x[1]),hs=[...g[2].matchAll(/(\d{3,4})\s*mm/gi)].map(x=>+x[1]);
+    if(ps.length===hs.length) ps.forEach((p,i)=>hp[p-1]=hs[i]);
+  }
+  if(hp.filter(Boolean).length) d.pilares=hp.filter(Boolean);
+  if((m=t.match(/\bTipo:\s*(TESTA|INGLETE|MIXTA)/i)))d.tipologia=m[1].toUpperCase();
   if((m=t.match(/M[óo]dulos:\s*(\d+)/i)))d.modulos=+m[1];
   if((m=t.match(/N[º°o]\.?\s*Lamas:\s*(\d+)/i)))d.lamas=+m[1];
   const n=(m=t.match(/Pilares:\s*(\d+)/i))?+m[1]:0,cortes=[];
   for(const p of t.matchAll(/\bP(\d{1,2})\s*:\s*(\d{3,4})\s*mm/g)) cortes[+p[1]-1]=+p[2];
   if(cortes.filter(Boolean).length) d.pilares=cortes.filter(Boolean).map(c=>c+10);
-  else if(n&&d.tipologia==='TESTA'&&(m=t.match(/Altura Paso Pilar:\s*([\d\/\s]+)mm/i))){
+  else if(!d.pilares&&n&&d.tipologia==='TESTA'&&(m=t.match(/Altura Paso Pilar:\s*([\d\/\s]+)mm/i))){
     const pasos=m[1].split('/').map(x=>parseInt(x,10)).filter(x=>x>500);
     if(pasos.length) d.pilares=Array.from({length:n},(_,i)=>(pasos[i]||pasos[pasos.length-1])+220);
   }
