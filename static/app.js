@@ -5,7 +5,10 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const num=v=>Math.max(0,Math.round(Number(v)||0));
 let base=null,perfiles=[],cajas=[],sinDatos=false;
 let editCaja=null,editPerfil=null,confirmar=null,ultimoResumen='';
-let pedido={tipo:'carton',holgura:5,lineas:[]};
+// El destino de la pérgola decide el tipo de embalaje: envío local en cartón, exportación marítima en madera cerrada y
+// terrestre en madera abierta. pedido.destino es ese tipo una vez elegido (vacío = sin elegir: no se calcula hasta tenerlo).
+const DESTINOS={carton:'Envío local',cerrada:'Exportación marítima',abierta:'Exportación terrestre'};
+let pedido={tipo:'carton',destino:'',lugar:'',holgura:5,lineas:[]};
 // La app se abre siempre con el pedido vacío. El último pedido se conserva aparte (anterior) por si se quiere recuperar,
 // hasta que se empieza uno nuevo.
 let anterior=null;
@@ -26,9 +29,10 @@ function leyenda(){
 }
 // Datos de la pérgola tal como vienen en la cabecera de las hojas de corte.
 function datosPedido(){
-  const h=(pedido.hojas||[])[0];if(!h)return [];
+  const h=(pedido.hojas||[])[0],dst=pedido.destino?[['Destino',DESTINOS[pedido.destino]+' ('+TIPOS[pedido.destino].toLowerCase()+')'+(pedido.lugar?' · '+pedido.lugar:'')]]:[];
+  if(!h)return dst;
   const u=k=>[...new Set(pedido.hojas.map(x=>x[k]).filter(Boolean))].join(' + ');
-  return [[pedidosDe().length>1?'Hojas de corte (envío compartido)':'Hoja de corte',u('numero')],['Pérgola',u('nombre')],['Tipología',[...new Set(pedido.hojas.map(x=>x.tipologia).filter(Boolean))].join(' / ')],['Medidas pérgola',h.pergola],['Color estructura',h.colorE],['Color lamas',h.colorL]].filter(d=>d[1]);
+  return dst.concat([[pedidosDe().length>1?'Hojas de corte (envío compartido)':'Hoja de corte',u('numero')],['Pérgola',u('nombre')],['Tipología',[...new Set(pedido.hojas.map(x=>x.tipologia).filter(Boolean))].join(' / ')],['Medidas pérgola',h.pergola],['Color estructura',h.colorE],['Color lamas',h.colorL]].filter(d=>d[1]));
 }
 // Bloque «Hojas de corte del pedido»: datos de la pérgola y una fila por hoja leída, con su módulo y su color.
 function renderHojas(){
@@ -49,7 +53,9 @@ const perfilDe=pid=>pid==='_comp'?perfilComp():perfiles.find(x=>x.id===pid);
 function renderPedido(){
   const cp=componentes();
   for(const [id,k] of [['comp-n','n'],['comp-l','L'],['comp-a','A'],['comp-h','H']]) if(document.activeElement!==$(id)) $(id).value=cp[k];
-  $('tipo-'+pedido.tipo).checked=true;
+  document.querySelectorAll('#tipos input').forEach(x=>x.checked=x.value===pedido.destino);
+  $('destino').classList.toggle('falta',!pedido.destino&&pedido.lineas.length>0);
+  if(document.activeElement!==$('lugar')) $('lugar').value=pedido.lugar||'';
   if(document.activeElement!==$('holgura')) $('holgura').value=pedido.holgura;
   if(document.activeElement!==$('ref-pedido')) $('ref-pedido').value=pedido.ref||'';
   const sel=$('l-perfil'),prev=sel.value;
@@ -343,6 +349,7 @@ function renderResultado(recalcular){
   if(!modelos.length){el.innerHTML=head+`<div class="empty">Todavía no hay ninguna caja de tipo <b>${TIPOS[pedido.tipo]}</b>. Dala de alta en la pestaña Cajas con sus medidas interiores y exteriores y aquí aparecerá el reparto.</div>`;return;}
   const pend=leidas.length?`<div class="note pend">${leidas.length} ${leidas.length===1?'línea de las hojas de corte tiene':'líneas de las hojas de corte tienen'} una referencia que no está en el catálogo y no ${leidas.length===1?'está':'están'} en el pedido. Elige su perfil en la columna izquierda y pulsa «Añadir al pedido», o descártalas.</div>`:'';
   if(!pedido.lineas.length){el.innerHTML=head+(pend||`<div class="empty">El pedido está vacío. Arrastra las hojas de corte o añade los perfiles a mano, y aquí saldrán las cajas que hacen falta y cómo van colocados los bultos (elijo entre ${modelos.length} ${modelos.length===1?'modelo':'modelos'} de caja de ${TIPOS[pedido.tipo].toLowerCase()}).</div>`);return;}
+  if(!pedido.destino){el.innerHTML=head+pend+`<div class="note falta-destino" role="alert">Falta el destino de la pérgola: según dónde vaya, se embala en cartón, madera cerrada o madera abierta.<br>${Object.keys(DESTINOS).map(t=>`<button class="btn small" type="button" data-act="destino" data-t="${t}">${DESTINOS[t]} · ${TIPOS[t].toLowerCase()}</button>`).join('')}</div>`;return;}
   const hol=num(pedido.holgura),clave=JSON.stringify([{tipo:pedido.tipo,holgura:pedido.holgura,lineas:pedido.lineas,comp:componentes()},modelos,perfiles]);
   if(recalcular||!reparto||clave!==repartoClave){
     const g=recalcular?null:cargarReparto(clave,modelos);
@@ -429,6 +436,7 @@ function solicitud(){
 }
 async function solicitarCajas(){
   const r=reparto;
+  if(pedido.lineas.length&&!pedido.destino){estado('Elige primero el destino de la pérgola: de él depende el tipo de caja.');return;}
   if(!r||!r.bins.length||!pedido.lineas.length){estado('Todavía no hay cajas calculadas: arrastra las hojas de corte o añade perfiles al pedido y después solicita las cajas.');return;}
   if(r.aparcados.length||r.unfit.length){avisoMov=`Antes de pedir las cajas: hay ${r.aparcados.length+r.unfit.length} ${r.aparcados.length+r.unfit.length===1?'bulto':'bultos'} sin caja (aparcados o que no caben). Mételos en alguna caja para que la solicitud esté completa.`;sel=null;return renderResultado();}
   // La solicitud se enseña en una ventana, con el asunto y el texto a la vista para copiarlos o cortarlos y pegarlos en el correo.
@@ -755,7 +763,7 @@ async function leerPDF(files){
   }
   const nh=leidasHojas.length,r=nuevas?volcarLeidas():{ok:0,mont:0,pend:0};
   if(!nuevas) renderLeidas();
-  estado((nuevas?`${r.ok} líneas de ${nh} ${nh===1?'hoja':'hojas'} añadidas al pedido`+(r.mont?`; ${r.mont} van montadas en otro perfil`:'')+(r.pend?`; ${r.pend} sin perfil, revísalas debajo`:'')+'.':'')+(malas.length?` No se ha leído: ${malas.join('; ')}.`:''));
+  estado((nuevas?`${r.ok} líneas de ${nh} ${nh===1?'hoja':'hojas'} añadidas al pedido`+(r.mont?`; ${r.mont} van montadas en otro perfil`:'')+(r.pend?`; ${r.pend} sin perfil, revísalas debajo`:'')+'.'+(pedido.destino?'':' Elige el destino de la pérgola para calcular las cajas.'):'')+(malas.length?` No se ha leído: ${malas.join('; ')}.`:''));
 }
 (function(){
   const d=$('drop');
@@ -851,7 +859,9 @@ document.querySelector('.tabs').addEventListener('click',e=>{
   ['pedido','cajas','perfiles','prevision'].forEach(t=>$('tab-'+t).hidden=t!==b.dataset.tab);
   $('cat-bar').hidden=b.dataset.tab==='pedido'||b.dataset.tab==='prevision';
 });
-$('tipos').addEventListener('change',e=>{pedido.tipo=e.target.value;guardarPedido();renderResultado();});
+function elegirDestino(t){if(!TIPOS[t])return;pedido.tipo=pedido.destino=t;guardarPedido();renderPedido();}
+$('tipos').addEventListener('change',e=>elegirDestino(e.target.value));
+$('lugar').addEventListener('input',e=>{pedido.lugar=e.target.value.trim();guardarPedido();renderHojas();});
 for(const [id,k] of [['comp-n','n'],['comp-l','L'],['comp-a','A'],['comp-h','H']]) $(id).addEventListener('input',e=>{
   componentes();pedido.comp[k]=num(e.target.value);
   try{localStorage.setItem('componentes-embalaje',JSON.stringify({L:pedido.comp.L,A:pedido.comp.A,H:pedido.comp.H}));}catch(err){}
@@ -865,7 +875,7 @@ $('f-linea').addEventListener('submit',e=>{
   if(!pid||!largo||!cant)return;
   pedido.lineas.push({pid,largo,cant,marcas:$('l-marcas').value.split(',').map(x=>x.trim()).filter(Boolean)});$('l-marcas').value='';guardarPedido();renderPedido();
 });
-$('vaciar').addEventListener('click',()=>{pedido.comp=null;pedido.lineas=[];pedido.hojas=[];pedido.ref='';guardarPedido();renderPedido();});
+$('vaciar').addEventListener('click',()=>{pedido.comp=null;pedido.lineas=[];pedido.hojas=[];pedido.ref='';pedido.destino='';pedido.lugar='';$('lugar').value='';leidas=[];leidasHojas=[];guardarPedido();renderLeidas();renderPedido();estado('Pantalla limpia: puedes empezar otro pedido.');});
 $('f-caja').addEventListener('submit',e=>{
   e.preventDefault();
   const d={nombre:$('c-nombre').value.trim(),tipo:$('c-tipo').value,intL:num($('c-il').value),intA:num($('c-ia').value),intH:num($('c-ih').value),extL:num($('c-el').value),extA:num($('c-ea').value),extH:num($('c-eh').value)};
@@ -908,7 +918,8 @@ document.addEventListener('click',async e=>{
   if(!b)return;
   const a=b.dataset.act,id=b.dataset.id;
   if(a==='quitar'){pedido.lineas.splice(Number(b.dataset.i),1);guardarPedido();renderPedido();}
-  else if(a==='recuperar'&&anterior){pedido=Object.assign({tipo:'carton',holgura:5,lineas:[]},anterior);anterior=null;renderPedido();estado('Último pedido recuperado.');}
+  else if(a==='destino') elegirDestino(b.dataset.t);
+  else if(a==='recuperar'&&anterior){pedido=Object.assign({tipo:'carton',holgura:5,lineas:[]},anterior);if(pedido.destino===undefined)pedido.destino=pedido.tipo;anterior=null;renderPedido();estado('Último pedido recuperado.');}
   else if(a==='quitar-hoja'){pedido.lineas=pedido.lineas.filter(l=>l.hoja!==id);pedido.hojas=(pedido.hojas||[]).filter(h=>h.id!==id);if(!pedido.hojas.length&&!pedido.lineas.length)pedido.ref='';else refAuto();guardarPedido();renderPedido();}
   else if(a==='cancelar'){confirmar=null;renderCajas();renderPerfiles();renderCatalogo();}
   else if(a==='exportar'){exportar();}
@@ -1011,6 +1022,7 @@ function juntarPrev(ps,tipo){
 }
 function aPrevision(){
   const r=reparto;
+  if(pedido.lineas.length&&!pedido.destino){estado('Elige primero el destino de la pérgola: de él depende el tipo de caja.');return;}
   if(!r||!r.bins.length||!pedido.lineas.length){estado('Todavía no hay cajas calculadas: arrastra las hojas de corte o añade perfiles al pedido.');return;}
   const h=(pedido.hojas||[])[0]||{};
   const hs=pedido.hojas||[],peds=pedidosDe(),hoy=new Date().toISOString().slice(0,10);

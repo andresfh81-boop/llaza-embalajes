@@ -8,7 +8,7 @@
   <link rel="icon" href="static/favicon.ico">
   <link rel="apple-touch-icon" href="static/icon-180.png">
   <meta name="theme-color" content="#0b5c8a">
-  <link rel="stylesheet" href="static/estilo.css?v=60">
+  <link rel="stylesheet" href="static/estilo.css?v=61">
 </head>
 <body>
 <div class="wrap">
@@ -29,12 +29,15 @@
 
   <section id="tab-pedido" class="bench">
     <div class="panel">
-      <h2>Pedido</h2>
-      <div class="seg" id="tipos">
-        <label><input type="radio" name="tipo" id="tipo-carton" value="carton">Cartón <small>envío local</small></label>
-        <label><input type="radio" name="tipo" id="tipo-cerrada" value="cerrada">Madera cerrada <small>marítimo</small></label>
-        <label><input type="radio" name="tipo" id="tipo-abierta" value="abierta">Madera abierta <small>terrestre</small></label>
-      </div>
+      <div class="cab-pedido"><h2>Pedido</h2><button class="btn danger" id="vaciar" type="button">Limpiar pantalla</button></div>
+      <fieldset class="destino" id="destino"><legend>Destino de la pérgola</legend>
+        <div class="seg" id="tipos">
+          <label><input type="radio" name="tipo" id="tipo-carton" value="carton">Envío local <small>cartón</small></label>
+          <label><input type="radio" name="tipo" id="tipo-cerrada" value="cerrada">Exportación marítima <small>madera cerrada</small></label>
+          <label><input type="radio" name="tipo" id="tipo-abierta" value="abierta">Exportación terrestre <small>madera abierta</small></label>
+        </div>
+        <label>Lugar (opcional)<input id="lugar" placeholder="Ciudad, país"></label>
+      </fieldset>
       <label class="drop" id="drop"><input type="file" id="pdf" accept="application/pdf,.pdf" multiple>Arrastra aquí las hojas de corte<small>Una o varias a la vez, en PDF, o pulsa para elegirlas. Se añaden al pedido y se calculan las cajas al momento. Lee los datos de la pérgola, el módulo y, de cada perfil, referencia, largo, cantidad y marcaje.</small></label>
       <div id="leidas"></div>
       <div id="hojas"></div>
@@ -55,7 +58,6 @@
       </div></fieldset>
       <label>Referencia del pedido (sale en la lista y en la solicitud)<input id="ref-pedido"></label>
       <button class="btn" type="button" data-act="solicitar">Solicitud de cajas al almacén</button>
-      <button class="btn ghost" id="vaciar" type="button">Vaciar pedido</button>
     </div>
     <div class="panel" id="resultado"></div>
   </section>
@@ -101,7 +103,7 @@
     <h2>Previsión de cajas</h2>
     <p class="sub">Para saber con tiempo cuántas cajas van a hacer falta: junta aquí los pedidos que vienen y te da la lista por pedido y el total de cada modelo. Se guarda en este navegador.</p>
     <div class="row">
-      <label>Embalaje para las hojas que sueltes<select id="prev-tipo"><option value="carton">Cartón</option><option value="cerrada">Madera cerrada</option><option value="abierta">Madera abierta</option></select></label>
+      <label>Destino de las hojas que sueltes<select id="prev-tipo"><option value="carton">Envío local · cartón</option><option value="cerrada">Exportación marítima · madera cerrada</option><option value="abierta">Exportación terrestre · madera abierta</option></select></label>
     </div>
     <label class="drop" id="drop-prev"><input type="file" id="pdf-prev" accept="application/pdf,.pdf" multiple>Arrastra aquí varias hojas de corte<small>Cada número de hoja es un pedido (las hojas de los módulos de una misma pérgola se juntan). Se calcula con la colocación automática y se añade a la lista.</small></label>
     <div id="prevision"></div>
@@ -137,9 +139,9 @@
 <div id="imprimir"></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script src="static/nucleo.js?v=60"></script>
-<script src="static/pdf.js?v=60"></script>
-<script src="static/xlsx.js?v=60"></script>
-<script src="static/app.js?v=60"></script>
+<script src="static/nucleo.js?v=61"></script>
+<script src="static/pdf.js?v=61"></script>
+<script src="static/xlsx.js?v=61"></script>
+<script src="static/app.js?v=61"></script>
 </body>
 </html>

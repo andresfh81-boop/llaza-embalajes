@@ -69,12 +69,29 @@ function leerPagina(its){
     f.forEach(r=>r.its.sort((a,b)=>a.x-b.x));
     return f;
   };
-  const filas=[];let letras=0;
+  const filas=[],sinLargo=[],soloLargo=[];let letras=0;
   for(const f of agrupa(its.filter(i=>!esMarca(i)))){
     const t=f.its.map(i=>i.s).join(' ');letras+=t.length;
     const p=parseHoja([t])[0];
-    if(p) filas.push(Object.assign(p,{y:f.y,marcas:[]}));
+    if(p){filas.push(Object.assign(p,{y:f.y,marcas:[]}));continue;}
+    const n=t.replace(/[‐-―−]/g,'-').replace(/\s+/g,' ').trim();
+    if(/^\d{2,5}(?:[.,]\d+)?\s*mm\b/.test(n)) soloLargo.push({y:f.y,t:n});
+    else{const r=n.match(/^(\d{4,6})\s+([A-Za-zÁÉÍÓÚÑáéíóúñ]{2}.*)$/);if(r&&!/\bmm\b/.test(n))sinLargo.push({y:f.y,ref:r[1],desc:r[2].split(' ').filter(w=>!/º|°/.test(w)).join(' ')});}
   }
+  // Perfiles con varios largos (pilares, canal, tapas): la referencia y el nombre van en una fila sin largo y cada largo,
+  // con su cantidad, en filas sueltas encima y debajo. Cada largo va con la referencia más cercana sin pasar por otra fila completa.
+  const completas=filas.slice();
+  for(const l of soloLargo){
+    let ref=null;
+    for(const r of sinLargo){
+      const d=Math.abs(r.y-l.y),a=Math.min(r.y,l.y),b=Math.max(r.y,l.y);
+      if(d>45||completas.some(f=>f.y>a&&f.y<b)||sinLargo.some(o=>o!==r&&o.y>a&&o.y<b)) continue;
+      if(!ref||d<Math.abs(ref.y-l.y)) ref=r;
+    }
+    const p=ref&&parseHoja([ref.ref+' '+ref.desc+' '+l.t])[0];
+    if(p) filas.push(Object.assign(p,{y:l.y,marcas:[]}));
+  }
+  filas.sort((a,b)=>a.y-b.y);
   for(const m of agrupa(its.filter(esMarca))){
     const t=m.its.map(i=>i.s).join('').replace(/ /g,'').replace(/[\u2010-\u2015\u2212]/g,'-');
     if(!t||t.slice(-1)===':') continue; // "1ª:", "n/2:"… son casillas para rellenar a mano

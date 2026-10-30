@@ -245,3 +245,10 @@ dialog#dlg-prev h2{margin:0}
 /* El navegador no imprime fondos si no se le pide: sin esto, los cuadritos de color de la leyenda salen en blanco */
 @media print{#imprimir .sw,#imprimir .leyenda,#imprimir .leyenda *{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 table.prev tr.compartido td{background:var(--box)}
+/* Cabecera del pedido con «Limpiar pantalla» siempre arriba, y destino de la pérgola (decide el tipo de embalaje) */
+.cab-pedido{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+fieldset.destino{border:2px solid var(--line);border-radius:4px;padding:8px 10px 10px;margin:0;min-width:0;display:flex;flex-direction:column;gap:8px}
+fieldset.destino legend{font:600 12px var(--body);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:0 4px}
+fieldset.destino.falta{border-color:var(--warn);background:var(--warn-bg)}
+fieldset.destino.falta legend{color:var(--warn)}
+.falta-destino .btn{margin:6px 6px 0 0}

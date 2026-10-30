@@ -75,6 +75,13 @@ const pag=leerPagina([{s:'MARCAJE',x:1055,y:116.9},{s:'CHECK',x:1123,y:116.9},
   {s:'P3',x:1068,y:457.6},...fila(466.1,'33004','PILAR',2652,2),{s:'P6',x:1068,y:475.6},
   {s:'1ª:',x:1060,y:500},...fila(508,'33000','LAMA',3855,26),{s:'2ª:',x:1060,y:516}]);
 assert.deepStrictEqual(pag.filas.map(f=>[f.ref,f.largo,f.cant,f.marcas.join('|')]),[['33017',6000,2,'V1-2|V4-5'],['33016',5863,2,''],['33004',2652,2,'P3|P6'],['33000',3855,26,'']]);
+// Perfil con varios largos (hoja 54007677): referencia y nombre en una fila sin largo y cada largo en su fila, encima y debajo.
+const t=(y,x,s)=>({s,x,y});
+const pv=leerPagina([t(108,1055,'MARCAJE'),t(108,1123,'CHECK'),...fila(162,'33007','VIGA GRANDE',3700,2),
+  t(186,354,'2754 mm'),t(186,529,'1'),t(186,1068,'P1'),t(201,354,'2805 mm'),t(201,529,'1'),t(201,1068,'P2'),
+  t(210,157,'33004'),t(210,250,'PILAR'),t(210,451,'90º/90º'),t(219,354,'2748 mm'),t(219,529,'1'),t(219,1068,'P3'),
+  t(288,354,'3700 mm'),t(288,451,'90º/90º'),t(288,529,'2'),t(306,157,'33006'),t(306,250,'CANAL'),t(321,354,'3700 mm'),t(321,451,'90º/90º'),t(321,529,'2')]);
+assert.deepStrictEqual(pv.filas.map(f=>[f.ref,f.desc,f.largo,f.cant,f.marcas.join('|')]),[['33007','VIGA GRANDE',3700,2,''],['33004','PILAR',2754,1,'P1'],['33004','PILAR',2805,1,'P2'],['33004','PILAR',2748,1,'P3'],['33006','CANAL',3700,2,''],['33006','CANAL',3700,2,'']]);
 // Cabecera de la hoja: número, nombre, tipología, medidas, módulo (también "2-3" con guion raro) y colores.
 const cabe=m=>leerCabecera([{s:'PERGOLA PARED PORTERÍA',x:264,y:64.9},{s:'HOJA DE CORTE',x:154,y:75.5},{s:'TIPOLOGÍA: MIXTA',x:264,y:77},{s:'COLOR ESTRUC: 7416 TEXT',x:444,y:77},{s:'DIMENS. PÉRGOLA: 7380x8640 mm',x:264,y:89.2},{s:'COLOR LAMAS: 9016',x:444,y:89.2},{s:'54007372',x:172,y:94.6},{s:m,x:264,y:101.3},{s:'33017',x:157,y:142.4}]);
 assert.deepStrictEqual(cabe('DIMENS. MÓDULO 2\u20103: 6680 x 2640 mm'),{tipologia:'MIXTA',pergola:'7380x8640 mm',colorE:'7416 TEXT',colorL:'9016',modulo:'2-3',dimsModulo:'6680 x 2640 mm',numero:'54007372',nombre:'PERGOLA PARED PORTERÍA'});
