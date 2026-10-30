@@ -486,6 +486,7 @@ function imprimirLista(solo){
       <p class="tot">${TIPOS[M.tipo]||''} · exterior <b>${M.extL}×${M.extA}×${M.extH}</b> mm · interior ${M.intL}×${M.intA}×${M.intH} mm · <b>${b.items.length}</b> ${b.items.length===1?'bulto':'bultos'}${txtPeso(b)}</p>
       <table><thead><tr><th class="n">Bultos</th><th>Módulo</th><th>Perfil</th><th>Ref.</th><th class="n">Largo <span class="u">(mm)</span></th><th class="n">Piezas por bulto</th><th class="n">Piezas</th><th>Marcaje</th><th>Hecho</th></tr></thead><tbody>${grupos(b).map(c=>`<tr><td class="n">${c.n}</td><td>${esc(c.mod)}</td><td>${esc(c.p.nombre)}</td><td>${esc(c.p.ref||'')}</td><td class="n">${c.L}</td><td class="n">${num(c.p.uds)||1}</td><td class="n">${c.pz}</td><td>${esc(c.ms.join(', '))}</td><td class="casilla"></td></tr>`).join('')}</tbody></table>
       ${flot.length?`<p class="ojo">Ojo, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</p>`:''}
+      <ul class="revision"><li><span class="cuadro"></span>Esquineros colocados</li></ul>
       ${solo!==undefined?posiciones(b):''}<div class="dib"><div><span class="tag">De frente · ancho × alto</span>${dibujoSeccion(b,i,col,hol)}</div><div><span class="tag">Desde arriba · largo × ancho (ancho ×${AMPLIA})</span>${dibujoPlanta(b,i,col)}</div></div></section>`;
   }).join('');
   $('imprimir').innerHTML=html;
