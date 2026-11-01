@@ -1,6 +1,6 @@
 // node pruebas/probar.js  — comprueba el encaje, la lectura de filas de la hoja de corte y la mezcla del catálogo
 const assert=require('assert'),path=require('path');
-const {repartir,destinoDeLugar,datosPlano,piezasPlano,apoyado:apoy,packWith:packWithSolo,leerPagina,leerCabecera,plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
+const {repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasPlano,apoyado:apoy,packWith:packWithSolo,leerPagina,leerCabecera,plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
 const G={nombre:'G',intL:6000,intA:600,intH:400,extL:6100,extA:660,extH:460};
 const S={nombre:'S',intL:4000,intA:300,intH:300,extL:4080,extA:350,extH:350};
 const mk=(n,w,h,L)=>Array.from({length:n},()=>({p:{nombre:w+'x'+h},w,h,L}));
@@ -104,6 +104,29 @@ assert.deepStrictEqual(piezasPlano({tipologia:'TESTA',ancho:4000,proy:4000}).sup
 assert.deepStrictEqual(parseHoja(['2720 mm 2720 mm 2720 mm','2710 mm P3: 2748 mm 2754']),[]);
 // Embalaje según el destino: Gran Bretaña por carretera; la isla de Irlanda (también Irlanda del Norte), por mar.
 for(const [l,t] of [['Francia','abierta'],['Londres, Reino Unido','abierta'],['Gran Bretaña','abierta'],['Escocia','abierta'],['Gales','abierta'],['UK','abierta'],['Irlanda','cerrada'],['Dublín','cerrada'],['Belfast, Reino Unido','cerrada'],['Irlanda del Norte','cerrada'],['Palma de Mallorca, España','cerrada'],['Tarragona','carton'],['Narnia','']]) assert.strictEqual(destinoDeLugar(l),t,l);
+// PDF mezclado: el presupuesto no es plano y las páginas de un mismo plano se juntan aunque el OCR falle una cifra.
+const presu='LLAZA WORLD ORDER CONFIRMATION DATE 23.07.2026 Model: ELYA AP PARALELAS Total Width: 3.020 mm Total Projection: 5.450 mm Free Height: 2.580 mm Total Height: 2.800 mm Perimeter Led: No leds Electronics: Cherubini SALES CONDITIONS Payment in advance before shipment';
+const caj=(a,o,x)=>`ESCALA: 1:30 FECHA: 02/10/2026 MODELO: ELYA PARED PORTERIA ${x||'PRP'} 1 MODULOS 2 PILARES ${a} H Total: 2820 mm H Libre: 2600 mm OFERTA: ${o}\nREFERENCIA:\nTOLDOS CERCA`;
+assert.strictEqual(esPlano(presu),false);assert.strictEqual(textoReal(presu),true);assert.strictEqual(esPlano(caj('5350x3500','24002139')),true);
+assert.strictEqual(textoReal('atou <H oz ire tvZ ilo u-F LII J u.< u ta t,{ u f, UI* c,r z- aD UJ\\l .<t ,o (J- *.e t*do n. k: ! mou +ri;0 rOrnZ'),false);
+(async()=>{
+  const lec=(mapa)=>async(i,g)=>{const v=mapa[i];if(g===v.giro)return {texto:v.t,conf:60,pal:40};return v.giro===undefined?{texto:v.t,conf:90,pal:80}:{texto:'xx',conf:40,pal:3};};
+  let usados=[];const ojo=m=>{const f=lec(m);return async(i,g)=>{usados.push(i+':'+g);return f(i,g);};};
+  // presupuesto legible, plano tumbado en 3 páginas (una lee mal una cifra) y otro presupuesto
+  let r=await buscarPlanos(5,()=>'',ojo([{t:presu},{t:caj('5350x3500','24002139'),giro:90},{t:caj('5250x3500','24002139'),giro:90},{t:caj('5350x3500','24002139'),giro:90},{t:presu}]));
+  assert.strictEqual(r.length,1);assert.strictEqual(r[0].ocr,true);
+  assert.deepStrictEqual(usados.filter(x=>x.startsWith('0:')),['0:0']); // el presupuesto no se gira
+  const d=datosPlano('escaneo001.pdf',r[0].texto,{ocr:true});
+  assert.strictEqual(d.ancho,5350);assert.strictEqual(d.proy,3500);assert.strictEqual(d.nPilares,2);assert.strictEqual(d.oferta,'24002139');assert.strictEqual(d.referencia,'TOLDOS CERCA');
+  // dos planos en el mismo PDF
+  r=await buscarPlanos(2,()=>'',lec([{t:caj('5350x3500','1000001'),giro:0},{t:caj('4000x4000','1000002'),giro:0}]));
+  assert.strictEqual(r.length,2);
+  // PRL: las lamas van en la primera medida (54007638)
+  const dl=datosPlano('escaneo.pdf',caj('2500x4770','24002066','PRL'),{ocr:true});assert.strictEqual(dl.proy,2500);assert.strictEqual(dl.ancho,4770);
+  // sin PRL ni PRP, la que no cabe en una lama es el ancho
+  const ds=datosPlano('escaneo.pdf','ESCALA 1 MODULOS 2 PILARES 2500x4770 H Total: 2720 mm MODELO',{ocr:true});assert.strictEqual(ds.proy,2500);
+  console.log('PDF mezclado: ok');
+})().catch(e=>{console.error(e);process.exit(1);});
 console.log('plano cliente: ok');
 // Cabecera de la hoja: número, nombre, tipología, medidas, módulo (también "2-3" con guion raro) y colores.
 const cabe=m=>leerCabecera([{s:'PERGOLA PARED PORTERÍA',x:264,y:64.9},{s:'HOJA DE CORTE',x:154,y:75.5},{s:'TIPOLOGÍA: MIXTA',x:264,y:77},{s:'COLOR ESTRUC: 7416 TEXT',x:444,y:77},{s:'DIMENS. PÉRGOLA: 7380x8640 mm',x:264,y:89.2},{s:'COLOR LAMAS: 9016',x:444,y:89.2},{s:'54007372',x:172,y:94.6},{s:m,x:264,y:101.3},{s:'33017',x:157,y:142.4}]);

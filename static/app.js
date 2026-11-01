@@ -378,7 +378,7 @@ function renderResultado(recalcular){
   const todos=r.bins.flatMap(b=>b.items),secB=todos.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)+r.unfit.reduce((s,it)=>s+it.w*it.h,0),secC=r.bins.reduce((s,b)=>s+b.model.intA*b.model.intH,0),minC=Math.max(1,Math.ceil(secB/Math.max(...modelos.map(m=>m.intA*m.intH))));
   if(secC) html+=`<div class="sub">Sección aprovechada: <b>${Math.round(secB/secC*100)} %</b>. ${r.bins.length<=minC?'Con estas cajas no se puede hacer con menos.':`Solo por superficie cabría en ${minC} ${minC===1?'caja':'cajas'}, pero las piezas no se pueden partir ni encajar sin huecos: es un mínimo teórico, no un fallo.`}</div>`;
   html+=pend;
-  if((pedido.hojas||[]).some(h=>h.plano)) html+=`<div class="note">Estimación desde el plano cliente: los largos y el nº de lamas salen de las reglas de las hojas de corte, no de la hoja de este pedido.${(pedido.hojas.find(h=>h.plano).supuestos||[]).length?' Supuesto, porque el plano no lo trae: <b>'+esc(pedido.hojas.find(h=>h.plano).supuestos.join(', '))+'</b>; si lo sabes, corrígelo en «Calcular desde el plano cliente», o suelta también la ficha de fabricación (PLANO.pdf, en la misma carpeta del pedido), que trae los pilares. Con la altura de los pilares puede cambiar el nº de cajas.':''} Cuando tengas la hoja de corte, cárgala y sustituye a la estimación.</div>`;
+  if((pedido.hojas||[]).some(h=>h.plano)) html+=`<div class="note">Estimación desde el plano cliente: los largos y el nº de lamas salen de las reglas de las hojas de corte, no de la hoja de este pedido.${pedido.hojas.find(h=>h.plano).medidasOCR?' <b>Comprueba las medidas</b>: se han leído del plano con OCR, no del nombre del archivo.':''}${(pedido.hojas.find(h=>h.plano).supuestos||[]).length?' Supuesto, porque el plano no lo trae: <b>'+esc(pedido.hojas.find(h=>h.plano).supuestos.join(', '))+'</b>; si lo sabes, corrígelo en «Calcular desde el plano cliente», o suelta también la ficha de fabricación (PLANO.pdf, en la misma carpeta del pedido), que trae los pilares. Con la altura de los pilares puede cambiar el nº de cajas.':''} Cuando tengas la hoja de corte, cárgala y sustituye a la estimación.</div>`;
   if(r.aparcados.length) html+=`<div class="note">${r.aparcados.length} ${r.aparcados.length===1?'bulto aparcado':'bultos aparcados'}: no ${r.aparcados.length===1?'está':'están'} en ninguna caja. Vuelve a ${r.aparcados.length===1?'meterlo':'meterlos'} antes de dar el reparto por bueno.</div>`;
   if(marcadas.size) html+=`<div class="manual">${marcadas.size} ${marcadas.size===1?'caja seleccionada':'cajas seleccionadas'}. <button class="btn small" type="button" data-act="ver-marcadas">Ver en pantalla completa</button> <button class="btn small ghost" type="button" data-act="desmarcar">Quitar selección</button></div>`;
   if(avisoMov) html+=`<div class="note" role="alert">${esc(avisoMov)}</div>`;
@@ -729,9 +729,9 @@ function calcularPlano(){
   const tip=$('pl-tip').value,ancho=num($('pl-ancho').value),proy=num($('pl-proy').value),mods=num($('pl-mod').value),numero=$('pl-num').value.trim();
   const alturas=($('pl-pil').value.match(/\d+(?:[.,]\d+)?/g)||[]).map(x=>Math.round(parseFloat(x.replace(',','.')))).filter(h=>h>=1000&&h<=6000);
   if(ancho<=700||proy<=700){estado('Falta el ancho y la proyección: vienen en el plano que firma el cliente (en el nombre, «nº_PROYECCIÓNxANCHO_TESTA.pdf», y en el dibujo).');$('plano').open=true;$(ancho<=700?'pl-ancho':'pl-proy').focus();return;}
-  const piezas=piezasPlano({tipologia:tip,ancho,proy,modulos:mods,pilares:alturas,lamas:num($('pl-lamas').value),hTotal:planoLeido.hTotal,nPilares:planoLeido.nPilares});
+  const piezas=piezasPlano({tipologia:tip,ancho,proy,modulos:mods,pilares:alturas,lamas:num($('pl-lamas').value),hTotal:planoLeido.hTotal,nPilares:planoLeido.nPilares,sinTipo:planoLeido.sinTipo,sinSentido:planoLeido.sinSentido});
   quitarPlano();
-  const hoja={id:nuevoId(),archivo:'Plano cliente',plano:true,mod:'',numero,nombre:'Estimación desde el plano cliente',tipologia:tip,pergola:`ancho ${ancho} mm × proyección ${proy} mm${mods>1?' · '+mods+' módulos':''}`,supuestos:piezas.supuestos};
+  const hoja={id:nuevoId(),archivo:'Plano cliente',plano:true,mod:'',numero,nombre:planoLeido.referencia||'',medidasOCR:planoLeido.medidasOCR,tipologia:tip,pergola:`ancho ${ancho} mm × proyección ${proy} mm${mods>1?' · '+mods+' módulos':''}`,supuestos:piezas.supuestos};
   const sin=[];
   for(const l of piezas){const p=perfiles.find(x=>String(x.ref).trim()===l.ref);if(!p){sin.push(l.desc);continue;}pedido.lineas.push({pid:p.id,largo:l.largo,cant:l.cant,marcas:[],mod:'',hoja:hoja.id,ped:numero});}
   pedido.hojas=(pedido.hojas||[]).concat(hoja);
@@ -740,14 +740,14 @@ function calcularPlano(){
   estado(`Estimación desde el plano: ${piezas.length} líneas al pedido, ${nl?nl.cant:0} ud. de lama de ${nl?nl.largo:0} mm.`+(piezas.supuestos.length?` Supuesto: ${piezas.supuestos.join(', ')}.`:'')+(sin.length?` Sin perfil en el catálogo: ${sin.join(', ')}.`:'')+(pedido.destino?'':' Elige el destino de la pérgola para calcular las cajas.'));
 }
 // Rellena el formulario con lo leído del plano y calcula; si no hay medidas (solo la ficha), las pide.
-function rellenarPlano(d,malas){
-  $('plano').open=true;planoLeido={hTotal:d.hTotal,nPilares:d.nPilares};
+function rellenarPlano(d,malas,extra){
+  $('plano').open=true;planoLeido={hTotal:d.hTotal,nPilares:d.nPilares,referencia:d.referencia,sinTipo:!d.tipologia,sinSentido:d.sinSentido,medidasOCR:d.medidasOCR};
   $('pl-tip').value=d.tipologia==='INGLETE'?'INGLETE':'TESTA';
   $('pl-mod').value=d.modulos||'';$('pl-ancho').value=d.ancho||'';$('pl-proy').value=d.proy||'';
-  $('pl-pil').value=d.pilares?d.pilares.join(', '):'';$('pl-lamas').value=d.lamas||'';$('pl-num').value=d.numero||'';
+  $('pl-pil').value=d.pilares?d.pilares.join(', '):'';$('pl-lamas').value=d.lamas||'';$('pl-num').value=d.numero||d.oferta||'';
   lamasSegunAncho();
   const leido=`Leído ${d.archivos.join(' y ')}`+(malas.length?` (no se ha leído: ${malas.join('; ')})`:'');
-  calcularPlano();estado(leido+'. '+$('estado').textContent);
+  calcularPlano();estado(leido+'. '+$('estado').textContent+(extra?` Este PDF trae ${extra+1} planos y se ha usado el primero: para calcularlos todos, suéltalo en la pestaña Previsión.`:''));
 }
 function volcarLeidas(){
   const ok=leidas.filter(l=>l.pid&&l.largo&&l.cant),mont=leidas.filter(l=>!l.pid&&l.montado).length;
@@ -764,13 +764,15 @@ function volcarLeidas(){
 // Lee un PDF de hoja de corte: filas de perfil, letras de texto que trae (pocas = escaneado) y datos de la cabecera.
 async function leerHojaPDF(file){
   const pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
-  const filas=[],textos=[];let letras=0,cab={};
+  const filas=[],paginas=[];let letras=0,cab={};
   for(let n=1;n<=pdf.numPages;n++){
     const page=await pdf.getPage(n),vp=page.getViewport({scale:1}),c=await page.getTextContent();
     const its=c.items.filter(i=>i.str&&i.str.trim()).map(i=>{const p=vp.convertToViewportPoint(i.transform[4],i.transform[5]);return {s:i.str.trim(),x:p[0],y:p[1],w:i.width};});
-    const r=leerPagina(its);filas.push(...r.filas);letras+=r.letras;cab=Object.assign({},r.cab,cab);textos.push(...its.map(i=>i.s));
+    const r=leerPagina(its);letras+=r.letras;paginas.push(its.map(i=>i.s).join(' '));
+    // solo cuenta como hoja de corte la página con la columna MARCAJE: en un PDF con varias cosas, un presupuesto no es una hoja
+    if(its.some(i=>/^MARCAJE$/i.test(i.s))){filas.push(...r.filas);cab=Object.assign({},r.cab,cab);}
   }
-  return {filas,letras,cab,texto:textos.join(' ')};
+  return {filas,letras,cab,paginas};
 }
 // Lee una o varias hojas de corte (una pérgola grande trae una por módulo o grupo de módulos).
 // Cada hoja se queda con los datos de su cabecera y sus líneas llevan el módulo (M1, M2-3…).
@@ -784,47 +786,53 @@ async function cargarOCR(){
   if(!ocrWorker) ocrWorker=await window.Tesseract.createWorker('spa',1,{workerPath:absUrl('vendor/tesseract/worker.min.js'),corePath:absUrl('vendor/tesseract/core'),langPath:absUrl('vendor/tesseract/lang'),gzip:true});
   return ocrWorker;
 }
-const puntosCajetin=t=>(String(t).match(/MODEL|PILAR|PILLAR|ESCALA|SCALE|FECHA|DATE|MODUL|H Total|H Libre|H Free|Ancho|Width|Proyecci|Projection/gi)||[]).length;
 function girarLienzo(c,grados){
-  const g=document.createElement('canvas');g.width=c.height;g.height=c.width;
+  const g=document.createElement('canvas'),rec=Math.abs(grados)===90;g.width=rec?c.height:c.width;g.height=rec?c.width:c.height;
   const x=g.getContext('2d');x.translate(g.width/2,g.height/2);x.rotate(grados*Math.PI/180);x.drawImage(c,-c.width/2,-c.height/2);return g;
 }
-async function ocrPlano(file){
-  const pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise,page=await pdf.getPage(1),vp=page.getViewport({scale:2.5});
-  const c=document.createElement('canvas');c.width=Math.round(vp.width);c.height=Math.round(vp.height);
-  const cx=c.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,c.width,c.height);
-  await page.render({canvasContext:cx,viewport:vp,intent:'print'}).promise; // «print»: no espera al refresco de pantalla (con la ventana oculta se quedaba parado)
-  { // en gris lee mejor (con color leía «CAPILLARS» y no veía la «H Free»)
-    const im=cx.getImageData(0,0,c.width,c.height),px=im.data;
-    for(let k=0;k<px.length;k+=4){const g=0.299*px[k]+0.587*px[k+1]+0.114*px[k+2];px[k]=px[k+1]=px[k+2]=g;}
-    cx.putImageData(im,0,0);
-  }
-  const w=await cargarOCR();let mejor='';
-  for(const g of [0,90,-90]){
-    const t=(await w.recognize(g?girarLienzo(c,g):c)).data.text;
-    if(puntosCajetin(t)>puntosCajetin(mejor)) mejor=t;
-    if(puntosCajetin(mejor)>=4) break;
-  }
-  return mejor;
+// Lector de páginas para buscarPlanos: pasa la página a imagen (×2,5, en gris) y la lee con OCR en el giro que se le pida.
+function lectorOCR(file){
+  let pdf=null,ult=-1,lienzo=null;
+  return async (i,grados)=>{
+    if(!pdf) pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+    if(ult!==i){
+      const page=await pdf.getPage(i+1),vp=page.getViewport({scale:2.5});
+      lienzo=document.createElement('canvas');lienzo.width=Math.round(vp.width);lienzo.height=Math.round(vp.height);
+      const cx=lienzo.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,lienzo.width,lienzo.height);
+      await page.render({canvasContext:cx,viewport:vp,intent:'print'}).promise; // «print»: no espera al refresco de pantalla (con la ventana oculta se quedaba parado)
+      // en gris lee mejor (con color leía «CAPILLARS» y no veía la «H Free»)
+      const im=cx.getImageData(0,0,lienzo.width,lienzo.height),px=im.data;
+      for(let k=0;k<px.length;k+=4){const g=0.299*px[k]+0.587*px[k+1]+0.114*px[k+2];px[k]=px[k+1]=px[k+2]=g;}
+      cx.putImageData(im,0,0);ult=i;
+    }
+    const w=await cargarOCR(),r=(await w.recognize(grados?girarLienzo(lienzo,grados):lienzo)).data;
+    return {texto:r.text,conf:r.confidence,pal:(r.text.match(/[A-Za-zÀ-ÿ]{4,}/g)||[]).length};
+  };
+}
+// Los planos de un PDF sin hoja de corte, ya con sus datos. Con el nombre de siempre («nº_PROYxANCHO_TESTA.pdf») es un plano
+// solo y se para en cuanto lo encuentra; con otro nombre (un escaneo con varias cosas) mira todas las páginas.
+async function planosDePDF(file,paginas){
+  const conNombre=/\d_\d{3,5}\s*x\s*\d{3,5}_(?:TESTA|INGLETE|MIXTA)/i.test(file.name);
+  let ps=[];
+  try{ps=await buscarPlanos(paginas.length,i=>paginas[i],lectorOCR(file),{uno:conNombre,aviso:(i,n)=>estado(`Buscando el plano en ${file.name}: página ${i} de ${n} (tarda unos segundos; la primera vez, algo más)…`)});}catch(e){console.error(e);}
+  const ds=ps.map(p=>datosPlano(file.name,p.texto,{ocr:p.ocr})).filter(Boolean);
+  if(ds.length) return ds;
+  const todo=paginas.join(' '),d=(conNombre||/Altura Paso Pilar|N[º°o]\.?\s*Lamas:/i.test(todo))&&datosPlano(file.name,todo);
+  return d?[d]:[];
 }
 async function leerPDF(files){
   files=[...(files||[])].filter(Boolean);if(!files.length)return;
   if(!window.pdfjsLib){estado('No se ha podido cargar el lector de PDF. Recarga la página.');return;}
   window.pdfjsLib.GlobalWorkerOptions.workerSrc='vendor/pdfjs/pdf.worker.min.js';
-  const malas=[];let nuevas=0,plano=null;
+  const malas=[];let nuevas=0,plano=null,extra=0;
   for(const file of files){
     estado('Leyendo '+file.name+'…');
     try{
-      const {filas,letras,cab,texto}=await leerHojaPDF(file);
-      // Plano cliente (escaneado: los datos salen del nombre) o ficha de fabricación: rellenan «Calcular desde el plano cliente».
-      let dp=!filas.length&&datosPlano(file.name,texto);
-      // plano escaneado (o con texto pero sin los datos del cajetín): se lee con OCR
-      if(!filas.length&&(dp||letras<40)&&!/PILARES|PILLARS|H\s*Total/i.test(texto)){
-        estado('Leyendo el plano escaneado '+file.name+' (tarda unos segundos; la primera vez, algo más)…');
-        try{const o=await ocrPlano(file);dp=datosPlano(file.name,texto+' '+o,{ocr:true})||dp;}catch(e){console.error(e);}
-      }
-      if(dp){plano=Object.assign(plano||{},dp,{archivos:((plano&&plano.archivos)||[]).concat(file.name)});continue;}
-      if(!filas.length){malas.push(file.name+(letras<40?' (es una imagen escaneada, sin texto; si es el plano cliente, copia sus datos en «Calcular desde el plano cliente»)':' (no tiene líneas de perfiles)'));continue;}
+      const {filas,letras,cab,paginas}=await leerHojaPDF(file);
+      // sin hoja de corte: se busca el plano cliente página a página, y si hay más de uno se usa el primero
+      const ds=filas.length?[]:await planosDePDF(file,paginas);
+      if(ds.length){plano=Object.assign(plano||{},ds[0],{archivos:((plano&&plano.archivos)||[]).concat(file.name)});extra+=ds.length-1;continue;}
+      if(!filas.length){malas.push(file.name+' (no se ha encontrado ni hoja de corte ni plano cliente)');continue;}
       // si se vuelve a leer la misma hoja, sustituye a la anterior
       const vieja=leidasHojas.find(h=>h.archivo===file.name);
       if(vieja){leidas=leidas.filter(l=>l.hoja!==vieja.id);leidasHojas=leidasHojas.filter(h=>h!==vieja);}
@@ -837,7 +845,7 @@ async function leerPDF(files){
       nuevas+=filas.length;
     }catch(e){malas.push(file.name+' (no se ha podido leer)');}
   }
-  if(plano&&!nuevas){rellenarPlano(plano,malas);return;}
+  if(plano&&!nuevas){rellenarPlano(plano,malas,extra);return;}
   const nh=leidasHojas.length,r=nuevas?volcarLeidas():{ok:0,mont:0,pend:0};
   if(!nuevas) renderLeidas();
   estado((nuevas?`${r.ok} líneas de ${nh} ${nh===1?'hoja':'hojas'} añadidas al pedido`+(r.mont?`; ${r.mont} van montadas en otro perfil`:'')+(r.pend?`; ${r.pend} sin perfil, revísalas debajo`:'')+'.'+(pedido.destino?'':' Elige el destino de la pérgola para calcular las cajas.'):'')+(malas.length?` No se ha leído: ${malas.join('; ')}.`:''));
@@ -849,7 +857,7 @@ async function leerPDF(files){
   d.addEventListener('drop',e=>leerPDF(e.dataTransfer&&e.dataTransfer.files));
   ['dragover','drop'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault()));
   // Soltar los PDF en cualquier sitio de la pestaña Pedido vale igual que en el recuadro (Andrés los soltaba fuera y no pasaba nada).
-  document.addEventListener('drop',e=>{if($('tab-pedido').hidden||e.target.closest('#drop,#drop-prev')||!e.dataTransfer||!e.dataTransfer.files.length)return;leerPDF(e.dataTransfer.files);});
+  document.addEventListener('drop',e=>{if(e.target.closest('#drop,#drop-prev')||!e.dataTransfer||!e.dataTransfer.files.length)return;if(!$('tab-pedido').hidden)leerPDF(e.dataTransfer.files);else if(!$('tab-prevision').hidden)lotePrevision(e.dataTransfer.files);});
   $('pdf').addEventListener('change',e=>{const f=[...e.target.files];e.target.value='';leerPDF(f);});
   $('leidas').addEventListener('change',e=>{
     const t=e.target,i=Number(t.dataset.i);if(!t.dataset.k||!leidas[i])return;
@@ -989,7 +997,7 @@ $('f-linea').addEventListener('submit',e=>{
   if(!pid||!largo||!cant)return;
   pedido.lineas.push({pid,largo,cant,marcas:$('l-marcas').value.split(',').map(x=>x.trim()).filter(Boolean)});$('l-marcas').value='';guardarPedido();renderPedido();
 });
-$('vaciar').addEventListener('click',()=>{pedido.comp=null;pedido.lineas=[];pedido.hojas=[];pedido.ref='';pedido.destino='';pedido.destinoAuto=false;planoLeido={};pedido.lugar='';$('lugar').value='';lugarPend=null;leidas=[];leidasHojas=[];guardarPedido();renderLeidas();renderPedido();estado('Pantalla limpia: puedes empezar otro pedido.');});
+$('vaciar').addEventListener('click',()=>{pedido.comp=null;pedido.lineas=[];pedido.hojas=[];pedido.ref='';pedido.destino='';pedido.destinoAuto=false;planoLeido={};pedido.lugar='';$('lugar').value='';lugarPend=null;for(const x of ['pl-mod','pl-ancho','pl-proy','pl-pil','pl-lamas','pl-num'])$(x).value='';lamasSegunAncho();leidas=[];leidasHojas=[];guardarPedido();renderLeidas();renderPedido();estado('Pantalla limpia: puedes empezar otro pedido.');});
 $('f-caja').addEventListener('submit',e=>{
   e.preventDefault();
   const d={nombre:$('c-nombre').value.trim(),tipo:$('c-tipo').value,intL:num($('c-il').value),intA:num($('c-ia').value),intH:num($('c-ih').value),extL:num($('c-el').value),extA:num($('c-ea').value),extH:num($('c-eh').value)};
@@ -1118,11 +1126,13 @@ function calcularPrev(e){
 }
 // Mete un pedido en la previsión; si ya estaba (mismo nº de pedido), lo sustituye. Si estaba dentro de un envío
 // compartido, se sustituye su parte y el envío se vuelve a calcular junto.
+// el mismo pedido viene como 54007673-10 en el nombre del plano y como 54007673/10 en la hoja
+const normNum=n=>String(n||'').trim().replace(/\s*[\/\u2010-\u2015-]\s*/g,'-');
 function meterPrevision(e){
-  const k=prevision.findIndex(x=>e.numero&&x.numero===e.numero);
+  const k=prevision.findIndex(x=>e.numero&&normNum(x.numero)===normNum(e.numero));
   if(k>=0){prevision[k]=Object.assign(e,{id:prevision[k].id});return true;}
-  const j=prevision.findIndex(x=>e.numero&&x.partes&&x.partes.some(p=>p.numero===e.numero));
-  if(j>=0){const ps=prevision[j].partes.map(p=>p.numero===e.numero?e:p);prevision[j]=Object.assign(juntarPrev(ps,prevision[j].tipo),{id:prevision[j].id});return true;}
+  const j=prevision.findIndex(x=>e.numero&&x.partes&&x.partes.some(p=>normNum(p.numero)===normNum(e.numero)));
+  if(j>=0){const ps=prevision[j].partes.map(p=>normNum(p.numero)===normNum(e.numero)?e:p);prevision[j]=Object.assign(juntarPrev(ps,prevision[j].tipo),{id:prevision[j].id});return true;}
   prevision.push(e);return false;
 }
 // Envío compartido: varios pedidos que van en las mismas cajas. Se calculan juntos (colocación automática), con un bulto de
@@ -1143,7 +1153,7 @@ function aPrevision(){
   const lin=ls=>ls.map(l=>({pid:l.pid,largo:l.largo,cant:l.cant}));
   // con varios números, cada uno es una parte (con un bulto de componentes) para poder separarlos en la previsión
   const partes=peds.length>1?peds.map(n=>calcularPrev({id:nuevoId(),fecha:hoy,numero:n,cliente:(hs.find(x=>x.numero===n)||{}).nombre||'',tipo:pedido.tipo,origen:'lote',lineas:lin(pedido.lineas.filter(l=>pedDe(l)===n)),comp:Object.assign({},componentes(),{n:1})})):null;
-  const e=Object.assign({id:nuevoId(),fecha:hoy,numero:peds.length>1?peds.join(' + '):h.numero||'',cliente:peds.length>1?[...new Set(hs.map(x=>x.nombre).filter(Boolean))].join(' + '):h.nombre||pedido.ref||'',tipo:pedido.tipo,origen:'pedido',
+  const e=Object.assign({id:nuevoId(),fecha:hoy,numero:peds.length>1?peds.join(' + '):h.numero||'',cliente:peds.length>1?[...new Set(hs.map(x=>x.nombre).filter(Boolean))].join(' + '):h.nombre||pedido.ref||'',tipo:pedido.tipo,origen:'pedido',estimado:hs.some(x=>x.plano),
     lineas:lin(pedido.lineas),comp:componentes()},resumenCajas(r),partes?{partes}:{});
   const ya=meterPrevision(e);guardarPrevision();renderPrevision();
   estado(`${ya?'Pedido sustituido':'Pedido añadido'} en la previsión${e.numero?' ('+e.numero+')':''}: ${e.total} ${e.total===1?'caja':'cajas'}. Está en la pestaña Previsión.`);
@@ -1154,13 +1164,27 @@ async function lotePrevision(files){
   if(!window.pdfjsLib){estado('No se ha podido cargar el lector de PDF. Recarga la página.');return;}
   if(!base){estado('Espera a que cargue el catálogo y vuelve a soltar las hojas.');return;}
   window.pdfjsLib.GlobalWorkerOptions.workerSrc='vendor/pdfjs/pdf.worker.min.js';
-  const grupos=new Map(),malas=[];
+  const grupos=new Map(),malas=[];let nPlanos=0;
   for(const file of files){
     estado('Leyendo '+file.name+'…');
     try{
-      const {filas,letras,cab}=await leerHojaPDF(file);
-      if(!filas.length){malas.push(file.name+(letras<40?' (escaneada, sin texto)':' (sin líneas de perfiles)'));continue;}
-      const k=cab.numero||file.name,g=grupos.get(k)||{numero:cab.numero||'',cliente:cab.nombre||file.name.replace(/\.pdf$/i,''),filas:[]};
+      const {filas,cab,paginas}=await leerHojaPDF(file);
+      if(!filas.length){
+        // plano cliente, también dentro de un PDF con más cosas; cada plano es una estimación, que una hoja de corte del mismo nº sustituye
+        const ds=await planosDePDF(file,paginas);let hay=0;
+        ds.forEach((d,i)=>{
+          const pz=piezasPlano(Object.assign({},d,{sinTipo:!d.tipologia}));if(!pz.length)return;
+          hay++;
+          const num=d.numero||d.oferta||'',k=normNum(num)||file.name+'#'+i;
+          if(grupos.has(k))return;
+          grupos.set(k,{numero:num,cliente:d.referencia||file.name.replace(/\.pdf$/i,''),filas:pz,estimado:true,notaPlano:d.medidasOCR?'medidas leídas con OCR: compruébalas':''});
+          nPlanos++;
+        });
+        if(!hay) malas.push(file.name+(ds.length?' (ficha de fabricación sin medidas: suelta el plano cliente)':' (no se ha encontrado ni hoja de corte ni plano cliente)'));
+        continue;
+      }
+      const k=normNum(cab.numero)||file.name;let g=grupos.get(k);
+      if(!g||g.estimado){g={numero:cab.numero||'',cliente:cab.nombre||file.name.replace(/\.pdf$/i,''),filas:[]};if(grupos.has(k)&&grupos.get(k).estimado)nPlanos--;}
       g.filas.push(...filas);grupos.set(k,g);
     }catch(e){malas.push(file.name+' (no se ha podido leer)');}
   }
@@ -1172,12 +1196,12 @@ async function lotePrevision(files){
       if(p&&l.largo&&l.cant) lineas.push({pid:p.id,largo:l.largo,cant:l.cant});
       else if(!p&&!base.montados.find(x=>String(x.ref).trim()===l.ref)) sin++;
     }
-    const e=calcularPrev({id:nuevoId(),fecha:new Date().toISOString().slice(0,10),numero:g.numero,cliente:g.cliente,tipo:prevTipo||pedido.tipo,origen:'lote',lineas,comp:Object.assign({},componentes(),{n:1}),sinPerfil:sin});
+    const e=calcularPrev({id:nuevoId(),fecha:new Date().toISOString().slice(0,10),numero:g.numero,cliente:g.cliente,tipo:prevTipo||pedido.tipo,origen:'lote',lineas,comp:Object.assign({},componentes(),{n:1}),sinPerfil:sin,estimado:!!g.estimado,notaPlano:g.notaPlano||''});
     if(meterPrevision(e)) sust++;
     n++;
   }
   guardarPrevision();renderPrevision();
-  estado((n?`${n} ${n===1?'pedido añadido':'pedidos añadidos'} a la previsión`+(sust?` (${sust} ya ${sust===1?'estaba y se ha sustituido':'estaban y se han sustituido'})`:'')+'.':'')+(malas.length?` No se ha leído: ${malas.join('; ')}.`:''));
+  estado((n?`${n} ${n===1?'pedido añadido':'pedidos añadidos'} a la previsión`+(nPlanos?` (${nPlanos} desde el plano cliente, ${nPlanos===1?'estimación':'estimaciones'})`:'')+(sust?` (${sust} ya ${sust===1?'estaba y se ha sustituido':'estaban y se han sustituido'})`:'')+'.':'')+(malas.length?` No se ha leído: ${malas.join('; ')}.`:''));
 }
 function totalesPrev(){
   const m=new Map();
@@ -1191,11 +1215,11 @@ function renderPrevision(){
   const el=$('prevision');if(!el)return;
   if(document.activeElement!==$('prev-tipo')) $('prev-tipo').value=prevTipo||pedido.tipo;
   const leyenda=`<div class="leyenda"><span class="tag">Tipo de embalaje</span>${Object.keys(TIPOS).map(t=>`<span><i class="sw" style="background:var(--t-${t})"></i>${tipoTxt(t)}</span>`).join('')}</div>`;
-  if(!prevision.length){el.innerHTML=leyenda+'<div class="empty">Todavía no hay pedidos en la previsión. Suelta aquí arriba varias hojas de corte, o calcula un pedido en la pestaña Pedido y pulsa «Añadir a la previsión».</div>';return;}
+  if(!prevision.length){el.innerHTML=leyenda+'<div class="empty">Todavía no hay pedidos en la previsión. Suelta aquí arriba hojas de corte o planos cliente, o calcula un pedido en la pestaña Pedido y pulsa «Añadir a la previsión».</div>';return;}
   const tot=totalesPrev(),nc=tot.reduce((s,c)=>s+c.n,0),m3=prevision.reduce((s,e)=>s+(e.m3||0),0);
   el.innerHTML=`<div class="totals"><div><b>${prevision.length}</b> <span>${prevision.length===1?'pedido':'pedidos'}</span></div><div><b>${nc}</b> <span>${nc===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><span class="acciones"><button class="btn" type="button" data-act="prev-correo">Enviar por correo</button><button class="btn ghost" type="button" data-act="prev-excel">Guardar en Excel</button><button class="btn ${prevVaciar?'danger':'ghost'}" type="button" data-act="prev-vaciar">${prevVaciar?'¿Seguro? Pulsa otra vez':'Vaciar previsión'}</button></span></div>${leyenda}
     <h3>Cajas que hacen falta</h3><div class="scroll"><table><thead><tr><th>Modelo</th><th>Tipo</th><th>Exterior L×A×H <span class="u">(mm)</span></th><th class="n">Cantidad</th></tr></thead><tbody>${tot.map(c=>`<tr><td><b class="t-${esc(c.tipo)}">${esc(c.nombre)}</b></td><td>${tipoTxt(c.tipo)}</td><td>${c.ext.join(' × ')} mm</td><td class="n"><b class="t-${esc(c.tipo)}">${uds(c.n)}</b></td></tr>`).join('')}</tbody></table></div>
-    <h3>Pedidos</h3>${prevMarcas.size>=2?`<div class="manual">${prevMarcas.size} pedidos marcados. <button class="btn small" type="button" data-act="prev-juntar">Juntar en un envío</button> <button class="btn small ghost" type="button" data-act="prev-desmarcar">Quitar marcas</button></div>`:'<p class="sub">Si dos pedidos van en las mismas cajas, márcalos y pulsa «Juntar en un envío».</p>'}<div class="scroll"><table class="prev"><thead><tr><th></th><th>Fecha</th><th>Nº pedido</th><th>Cliente / pérgola</th><th>Embalaje</th><th>Cajas</th><th class="n">Total</th><th class="n">m³</th><th></th></tr></thead><tbody>${prevision.map((e,i)=>`<tr${e.partes?' class="compartido"':''}><td><input type="checkbox" data-pmarca="${esc(e.id)}"${prevMarcas.has(e.id)?' checked':''} aria-label="Marcar para juntar"></td><td>${fechaEs(e.fecha)}</td>${e.partes?`<td>${e.partes.map(p=>esc(p.numero||'sin nº')).join('<br>')}</td><td>${e.partes.map(p=>esc(p.cliente||'')).join('<br>')}</td>`:`<td><input class="prev-in" data-pi="${i}" data-pk="numero" value="${esc(e.numero)}" aria-label="Nº de pedido"></td><td><input class="prev-in ancho" data-pi="${i}" data-pk="cliente" value="${esc(e.cliente)}" aria-label="Cliente"></td>`}<td><select class="prev-in t-${esc(e.tipo)}" data-pi="${i}" data-pk="tipo" aria-label="Tipo de embalaje">${Object.entries(TIPOS).map(([k,t])=>`<option value="${k}"${k===e.tipo?' selected':''}>${t}</option>`).join('')}</select></td><td>${e.sinCajas?`<span class="ojo">No hay cajas de ${esc(TIPOS[e.tipo].toLowerCase())} en el catálogo</span>`:e.cajas.map(c=>`<b class="t-${esc(c.tipo)}">${c.n} × ${esc(c.nombre)}</b>`).join(', ')}${e.fuera?` <span class="ojo">· ${e.fuera} ${e.fuera===1?'bulto no cabe':'bultos no caben'}</span>`:''}${e.sinPerfil?` <span class="ojo">· ${e.sinPerfil} ${e.sinPerfil===1?'línea sin perfil en el catálogo':'líneas sin perfil en el catálogo'}</span>`:''}${e.partes?` <span class="tag">Envío compartido · ${e.partes.length} pedidos</span>`:''}${e.origen==='pedido'?' <small class="sub">(del pedido, con sus retoques)</small>':''}</td><td class="n">${uds(e.total)}</td><td class="n">${(e.m3||0).toFixed(2)}</td><td class="act">${e.partes?`<button class="btn small ghost" type="button" data-act="prev-separar" data-i="${i}">Separar</button>`:''}<button class="btn small danger" type="button" data-act="prev-quitar" data-i="${i}">Quitar</button></td></tr>`).join('')}</tbody></table></div>
+    <h3>Pedidos</h3>${prevMarcas.size>=2?`<div class="manual">${prevMarcas.size} pedidos marcados. <button class="btn small" type="button" data-act="prev-juntar">Juntar en un envío</button> <button class="btn small ghost" type="button" data-act="prev-desmarcar">Quitar marcas</button></div>`:'<p class="sub">Si dos pedidos van en las mismas cajas, márcalos y pulsa «Juntar en un envío».</p>'}<div class="scroll"><table class="prev"><thead><tr><th></th><th>Fecha</th><th>Nº pedido</th><th>Cliente / pérgola</th><th>Embalaje</th><th>Cajas</th><th class="n">Total</th><th class="n">m³</th><th></th></tr></thead><tbody>${prevision.map((e,i)=>`<tr${e.partes?' class="compartido"':''}><td><input type="checkbox" data-pmarca="${esc(e.id)}"${prevMarcas.has(e.id)?' checked':''} aria-label="Marcar para juntar"></td><td>${fechaEs(e.fecha)}</td>${e.partes?`<td>${e.partes.map(p=>esc(p.numero||'sin nº')).join('<br>')}</td><td>${e.partes.map(p=>esc(p.cliente||'')).join('<br>')}</td>`:`<td><input class="prev-in" data-pi="${i}" data-pk="numero" value="${esc(e.numero)}" aria-label="Nº de pedido"></td><td><input class="prev-in ancho" data-pi="${i}" data-pk="cliente" value="${esc(e.cliente)}" aria-label="Cliente">${e.estimado?`<small class="marca">Estimación desde el plano${e.notaPlano?' · '+esc(e.notaPlano):''}</small>`:''}</td>`}<td><select class="prev-in t-${esc(e.tipo)}" data-pi="${i}" data-pk="tipo" aria-label="Tipo de embalaje">${Object.entries(TIPOS).map(([k,t])=>`<option value="${k}"${k===e.tipo?' selected':''}>${t}</option>`).join('')}</select></td><td>${e.sinCajas?`<span class="ojo">No hay cajas de ${esc(TIPOS[e.tipo].toLowerCase())} en el catálogo</span>`:e.cajas.map(c=>`<b class="t-${esc(c.tipo)}">${c.n} × ${esc(c.nombre)}</b>`).join(', ')}${e.fuera?` <span class="ojo">· ${e.fuera} ${e.fuera===1?'bulto no cabe':'bultos no caben'}</span>`:''}${e.sinPerfil?` <span class="ojo">· ${e.sinPerfil} ${e.sinPerfil===1?'línea sin perfil en el catálogo':'líneas sin perfil en el catálogo'}</span>`:''}${e.partes?` <span class="tag">Envío compartido · ${e.partes.length} pedidos</span>`:''}${e.origen==='pedido'?' <small class="sub">(del pedido, con sus retoques)</small>':''}</td><td class="n">${uds(e.total)}</td><td class="n">${(e.m3||0).toFixed(2)}</td><td class="act">${e.partes?`<button class="btn small ghost" type="button" data-act="prev-separar" data-i="${i}">Separar</button>`:''}<button class="btn small danger" type="button" data-act="prev-quitar" data-i="${i}">Quitar</button></td></tr>`).join('')}</tbody></table></div>
     <p class="sub">La previsión se guarda sola en este navegador. Los pedidos leídos de varias hojas usan la colocación automática; los que vienen de la pestaña Pedido guardan las cajas tal como estaban. Si cambias el embalaje de un pedido, se recalcula con la colocación automática. Un envío compartido cuenta sus cajas una sola vez; «Separar» vuelve a calcular cada pedido por su cuenta.</p>`;
 }
 function excelPrevision(){
@@ -1205,7 +1229,7 @@ function excelPrevision(){
     ...tot.map(c=>[{v:c.nombre,s:c.tipo},{v:TIPOS[c.tipo]||c.tipo,s:c.tipo},c.ext.join(' × ')+' mm',{v:c.n,s:c.tipo}]),
     ['','','Total',{v:tot.reduce((s,c)=>s+c.n,0),s:'neg'}]];
   const pedidos=[[{v:'Previsión de cajas · '+hoy,s:'titulo'}],[],['Fecha','Nº pedido','Cliente / pérgola','Embalaje','Cajas','Total cajas (uds.)','m³','Envío compartido'].map(v=>({v,s:'cab'})),
-    ...prevision.map(e=>[fechaEs(e.fecha),e.numero,e.cliente,{v:TIPOS[e.tipo]||e.tipo,s:e.tipo},{v:cajasTxt(e)+(e.fuera?` (${e.fuera} sin caja)`:''),s:e.tipo},e.total,{v:Math.round((e.m3||0)*100)/100,s:'dec'},e.partes?`Sí, ${e.partes.length} pedidos en las mismas cajas`:'']),
+    ...prevision.map(e=>[fechaEs(e.fecha),e.numero,e.cliente+(e.estimado?' (estimación desde el plano)':''),{v:TIPOS[e.tipo]||e.tipo,s:e.tipo},{v:cajasTxt(e)+(e.fuera?` (${e.fuera} sin caja)`:''),s:e.tipo},e.total,{v:Math.round((e.m3||0)*100)/100,s:'dec'},e.partes?`Sí, ${e.partes.length} pedidos en las mismas cajas`:'']),
     ['','','','','Total',{v:prevision.reduce((s,e)=>s+e.total,0),s:'neg'},{v:Math.round(prevision.reduce((s,e)=>s+(e.m3||0),0)*100)/100,s:'decneg'}],
     // los totales por modelo van también debajo de los pedidos, para verlos sin cambiar de hoja (Andrés, 27/10/2026)
     [],[{v:'Cajas que hacen falta',s:'titulo'}],...tablaTot,...ley];

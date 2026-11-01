@@ -127,6 +127,8 @@ function piezasPlano(d){
   if(!(A>600&&P>600)) return out;
   const {nA,nP}=rejilla(A,P,d.modulos),M=Math.max(nP,Math.round(d.modulos||1),nA*(nP>1?1:1)),ing=d.tipologia==='INGLETE'&&M===1;
   if(!d.modulos) sup.push('1 módulo');
+  if(d.sinTipo) sup.push('tipología TESTA');
+  if(d.sinSentido) sup.push('las lamas a lo largo de la proyección (no se ha leído PRL ni PRP)');
   if(nP>1) sup.push(`los módulos repartidos en ${nP} filas a lo largo de la proyección (${P} mm no caben en una lama)`);
   const nPil=nP>1?M+nP+1:M*2+2;let alt=(d.pilares||[]).map(Math.round).filter(h=>h>500);
   if(!alt.length){ // sin la altura de cada pilar: todos a la H total del plano (la del más alto) o, si no viene, PILAR_SUPUESTO
@@ -157,16 +159,43 @@ function datosPlano(nombre,texto,op){
   // plano cliente con texto o leído con OCR (op.ocr), en español o en el idioma del cliente: «4900 (Ancho)», «3000 (Proyección)»,
   // «1 MODULOS», «2 PILARES», «H Total: 3020 mm» y «H PILAR P1» con su altura debajo. Si no se lee la H total, H libre + 220 mm
   // (así en todas las obras: 2595 → 2815, 3000 → 3220, 2600 → 2820). Con OCR no se usan las alturas sueltas («28165 mm»).
-  // las medidas, mejor del nombre del archivo: el rótulo «(Ancho)» del dibujo no siempre va del mismo lado (54007638)
-  let m=!f&&t.match(/(\d{3,5})\s*\(\s*(?:Ancho|Width|Largeur|Breite|Larghezza)/i);if(m)d.ancho=+m[1];
-  if(!f&&(m=t.match(/(\d{3,5})\s*\(\s*(?:Proyecci[óo]n|Projection|Saillie|Ausfall|Tiefe|Sporgenza|Profondit)/i)))d.proy=+m[1];
-  if((m=t.match(/\b(\d{1,2})\s*M[ÓO]DUL(?:OS|O|ES|E|I|EN)\b/i)))d.modulos=+m[1];
-  if((m=t.match(/\bH\s*(?:Total|Totale|Gesamt)\s*[:;.]?\s*(\d{4})\s*mm/i)))d.hTotal=+m[1];
-  else if((m=t.match(/\bH\s*(?:Libre|Free|Libero|Frei|Lichte)\s*[:;.]?\s*(\d{4})\s*m/i)))d.hTotal=+m[1]+220;
+  // Las medidas, mejor del nombre del archivo (proyección × ancho). Si no lo trae, del cajetín, «5350x3500», y de los rótulos
+  // «5350 (Ancho)» y «3500 (Proyección)», que van en ese orden; se vota entre las páginas porque el OCR falla alguna cifra.
+  // PRP: ancho × proyección. PRL: las lamas van en la primera medida (54007638, 2500x4770, lama de 2295 mm). Sin leer ninguno,
+  // la que no cabe en una lama es el ancho.
+  const voto=l=>{const c=new Map();let b=0,n=0;for(const v of l){const k=(c.get(v)||0)+1;c.set(v,k);if(k>n){n=k;b=v;}}return b;};
+  const todos=re=>[...t.matchAll(re)].map(x=>+x[1]);
+  let m;
+  if(!f){
+    const A=[],B=[];
+    for(const x of t.matchAll(/\b(\d{4,5})\s*[xX×]\s*(\d{4,5})\b/g)){A.push(+x[1]);B.push(+x[2]);}
+    A.push(...todos(/(\d{4,5})\s*\(\s*(?:Ancho|Width|Largeur|Breite|Larghezza)/gi));
+    B.push(...todos(/(\d{4,5})\s*\(\s*(?:Proyecci[óo]n|Projection|Saillie|Ausfall|Tiefe|Sporgenza|Profondit)/gi));
+    const a=voto(A),b=voto(B),prl=(t.match(/\bPRL\b/g)||[]).length,prp=(t.match(/\bPRP\b/g)||[]).length;
+    if(a&&b){
+      d.medidasOCR=true;
+      if(prl>prp||(!prl&&!prp&&a<=PROY_MAX&&b>PROY_MAX)){d.proy=a;d.ancho=b;}else{d.ancho=a;d.proy=b;}
+      if(!prl&&!prp&&a<=PROY_MAX&&b<=PROY_MAX) d.sinSentido=true;
+    }
+  }
+  if((m=t.match(/(?:OFERTA|OFFER|QUOTE|ANGEBOT|OFFRE)[^0-9]{0,6}(\d{6,10})/i))) d.oferta=m[1];
+  const ln=String(texto||'').split('\n'),ir=ln.findIndex(x=>/REFEREN[CTZ]/i.test(x));
+  if(ir>=0){
+    const limpia=x=>String(x||'').split(/\s\|\s?|\s{2,}|\|/)[0].replace(/^[^A-Za-zÀ-ÿ0-9]+|[^A-Za-zÀ-ÿ0-9)]+$/g,'').trim();
+    const r=limpia(ln[ir].replace(/.*REFEREN\w*\s*:?/i,''))||limpia(ln[ir+1]);
+    // lo demás del cajetín va seguido en la capa de texto; y sin una palabra en mayúsculas es ruido del sello o la firma («Tel. e fax»)
+    const rf=r.split(/\s+(?:Motor|Desag|Centralita|PIE\b|H\s*PILAR|P\d\b|\d+°)/i)[0].slice(0,40).trim();
+    if(/[A-ZÀ-Ý]{3,}/.test(rf)) d.referencia=rf;
+  }
+  const mod=todos(/\b(\d{1,2})\s*M[ÓO]DUL(?:OS|O|ES|E|I|EN)\b/gi);if(mod.length)d.modulos=voto(mod);
+  const ht=todos(/\bH\s*(?:Total|Totale|Gesamt)\s*[:;.]?\s*(\d{4})\s*mm/gi),hl=todos(/\bH\s*(?:Libre|Free|Libero|Frei|Lichte)\s*[:;.]?\s*(\d{4})\s*m/gi);
+  if(ht.length)d.hTotal=voto(ht);else if(hl.length)d.hTotal=voto(hl)+220;
   // nº de pilares; el OCR a veces lee el 4 como «A» («APILLARS»). Si no se lee, por el modelo: a pared, módulos + 1
   // (2 en uno de un módulo); autoportante, 2 × (módulos + 1)
-  if((m=t.match(/(?:\b|[^A-Z])(\d{1,2}|A)\s*(?:PILARES|PILLARS|PILIERS|PILASTRI|POSTS|PFOSTEN|S[ÄA]ULEN)\b/i)))d.nPilares=m[1].toUpperCase()==='A'?4:+m[1];
-  else if(/\b(?:PARED|WALL|MURAL|WAND|PARETE)\b/i.test(t))d.nPilares=(d.modulos||1)+1;
+  const npl=todos(/(?:^|[^A-Za-z0-9])(\d{1,2})\s*(?:PILARES|PILLARS|PILIERS|PILASTRI|POSTS|PFOSTEN|S[ÄA]ULEN)\b/gi);
+  if(npl.length)d.nPilares=voto(npl);
+  else if(/(?:^|[^A-Za-z0-9])A\s*(?:PILARES|PILLARS)\b/.test(t))d.nPilares=4;
+  else if(op&&op.ocr&&/\b(?:PARED|WALL|MURAL|WAND|PARETE)\b/i.test(t))d.nPilares=(d.modulos||1)+1;
   else if(op&&op.ocr&&/AUTOPORTANT|FREE\s*STANDING|FREISTEHEND/i.test(t))d.nPilares=2*((d.modulos||1)+1);
   const hp=[];
   if(!(op&&op.ocr)) for(const g of t.matchAll(/((?:H PILAR P\d+\s*)+)((?:\d{3,4}\s*mm\s*)+)/gi)){
@@ -200,6 +229,42 @@ function destinoDeLugar(txt){
   // lo que va por mar, primero: «Palma de Mallorca, España» y «Belfast, Reino Unido» van en madera cerrada
   for(const k of ['cerrada','abierta','carton']) if(LUGARES[k].split(',').some(n=>t.includes(' '+n+' '))) return k;
   return '';
+}
+// PDF con varias cosas juntas (el cliente escanea plano y presupuesto a la vez): hay que mirar página a página.
+// Una página es de plano si tiene el cajetín: alturas o pilares, y además escala, modelo o los rótulos de las cotas.
+// Un presupuesto trae «Model» o «Date», pero no eso («Total Height» no es «H Total»).
+function puntosCajetin(t){return (String(t).match(/MODEL|PILAR|PILLAR|ESCALA|SCALE|FECHA|DATE|MODUL|H Total|H Libre|H Free|Ancho|Width|Proyecci|Projection/gi)||[]).length;}
+function esPlano(t){t=String(t);return puntosCajetin(t)>=4&&/\bH\s*(?:Total|Libre|Free)\b|\d\s*(?:PILARES|PILLARS)\b|H\s*PILAR/i.test(t)&&/ESCALA|SCALE|\bMODEL|\(\s*(?:Ancho|Width|Proyecci|Projection)/i.test(t);}
+// Capa de texto de verdad. Algunos escáneres dejan una de basura («atou <H oz ire», 54007638) y esa hay que pasarla por OCR.
+function textoReal(t){const tk=String(t).split(/\s+/).filter(Boolean),pal=tk.filter(w=>/^[A-Za-zÀ-ÿ]{4,}[.,:;]?$/.test(w)).length;return pal>=15&&pal/tk.length>=0.3;}
+// Las páginas de un mismo plano (planta y alzados) repiten el cajetín. Se agrupan por medidas, dando por iguales las que
+// difieren en una cifra (el OCR lee 5250 por 5350); sin medidas, por el nº de oferta.
+function casiIgual(a,b){if(a===b)return true;if(a.length!==b.length)return false;let n=0;for(let i=0;i<a.length;i++)if(a[i]!==b[i])n++;return n<=1;}
+function clavePlano(t){const d=String(t).match(/\b(\d{4,5})\s*[xX×]\s*(\d{4,5})\b/),o=String(t).match(/(?:OFERTA|OFFER|QUOTE|ANGEBOT|OFFRE)[^0-9]{0,6}(\d{6,10})/i);return {d:d?d[1]+'x'+d[2]:'',o:o?o[1]:''};}
+function mismoPlano(a,b){const x=clavePlano(a),y=clavePlano(b);if(x.d&&y.d)return casiIgual(x.d,y.d);if(x.o&&y.o)return casiIgual(x.o,y.o);return true;}
+// Busca los planos de un PDF. textoDe(i) da la capa de texto de la página i y ocrDe(i,giro) la lee con OCR: {texto,conf,pal}.
+// Prueba los giros solo donde hace falta: una página que se lee bien y no es plano (un presupuesto) no se gira, y tras
+// encontrar un plano se empieza por su giro. op.uno: parar en el primero. Devuelve [{texto,ocr}], un elemento por plano.
+async function buscarPlanos(npag,textoDe,ocrDe,op){
+  const o=op||{},pags=[],max=Math.min(npag,o.maxPag||20);let giro=0;
+  for(let i=0;i<max&&!(o.uno&&pags.length);i++){
+    const tx=textoDe(i)||'';
+    if(esPlano(tx)){pags.push({texto:tx,ocr:false});continue;}
+    if(textoReal(tx)) continue;
+    if(o.aviso) o.aviso(i+1,max);
+    for(const g of [giro,...[0,90,-90,180].filter(x=>x!==giro)]){
+      const r=await ocrDe(i,g);
+      if(esPlano(r.texto)){pags.push({texto:r.texto,ocr:true});giro=g;break;}
+      if(r.conf>=65&&r.pal>=30) break;
+    }
+  }
+  const planos=[];
+  for(const p of pags){
+    const u=planos[planos.length-1];
+    if(u&&mismoPlano(u.texto,p.texto)){u.texto+='\n'+p.texto;u.ocr=u.ocr||p.ocr;}
+    else planos.push({texto:p.texto,ocr:p.ocr});
+  }
+  return planos;
 }
 function newBin(model){return {model, free:[{x:0,y:0,w:model.intA,h:model.intH}], items:[]};}
 function tryPlace(bin,it){
@@ -449,4 +514,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={repartir,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};

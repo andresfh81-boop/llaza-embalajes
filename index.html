@@ -8,7 +8,7 @@
   <link rel="icon" href="static/favicon.ico">
   <link rel="apple-touch-icon" href="static/icon-180.png">
   <meta name="theme-color" content="#0b5c8a">
-  <link rel="stylesheet" href="static/estilo.css?v=73">
+  <link rel="stylesheet" href="static/estilo.css?v=77">
 </head>
 <body>
 <div class="wrap">
@@ -40,7 +40,7 @@
           <label><input type="radio" name="tipo" id="tipo-abierta" value="abierta">Exportación terrestre <small>madera abierta</small></label>
         </div>
       </fieldset>
-      <label class="drop" id="drop"><input type="file" id="pdf" accept="application/pdf,.pdf" multiple>Arrastra aquí las hojas de corte<small>Una o varias a la vez, en PDF, o pulsa para elegirlas. Sin hoja de corte, suelta el plano cliente y la ficha de fabricación. Se añaden al pedido y se calculan las cajas al momento. Lee los datos de la pérgola, el módulo y, de cada perfil, referencia, largo, cantidad y marcaje.</small></label>
+      <label class="drop" id="drop"><input type="file" id="pdf" accept="application/pdf,.pdf" multiple>Arrastra aquí las hojas de corte<small>Una o varias a la vez, en PDF, o pulsa para elegirlas. Sin hoja de corte, suelta el plano cliente, aunque venga escaneado con presupuestos. Se añaden al pedido y se calculan las cajas al momento. Lee los datos de la pérgola, el módulo y, de cada perfil, referencia, largo, cantidad y marcaje.</small></label>
       <details class="plano" id="plano"><summary>Sin hoja de corte: calcular desde el plano cliente</summary>
         <p class="sub">Suelta el plano que firma el cliente («nº_PROYECCIÓNxANCHO_TESTA.pdf») y la ficha de fabricación («PLANO.pdf») en la zona de las hojas de corte y se rellena solo; o copia aquí los datos a mano. Los largos y el nº de lamas salen de las reglas de las hojas de corte: es una estimación para pedir las cajas con tiempo. Calcula siempre: lo que el plano no trae (módulos, pilares) se supone y se avisa. Cuando llegue la hoja de corte, cárgala y sustituye a la estimación.</p>
         <form id="f-plano" class="row">
@@ -118,9 +118,9 @@
     <h2>Previsión de cajas</h2>
     <p class="sub">Para saber con tiempo cuántas cajas van a hacer falta: junta aquí los pedidos que vienen y te da la lista por pedido y el total de cada modelo. Se guarda en este navegador.</p>
     <div class="row">
-      <label>Destino de las hojas que sueltes<select id="prev-tipo"><option value="carton">Envío local · cartón</option><option value="cerrada">Exportación marítima · madera cerrada</option><option value="abierta">Exportación terrestre · madera abierta</option></select></label>
+      <label>Destino de los pedidos que sueltes<select id="prev-tipo"><option value="carton">Envío local · cartón</option><option value="cerrada">Exportación marítima · madera cerrada</option><option value="abierta">Exportación terrestre · madera abierta</option></select></label>
     </div>
-    <label class="drop" id="drop-prev"><input type="file" id="pdf-prev" accept="application/pdf,.pdf" multiple>Arrastra aquí varias hojas de corte<small>Cada número de hoja es un pedido (las hojas de los módulos de una misma pérgola se juntan). Se calcula con la colocación automática y se añade a la lista.</small></label>
+    <label class="drop" id="drop-prev"><input type="file" id="pdf-prev" accept="application/pdf,.pdf" multiple>Arrastra aquí hojas de corte o planos cliente<small>Cada número de hoja es un pedido (las hojas de los módulos de una misma pérgola se juntan). Un plano cliente, también escaneado junto con presupuestos, se calcula como estimación y su hoja de corte la sustituye cuando llegue. Con la colocación automática, y se añade a la lista.</small></label>
     <div id="prevision"></div>
   </section>
 </div>
@@ -154,9 +154,9 @@
 <div id="imprimir"></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script src="static/nucleo.js?v=73"></script>
-<script src="static/pdf.js?v=73"></script>
-<script src="static/xlsx.js?v=73"></script>
-<script src="static/app.js?v=73"></script>
+<script src="static/nucleo.js?v=77"></script>
+<script src="static/pdf.js?v=77"></script>
+<script src="static/xlsx.js?v=77"></script>
+<script src="static/app.js?v=77"></script>
 </body>
 </html>
