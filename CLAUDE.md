@@ -18,8 +18,8 @@ La versión anterior sigue publicada como artifact (https://claude.ai/artifact/J
 - `static/app.js` — interfaz: pedido, catálogos, lectura del PDF, exportar/importar.
 - `datos/catalogo.json` — catálogo común: `{ "perfiles": [...], "cajas": [...] }`, medidas en mm.
 - `vendor/pdfjs/` — pdf.js 3.11.174, la misma copia que `llaza-etiquetas-web`.
-- `vendor/tesseract/` — tesseract.js 6.0.1 (OCR) con su núcleo LSTM (normal y SIMD) y el idioma español «best_int» (`lang/spa.traineddata.gz`), unos 6 MB que el navegador solo descarga la primera vez que se suelta un plano escaneado (`cargarOCR` en `app.js`). Sacado de npm (tesseract.js, tesseract.js-core, @tesseract.js-data/spa); licencias en la carpeta.
-- `manifest.json`, `sw.js` e iconos en `static/` — la app se puede instalar en ordenador y móvil y funciona sin conexión (12/10/2026), igual que `llaza-etiquetas-web`. `sw.js` va con «red primero»: con internet siempre pide lo último y guarda copia; sin conexión sirve la copia. Si se añaden archivos nuevos a la app, apuntarlos en `APP_SHELL` y subir el número de `CACHE_NAME`.
+- `vendor/tesseract/` — tesseract.js 6.0.1 (OCR) con su núcleo LSTM (normal y SIMD) y el idioma español «best_int» (`lang/spa.traineddata.gz`), unos 10 MB que `sw.js` guarda al instalarse para que funcione sin conexión (lista `OCR`; se cargan al soltar un plano escaneado, `cargarOCR` en `app.js`). Sacado de npm (tesseract.js, tesseract.js-core, @tesseract.js-data/spa); licencias en la carpeta.
+- `manifest.json`, `sw.js` e iconos en `static/` — la app se puede instalar en ordenador y móvil y funciona sin conexión (12/10/2026), igual que `llaza-etiquetas-web`. `sw.js` va con «red primero»: con internet siempre pide lo último y guarda copia; sin conexión, o si la red tarda más de 4 s (wifi sin internet, mala señal), sirve la copia. Si se añaden archivos nuevos a la app, apuntarlos en `APP_SHELL` y subir el número de `CACHE_NAME`.
 - `pruebas/probar.js` — `node pruebas/probar.js`.
 - `ejemplos/` — todavía no existe; aquí irán las hojas de corte reales de muestra (ojo: el repo es público, sin datos de clientes).
 
