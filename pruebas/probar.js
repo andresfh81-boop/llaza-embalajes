@@ -1,6 +1,6 @@
 // node pruebas/probar.js  — comprueba el encaje, la lectura de filas de la hoja de corte y la mezcla del catálogo
 const assert=require('assert'),path=require('path');
-const {repartir,datosPlano,piezasPlano,apoyado:apoy,packWith:packWithSolo,leerPagina,leerCabecera,plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
+const {repartir,destinoDeLugar,datosPlano,piezasPlano,apoyado:apoy,packWith:packWithSolo,leerPagina,leerCabecera,plan,planGrupos,chocan,libre,apoyado,parseHoja,aplicar,diferencia}=require(path.join(__dirname,'..','static','nucleo.js'));
 const G={nombre:'G',intL:6000,intA:600,intH:400,extL:6100,extA:660,extH:460};
 const S={nombre:'S',intL:4000,intA:300,intH:300,extL:4080,extA:350,extH:350};
 const mk=(n,w,h,L)=>Array.from({length:n},()=>({p:{nombre:w+'x'+h},w,h,L}));
@@ -102,6 +102,8 @@ assert.strictEqual(k(piezasPlano({tipologia:'TESTA',ancho:10500,proy:4000,modulo
 // Sin módulos ni pilares en el plano: calcula igual y dice qué ha supuesto.
 assert.deepStrictEqual(piezasPlano({tipologia:'TESTA',ancho:4000,proy:4000}).supuestos,['1 módulo','4 pilares (no se ha leído cuántos) de 2900 mm de alto']);
 assert.deepStrictEqual(parseHoja(['2720 mm 2720 mm 2720 mm','2710 mm P3: 2748 mm 2754']),[]);
+// Embalaje según el destino: Gran Bretaña por carretera; la isla de Irlanda (también Irlanda del Norte), por mar.
+for(const [l,t] of [['Francia','abierta'],['Londres, Reino Unido','abierta'],['Gran Bretaña','abierta'],['Escocia','abierta'],['Gales','abierta'],['UK','abierta'],['Irlanda','cerrada'],['Dublín','cerrada'],['Belfast, Reino Unido','cerrada'],['Irlanda del Norte','cerrada'],['Palma de Mallorca, España','cerrada'],['Tarragona','carton'],['Narnia','']]) assert.strictEqual(destinoDeLugar(l),t,l);
 console.log('plano cliente: ok');
 // Cabecera de la hoja: número, nombre, tipología, medidas, módulo (también "2-3" con guion raro) y colores.
 const cabe=m=>leerCabecera([{s:'PERGOLA PARED PORTERÍA',x:264,y:64.9},{s:'HOJA DE CORTE',x:154,y:75.5},{s:'TIPOLOGÍA: MIXTA',x:264,y:77},{s:'COLOR ESTRUC: 7416 TEXT',x:444,y:77},{s:'DIMENS. PÉRGOLA: 7380x8640 mm',x:264,y:89.2},{s:'COLOR LAMAS: 9016',x:444,y:89.2},{s:'54007372',x:172,y:94.6},{s:m,x:264,y:101.3},{s:'33017',x:157,y:142.4}]);

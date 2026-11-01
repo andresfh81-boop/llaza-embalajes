@@ -187,6 +187,20 @@ function datosPlano(nombre,texto,op){
   if(n&&!d.pilares) d.nPilares=n;
   return Object.keys(d).length?d:null;
 }
+// Qué embalaje corresponde al país o ciudad de destino (la fábrica está en Alcover, Tarragona): España peninsular en cartón;
+// islas españolas, Ceuta, Melilla, la isla de Irlanda (también Irlanda del Norte) y fuera de Europa por mar, en madera cerrada;
+// la Europa continental y la isla de Gran Bretaña por carretera, en madera abierta (Andrés, 01/11/2026). Si no se reconoce, ''.
+const LUGARES={
+  cerrada:'baleares,balears,mallorca,menorca,ibiza,eivissa,formentera,canarias,tenerife,gran canaria,lanzarote,fuerteventura,la palma,la gomera,el hierro,ceuta,melilla,irlanda,ireland,eire,dublin,cork,galway,limerick,belfast,islandia,malta,chipre,estados unidos,eeuu,usa,canada,mexico,brasil,argentina,chile,peru,colombia,uruguay,panama,republica dominicana,puerto rico,marruecos,argelia,tunez,egipto,sudafrica,emiratos,dubai,qatar,arabia saudi,israel,turquia,china,japon,india,australia,nueva zelanda',
+  abierta:'gran bretana,great britain,reino unido,united kingdom,uk,inglaterra,england,escocia,scotland,gales,wales,londres,london,manchester,birmingham,liverpool,leeds,bristol,edimburgo,edinburgh,glasgow,cardiff,francia,france,portugal,andorra,monaco,alemania,germany,italia,italy,belgica,holanda,paises bajos,luxemburgo,suiza,austria,polonia,chequia,republica checa,eslovaquia,hungria,eslovenia,croacia,rumania,bulgaria,dinamarca,suecia,noruega,finlandia,lituania,letonia,estonia,grecia',
+  carton:'espana,spain,andalucia,aragon,asturias,cantabria,cataluna,catalunya,galicia,navarra,la rioja,murcia,extremadura,madrid,barcelona,valencia,sevilla,malaga,cordoba,granada,jaen,almeria,cadiz,huelva,zaragoza,huesca,teruel,oviedo,gijon,santander,bilbao,vizcaya,bizkaia,alava,araba,vitoria,guipuzcoa,gipuzkoa,donostia,san sebastian,pamplona,logrono,burgos,leon,palencia,valladolid,zamora,salamanca,segovia,avila,soria,caceres,badajoz,toledo,ciudad real,cuenca,guadalajara,albacete,alicante,castellon,tarragona,lleida,lerida,girona,gerona,a coruna,coruna,lugo,ourense,orense,pontevedra,vigo,santiago de compostela'
+};
+function destinoDeLugar(txt){
+  const t=' '+String(txt||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]+/g,' ').trim()+' ';
+  // lo que va por mar, primero: «Palma de Mallorca, España» y «Belfast, Reino Unido» van en madera cerrada
+  for(const k of ['cerrada','abierta','carton']) if(LUGARES[k].split(',').some(n=>t.includes(' '+n+' '))) return k;
+  return '';
+}
 function newBin(model){return {model, free:[{x:0,y:0,w:model.intA,h:model.intH}], items:[]};}
 function tryPlace(bin,it){
   if(it.L>bin.model.intL) return false;
@@ -435,4 +449,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={repartir,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={repartir,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};

@@ -9,6 +9,7 @@ let editCaja=null,editPerfil=null,confirmar=null,ultimoResumen='';
 // terrestre en madera abierta. pedido.destino es ese tipo una vez elegido (vacío = sin elegir: no se calcula hasta tenerlo).
 const DESTINOS={carton:'Envío local',cerrada:'Exportación marítima',abierta:'Exportación terrestre'};
 let pedido={tipo:'carton',destino:'',lugar:'',holgura:5,lineas:[]};
+let lugarPend=null; // lugar escrito y aún sin aplicar con «Actualizar destino»
 // La app se abre siempre con el pedido vacío. El último pedido se conserva aparte (anterior) por si se quiere recuperar,
 // hasta que se empieza uno nuevo.
 let anterior=null;
@@ -55,9 +56,8 @@ function renderPedido(){
   for(const [id,k] of [['comp-n','n'],['comp-l','L'],['comp-a','A'],['comp-h','H']]) if(document.activeElement!==$(id)) $(id).value=cp[k];
   document.querySelectorAll('#tipos input').forEach(x=>x.checked=x.value===pedido.destino);
   $('destino').classList.toggle('falta',!pedido.destino&&pedido.lineas.length>0);
-  if(document.activeElement!==$('lugar')) $('lugar').value=pedido.lugar||'';
-  $('lugar-nota').textContent=pedido.destino&&pedido.destinoAuto?`Elegido por el lugar: ${DESTINOS[pedido.destino].toLowerCase()} (${TIPOS[pedido.destino].toLowerCase()}). Si va de otra forma, cámbialo abajo.`
-    :pedido.lugar&&!pedido.destino?'No reconozco ese lugar: elige el embalaje abajo.':'Al escribirlo se elige solo el embalaje (salimos de Alcover, Tarragona).';
+  if(document.activeElement!==$('lugar')) $('lugar').value=lugarPend!==null?lugarPend:pedido.lugar||'';
+  notaLugar();
   if(document.activeElement!==$('holgura')) $('holgura').value=pedido.holgura;
   if(document.activeElement!==$('ref-pedido')) $('ref-pedido').value=pedido.ref||'';
   const sel=$('l-perfil'),prev=sel.value;
@@ -938,28 +938,43 @@ document.querySelector('.tabs').addEventListener('click',e=>{
   ['pedido','cajas','perfiles','prevision'].forEach(t=>$('tab-'+t).hidden=t!==b.dataset.tab);
   $('cat-bar').hidden=b.dataset.tab==='pedido'||b.dataset.tab==='prevision';
 });
-function elegirDestino(t,auto){if(!TIPOS[t])return;pedido.tipo=pedido.destino=t;pedido.destinoAuto=!!auto;guardarPedido();renderPedido();}
-// El lugar escrito elige el destino cuando se reconoce y nadie lo ha elegido a mano (pedido.destinoAuto): España peninsular
-// en cartón; islas, Ceuta, Melilla y fuera de Europa por mar; la Europa continental por carretera. Si no se reconoce, no elige.
-const LUGARES={
-  cerrada:'baleares,balears,mallorca,menorca,ibiza,eivissa,formentera,canarias,tenerife,gran canaria,lanzarote,fuerteventura,la palma,la gomera,el hierro,ceuta,melilla,reino unido,inglaterra,uk,escocia,gales,irlanda,islandia,malta,chipre,estados unidos,eeuu,usa,canada,mexico,brasil,argentina,chile,peru,colombia,uruguay,panama,republica dominicana,puerto rico,marruecos,argelia,tunez,egipto,sudafrica,emiratos,dubai,qatar,arabia saudi,israel,turquia,china,japon,india,australia,nueva zelanda',
-  abierta:'francia,france,portugal,andorra,monaco,alemania,germany,italia,italy,belgica,holanda,paises bajos,luxemburgo,suiza,austria,polonia,chequia,republica checa,eslovaquia,hungria,eslovenia,croacia,rumania,bulgaria,dinamarca,suecia,noruega,finlandia,lituania,letonia,estonia,grecia',
-  carton:'espana,spain,andalucia,aragon,asturias,cantabria,cataluna,catalunya,galicia,navarra,la rioja,murcia,extremadura,madrid,barcelona,valencia,sevilla,malaga,cordoba,granada,jaen,almeria,cadiz,huelva,zaragoza,huesca,teruel,oviedo,gijon,santander,bilbao,vizcaya,bizkaia,alava,araba,vitoria,guipuzcoa,gipuzkoa,donostia,san sebastian,pamplona,logrono,burgos,leon,palencia,valladolid,zamora,salamanca,segovia,avila,soria,caceres,badajoz,toledo,ciudad real,cuenca,guadalajara,albacete,alicante,castellon,tarragona,lleida,lerida,girona,gerona,a coruna,coruna,lugo,ourense,orense,pontevedra,vigo,santiago de compostela'
-};
-function destinoDeLugar(txt){
-  const t=' '+String(txt||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]+/g,' ').trim()+' ';
-  // islas y ciudades por mar primero: «Palma de Mallorca, España» va en madera cerrada, no en cartón
-  for(const k of ['cerrada','abierta','carton']) if(LUGARES[k].split(',').some(n=>t.includes(' '+n+' '))) return k;
-  return '';
+function elegirDestino(t,auto){if(!TIPOS[t])return;pedido.tipo=pedido.destino=t;pedido.destinoAuto=!!auto;if(lugarPend!==null){pedido.lugar=lugarPend;lugarPend=null;}guardarPedido();renderPedido();}
+// Sin destino todavía, el lugar lo elige al escribirlo. Con destino ya elegido no cambia solo: cambiar el embalaje rehace el
+// reparto, así que el lugar nuevo queda pendiente (lugarPend) hasta pulsar «Actualizar destino» o Intro (Andrés, 01/11/2026).
+function notaLugar(){
+  const v=lugarPend!==null?lugarPend:pedido.lugar||'',d=destinoDeLugar(v),nom=t=>`${DESTINOS[t].toLowerCase()} (${TIPOS[t].toLowerCase()})`;
+  const pend=lugarPend!==null&&!!pedido.destino;
+  $('act-destino').classList.toggle('ghost',!pend);
+  $('lugar-nota').textContent=pend?(d&&d!==pedido.destino?`«${v}» corresponde a ${nom(d)}; ahora está en ${nom(pedido.destino)}. Pulsa «Actualizar destino».`:d?'Pulsa «Actualizar destino» para guardar el lugar.':`No reconozco «${v}»: si cambia el embalaje, elígelo abajo.`)
+    :pedido.destino&&pedido.destinoAuto?`Elegido por el lugar: ${nom(pedido.destino)}. Si va de otra forma, cámbialo abajo.`
+    :pedido.destino?'Embalaje elegido a mano. Para que lo elija el lugar, escríbelo y pulsa «Actualizar destino».'
+    :v?'No reconozco ese lugar: elige el embalaje abajo.':'Al escribirlo se elige solo el embalaje (salimos de Alcover, Tarragona).';
 }
-$('tipos').addEventListener('change',e=>elegirDestino(e.target.value));
+function actualizarDestino(){
+  const v=$('lugar').value.trim(),d=destinoDeLugar(v),antes=pedido.destino;
+  if(!v){lugarPend=null;pedido.lugar='';guardarPedido();renderPedido();estado('Escribe el país o la ciudad de destino, o elige el embalaje abajo.');return;}
+  lugarPend=v;
+  if(!d){pedido.lugar=v;lugarPend=null;guardarPedido();renderPedido();$('lugar-nota').textContent=`No reconozco «${v}»${antes?`: sigue en ${DESTINOS[antes].toLowerCase()} (${TIPOS[antes].toLowerCase()})`:''}. Elige el embalaje abajo si va de otra forma.`;estado(`No reconozco «${v}»: elige el embalaje a mano.`);return;}
+  elegirDestino(d,true);
+  estado(d===antes?`Destino actualizado: ${v}. El embalaje no cambia: ${DESTINOS[d].toLowerCase()} (${TIPOS[d].toLowerCase()}).`:`Destino actualizado: ${v} → ${DESTINOS[d].toLowerCase()} (${TIPOS[d].toLowerCase()}).`+(pedido.lineas.length?' Cajas recalculadas.':''));
+}
+$('act-destino').addEventListener('click',actualizarDestino);
+$('lugar').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();actualizarDestino();}});
+const aMano=t=>{elegirDestino(t);estado(`Embalaje elegido a mano: ${DESTINOS[t].toLowerCase()} (${TIPOS[t].toLowerCase()}).`);};
+$('tipos').addEventListener('change',e=>aMano(e.target.value));
 $('f-plano').addEventListener('submit',e=>{e.preventDefault();calcularPlano();});
 $('pl-ancho').addEventListener('input',lamasSegunAncho);
 $('pl-mod').addEventListener('input',lamasSegunAncho);
 $('lugar').addEventListener('input',e=>{
-  pedido.lugar=e.target.value.trim();
-  if(!pedido.destino||pedido.destinoAuto){const d=destinoDeLugar(pedido.lugar);if(d){if(d!==pedido.destino)elegirDestino(d,true);}else if(pedido.destinoAuto){pedido.destino='';pedido.destinoAuto=false;planoLeido={};renderPedido();}}
-  guardarPedido();renderHojas();
+  const v=e.target.value.trim();
+  if(!pedido.destino){
+    lugarPend=null;pedido.lugar=v;
+    const d=destinoDeLugar(v);
+    if(d){elegirDestino(d,true);estado(`Destino: ${v} → ${DESTINOS[d].toLowerCase()} (${TIPOS[d].toLowerCase()}).`);} else{guardarPedido();notaLugar();renderHojas();}
+    return;
+  }
+  lugarPend=v===(pedido.lugar||'')?null:v;
+  notaLugar();
 });
 for(const [id,k] of [['comp-n','n'],['comp-l','L'],['comp-a','A'],['comp-h','H']]) $(id).addEventListener('input',e=>{
   componentes();pedido.comp[k]=num(e.target.value);
@@ -974,7 +989,7 @@ $('f-linea').addEventListener('submit',e=>{
   if(!pid||!largo||!cant)return;
   pedido.lineas.push({pid,largo,cant,marcas:$('l-marcas').value.split(',').map(x=>x.trim()).filter(Boolean)});$('l-marcas').value='';guardarPedido();renderPedido();
 });
-$('vaciar').addEventListener('click',()=>{pedido.comp=null;pedido.lineas=[];pedido.hojas=[];pedido.ref='';pedido.destino='';pedido.destinoAuto=false;planoLeido={};pedido.lugar='';$('lugar').value='';leidas=[];leidasHojas=[];guardarPedido();renderLeidas();renderPedido();estado('Pantalla limpia: puedes empezar otro pedido.');});
+$('vaciar').addEventListener('click',()=>{pedido.comp=null;pedido.lineas=[];pedido.hojas=[];pedido.ref='';pedido.destino='';pedido.destinoAuto=false;planoLeido={};pedido.lugar='';$('lugar').value='';lugarPend=null;leidas=[];leidasHojas=[];guardarPedido();renderLeidas();renderPedido();estado('Pantalla limpia: puedes empezar otro pedido.');});
 $('f-caja').addEventListener('submit',e=>{
   e.preventDefault();
   const d={nombre:$('c-nombre').value.trim(),tipo:$('c-tipo').value,intL:num($('c-il').value),intA:num($('c-ia').value),intH:num($('c-ih').value),extL:num($('c-el').value),extA:num($('c-ea').value),extH:num($('c-eh').value)};
@@ -1017,8 +1032,8 @@ document.addEventListener('click',async e=>{
   if(!b)return;
   const a=b.dataset.act,id=b.dataset.id;
   if(a==='quitar'){pedido.lineas.splice(Number(b.dataset.i),1);guardarPedido();renderPedido();}
-  else if(a==='destino') elegirDestino(b.dataset.t);
-  else if(a==='recuperar'&&anterior){pedido=Object.assign({tipo:'carton',holgura:5,lineas:[]},anterior);if(pedido.destino===undefined)pedido.destino=pedido.tipo;anterior=null;renderPedido();estado('Último pedido recuperado.');}
+  else if(a==='destino') aMano(b.dataset.t);
+  else if(a==='recuperar'&&anterior){pedido=Object.assign({tipo:'carton',holgura:5,lineas:[]},anterior);if(pedido.destino===undefined)pedido.destino=pedido.tipo;anterior=null;lugarPend=null;renderPedido();estado('Último pedido recuperado.');}
   else if(a==='quitar-hoja'){pedido.lineas=pedido.lineas.filter(l=>l.hoja!==id);pedido.hojas=(pedido.hojas||[]).filter(h=>h.id!==id);if(!pedido.hojas.length&&!pedido.lineas.length)pedido.ref='';else refAuto();guardarPedido();renderPedido();}
   else if(a==='cancelar'){confirmar=null;renderCajas();renderPerfiles();renderCatalogo();}
   else if(a==='exportar'){exportar();}
