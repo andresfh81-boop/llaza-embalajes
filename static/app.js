@@ -765,13 +765,15 @@ function volcarLeidas(){
 async function leerHojaPDF(file){
   const pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
   const filas=[],paginas=[];let letras=0,cab={};
-  for(let n=1;n<=pdf.numPages;n++){
-    const page=await pdf.getPage(n),vp=page.getViewport({scale:1}),c=await page.getTextContent();
-    const its=c.items.filter(i=>i.str&&i.str.trim()).map(i=>{const p=vp.convertToViewportPoint(i.transform[4],i.transform[5]);return {s:i.str.trim(),x:p[0],y:p[1],w:i.width};});
-    const r=leerPagina(its);letras+=r.letras;paginas.push(its.map(i=>i.s).join(' '));
-    // solo cuenta como hoja de corte la página con la columna MARCAJE: en un PDF con varias cosas, un presupuesto no es una hoja
-    if(its.some(i=>/^MARCAJE$/i.test(i.s))){filas.push(...r.filas);cab=Object.assign({},r.cab,cab);}
-  }
+  try{
+    for(let n=1;n<=pdf.numPages;n++){
+      const page=await pdf.getPage(n),vp=page.getViewport({scale:1}),c=await page.getTextContent();
+      const its=c.items.filter(i=>i.str&&i.str.trim()).map(i=>{const p=vp.convertToViewportPoint(i.transform[4],i.transform[5]);return {s:i.str.trim(),x:p[0],y:p[1],w:i.width};});
+      const r=leerPagina(its);letras+=r.letras;paginas.push(its.map(i=>i.s).join(' '));
+      // solo cuenta como hoja de corte la página con la columna MARCAJE: en un PDF con varias cosas, un presupuesto no es una hoja
+      if(its.some(i=>/^MARCAJE$/i.test(i.s))){filas.push(...r.filas);cab=Object.assign({},r.cab,cab);}
+    }
+  }finally{pdf.destroy().catch(()=>{});} // cada PDF abre su propio lector: sin cerrarlo, la memoria sube con cada plano hasta cerrar la app
   return {filas,letras,cab,paginas};
 }
 // Lee una o varias hojas de corte (una pérgola grande trae una por módulo o grupo de módulos).
@@ -793,7 +795,7 @@ function girarLienzo(c,grados){
 // Lector de páginas para buscarPlanos: pasa la página a imagen (×2,5, en gris) y la lee con OCR en el giro que se le pida.
 function lectorOCR(file){
   let pdf=null,ult=-1,lienzo=null;
-  return async (i,grados)=>{
+  const leer=async (i,grados)=>{
     if(!pdf) pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
     if(ult!==i){
       const page=await pdf.getPage(i+1),vp=page.getViewport({scale:2.5});
@@ -808,13 +810,15 @@ function lectorOCR(file){
     const w=await cargarOCR(),r=(await w.recognize(grados?girarLienzo(lienzo,grados):lienzo)).data;
     return {texto:r.text,conf:r.confidence,pal:(r.text.match(/[A-Za-zÀ-ÿ]{4,}/g)||[]).length};
   };
+  leer.cerrar=()=>{if(lienzo)lienzo.width=lienzo.height=0;lienzo=null;ult=-1;if(pdf)pdf.destroy().catch(()=>{});pdf=null;};
+  return leer;
 }
 // Los planos de un PDF sin hoja de corte, ya con sus datos. Con el nombre de siempre («nº_PROYxANCHO_TESTA.pdf») es un plano
 // solo y se para en cuanto lo encuentra; con otro nombre (un escaneo con varias cosas) mira todas las páginas.
 async function planosDePDF(file,paginas){
   const conNombre=/\d_\d{3,5}\s*x\s*\d{3,5}_(?:TESTA|INGLETE|MIXTA)/i.test(file.name);
-  let ps=[];
-  try{ps=await buscarPlanos(paginas.length,i=>paginas[i],lectorOCR(file),{uno:conNombre,aviso:(i,n)=>estado(`Buscando el plano en ${file.name}: página ${i} de ${n} (tarda unos segundos; la primera vez, algo más)…`)});}catch(e){console.error(e);}
+  let ps=[];const lector=lectorOCR(file);
+  try{ps=await buscarPlanos(paginas.length,i=>paginas[i],lector,{uno:conNombre,aviso:(i,n)=>estado(`Buscando el plano en ${file.name}: página ${i} de ${n} (tarda unos segundos; la primera vez, algo más)…`)});}catch(e){console.error(e);}finally{lector.cerrar();}
   const ds=ps.map(p=>datosPlano(file.name,p.texto,{ocr:p.ocr})).filter(Boolean);
   if(ds.length) return ds;
   const todo=paginas.join(' '),d=(conNombre||/Altura Paso Pilar|N[º°o]\.?\s*Lamas:/i.test(todo))&&datosPlano(file.name,todo);
