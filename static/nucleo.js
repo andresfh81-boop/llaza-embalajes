@@ -147,6 +147,27 @@ function piezasPlano(d){
   add('33000','LAMA',pm-205.5,d.lamas>0?Math.round(d.lamas):lamasPlano(A,d.modulos,P));
   return out;
 }
+// Nombre del cliente en el cajetín: lo que hay bajo «REFERENCIA» / «REFERENCE». En un escaneado, el OCR suele leer detrás de la
+// etiqueta lo que tiene al lado (sello, firma: «REFERENCE: Lor», «REFERENCIA: | Tel. e fax»), o ni siquiera lee la etiqueta (entonces
+// se mira tras el nº de «CLIENTE»). Vale la primera línea que parezca un nombre: casi todo en mayúsculas, como va en el cajetín.
+function clienteCajetin(texto){
+  const ln=String(texto||'').split('\n');
+  const limpia=x=>String(x||'').replace(/^[\s|]+/,'').split(/\s\|\s?|\s{2,}|\|/)[0].replace(/^[^A-Za-zÀ-ÿ0-9]+|[^A-Za-zÀ-ÿ0-9)]+$/g,'').trim();
+  const nombre=x=>{
+    // lo demás del cajetín va seguido en la capa de texto; «PLANO» es un rótulo de la hoja; un paréntesis sin cerrar quedó cortado por la firma
+    let r=limpia(x).split(/\s+(?:Motor|Desag|Centralita|PIE\b|H\s*PILAR|P\d\b|\d+°)/i)[0].replace(/\s+PLANO$/,'').slice(0,40).trim();
+    if(r.includes('(')&&!r.includes(')')) r=r.split('(')[0].trim();
+    const letras=r.replace(/[^A-Za-zÀ-ÿ]/g,''),may=r.replace(/[^A-ZÀ-Ý]/g,'');
+    return /[A-ZÀ-Ý]{3,}/.test(r)&&may.length>=letras.length*.6&&!/^(?:PIE|BASE|H\s*PILAR|INTERIOR|PLANO)\b/.test(r)?r:'';
+  };
+  const debajo=(i,k)=>{for(let j=i+1;j<=i+k&&j<ln.length;j++){const r=nombre(ln[j]);if(r)return r;}return '';};
+  const ir=ln.findIndex(x=>/REFEREN[CTZ]/i.test(x));
+  if(ir>=0) return nombre(ln[ir].replace(/.*REFEREN\w*\s*:?/i,''))||debajo(ir,3);
+  const ic=ln.findIndex(x=>/\b(?:CLIENTE?|KUNDE)\b/i.test(x));
+  if(ic<0) return '';
+  const id=ln.findIndex((x,k)=>k>=ic&&k<=ic+3&&/\b\d{5,7}\b/.test(x));
+  return id<0?'':debajo(id,2);
+}
 // Datos para piezasPlano sacados de un PDF que no es hoja de corte: del nombre del plano cliente escaneado
 // («54007677_4000x4000_TESTA.pdf» = nº, proyección × ancho, tipología) y del texto de la ficha de fabricación (PLANO.pdf):
 // tipo, módulos, nº de lamas, pilares y su altura. La ficha da la altura cortada de cada pilar («P1: 2754 mm») o solo la
@@ -179,14 +200,7 @@ function datosPlano(nombre,texto,op){
     }
   }
   if((m=t.match(/(?:OFERTA|OFFER|QUOTE|ANGEBOT|OFFRE)[^0-9]{0,6}(\d{6,10})/i))) d.oferta=m[1];
-  const ln=String(texto||'').split('\n'),ir=ln.findIndex(x=>/REFEREN[CTZ]/i.test(x));
-  if(ir>=0){
-    const limpia=x=>String(x||'').split(/\s\|\s?|\s{2,}|\|/)[0].replace(/^[^A-Za-zÀ-ÿ0-9]+|[^A-Za-zÀ-ÿ0-9)]+$/g,'').trim();
-    const r=limpia(ln[ir].replace(/.*REFEREN\w*\s*:?/i,''))||limpia(ln[ir+1]);
-    // lo demás del cajetín va seguido en la capa de texto; y sin una palabra en mayúsculas es ruido del sello o la firma («Tel. e fax»)
-    const rf=r.split(/\s+(?:Motor|Desag|Centralita|PIE\b|H\s*PILAR|P\d\b|\d+°)/i)[0].slice(0,40).trim();
-    if(/[A-ZÀ-Ý]{3,}/.test(rf)) d.referencia=rf;
-  }
+  const ref=clienteCajetin(texto);if(ref)d.referencia=ref;
   const mod=todos(/\b(\d{1,2})\s*M[ÓO]DUL(?:OS|O|ES|E|I|EN)\b/gi);if(mod.length)d.modulos=voto(mod);
   const ht=todos(/\bH\s*(?:Total|Totale|Gesamt)\s*[:;.]?\s*(\d{4})\s*mm/gi),hl=todos(/\bH\s*(?:Libre|Free|Libero|Frei|Lichte)\s*[:;.]?\s*(\d{4})\s*m/gi);
   if(ht.length)d.hTotal=voto(ht);else if(hl.length)d.hTotal=voto(hl)+220;
@@ -514,4 +528,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={clienteCajetin,repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};

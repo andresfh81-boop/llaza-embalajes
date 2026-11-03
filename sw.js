@@ -1,5 +1,5 @@
 // Guarda una copia de la app para que se pueda instalar y funcione sin conexión.
-const CACHE_NAME = 'embalajes-llaza-v6';
+const CACHE_NAME = 'embalajes-llaza-v7';
 const APP_SHELL = [
   './',
   './index.html',

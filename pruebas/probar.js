@@ -125,7 +125,17 @@ assert.strictEqual(textoReal('atou <H oz ire tvZ ilo u-F LII J u.< u ta t,{ u f,
   const dl=datosPlano('escaneo.pdf',caj('2500x4770','24002066','PRL'),{ocr:true});assert.strictEqual(dl.proy,2500);assert.strictEqual(dl.ancho,4770);
   // sin PRL ni PRP, la que no cabe en una lama es el ancho
   const ds=datosPlano('escaneo.pdf','ESCALA 1 MODULOS 2 PILARES 2500x4770 H Total: 2720 mm MODELO',{ocr:true});assert.strictEqual(ds.proy,2500);
-  console.log('PDF mezclado: ok');
+  // Cliente del cajetín: lecturas reales del OCR, con ruido del sello y la firma detrás de la etiqueta.
+{const {clienteCajetin:cc}=require(path.join(__dirname,'..','static','nucleo.js'));
+ assert.strictEqual(cc('CLIENT: BASE REGULABLE\n300583 (2 |\nREFERENCE: Lor |\nKAPITANY ORIGINAL KFT — |\n— — “ — 1'),'KAPITANY ORIGINAL KFT');
+ assert.strictEqual(cc('CLIENT: 7 |\n300583 |\nKAPITANY ORIGINAL KFT |\n———]— |'),'KAPITANY ORIGINAL KFT'); // no ha leído la etiqueta
+ assert.strictEqual(cc('REFERENCIA: | Tel. e fax 0432.923\' - |\nTENDE CARISMA PLANO |'),'TENDE CARISMA');
+ assert.strictEqual(cc('REFERENCIA: | Te: 200 4 1 gra\nTEXTILUX'),'TEXTILUX');
+ assert.strictEqual(cc('REFERENCIA:\n\nTOLSOL'),'TOLSOL');
+ assert.strictEqual(cc('REFERENCIA :\n| TOLDOS CERCA ROIG (R: Eo .\n== aa: — —'),'TOLDOS CERCA ROIG');
+ assert.strictEqual(cc('REFERENCIA: ALTONA INTERIOR SL  Motor izquierda'),'ALTONA INTERIOR SL');
+ assert.strictEqual(cc('sin nada de cajetín'),'');}
+console.log('PDF mezclado: ok');
 })().catch(e=>{console.error(e);process.exit(1);});
 console.log('plano cliente: ok');
 // Cabecera de la hoja: número, nombre, tipología, medidas, módulo (también "2-3" con guion raro) y colores.
