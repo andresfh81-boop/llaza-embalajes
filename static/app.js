@@ -1124,22 +1124,60 @@ function resumenCajas(r){
   for(const b of r.bins){const x=m.get(b.model.id)||{id:b.model.id,nombre:b.model.nombre,tipo:b.model.tipo,ext:[b.model.extL,b.model.extA,b.model.extH],n:0};x.n++;m.set(b.model.id,x);}
   return {cajas:[...m.values()],total:r.bins.length,m3:volBins(r.bins)/1e9,fuera:r.unfit.length+((r.aparcados||[]).length)};
 }
+// Comparación con el plano firmado: la fila de una hoja de corte guarda las piezas del plano de ese pedido (e.plano) y calcula
+// sus cajas con el mismo embalaje y la colocación automática, para avisar si no coinciden.
+function compararPlano(e){
+  if(!e.plano) return e;
+  const mods=cajas.filter(c=>c.tipo===e.tipo);
+  if(!mods.length){delete e.plano.cajas;return e;}
+  Object.assign(e.plano,resumenCajas(planGrupos(bultosDe(e.plano.lineas,e.plano.comp),mods)));
+  return e;
+}
+const firmaCajas=l=>(l||[]).map(c=>c.n+'×'+c.nombre).sort().join();
+// null si no hay nada que comparar; si no, si coinciden
+const coincidePlano=e=>e.estimado||!e.plano||!e.plano.cajas||e.sinCajas?null:firmaCajas(e.cajas)===firmaCajas(e.plano.cajas);
+const partesDe=e=>e.partes||[e];
+const noCoinciden=()=>prevision.flatMap(partesDe).filter(p=>coincidePlano(p)===false);
+function notaPlano(e){
+  if(e.partes){const m=e.partes.filter(p=>coincidePlano(p)===false);return m.map(p=>`<div class="ojo">${esc(p.numero)}: el plano daba ${esc(cajasTxt(p.plano))}; por separado, la hoja da ${esc(cajasTxt(p))}</div>`).join('');}
+  const c=coincidePlano(e);
+  if(c===null) return '';
+  return c?'<div class="plano-ok">✓ Coincide con el plano</div>':`<div class="ojo">⚠ No coincide: el plano daba ${esc(cajasTxt(e.plano))} (${uds(e.plano.total)})${e.origen==='pedido'?'. Esta fila lleva tus retoques a mano':''}</div>`;
+}
 function calcularPrev(e){
   const mods=cajas.filter(c=>c.tipo===e.tipo);
   if(!mods.length){Object.assign(e,{cajas:[],total:0,m3:0,fuera:0,sinCajas:true});return e;}
   delete e.sinCajas;
-  return Object.assign(e,resumenCajas(planGrupos(bultosDe(e.lineas,e.comp),mods)));
+  return compararPlano(Object.assign(e,resumenCajas(planGrupos(bultosDe(e.lineas,e.comp),mods))));
 }
 // Mete un pedido en la previsión; si ya estaba (mismo nº de pedido), lo sustituye. Si estaba dentro de un envío
 // compartido, se sustituye su parte y el envío se vuelve a calcular junto.
 // el mismo pedido viene como 54007673-10 en el nombre del plano y como 54007673/10 en la hoja
 const normNum=n=>String(n||'').trim().replace(/\s*[\/\u2010-\u2015-]\s*/g,'-');
+// La fila h (hoja) se queda con las piezas del plano p. La cabecera de la hoja solo trae el modelo de pérgola: el cliente del plano manda sobre él.
+function guardarPlano(h,p){
+  h.plano={lineas:p.lineas,comp:p.comp};compararPlano(h);
+  if(p.cliente&&(!h.cliente||/^P[ÉE]RGOLA\b/i.test(h.cliente))) h.cliente=p.cliente;
+}
+// La hoja e sustituye a la fila v: si v era el plano, o ya tenía guardado uno, lo conserva para comparar.
+function heredarPlano(e,v){
+  if(e.estimado) return;
+  const pl=e.plano||(v.estimado?{lineas:v.lineas,comp:v.comp}:v.plano);
+  if(pl){e.plano=pl;compararPlano(e);}
+}
 function meterPrevision(e){
   const k=prevision.findIndex(x=>e.numero&&normNum(x.numero)===normNum(e.numero));
   // la hoja de corte solo trae el modelo de pérgola: se conserva el cliente que ya hubiera (leído del plano o escrito a mano)
-  if(k>=0){const v=prevision[k];if(v.cliente&&(v.estimado||!e.cliente))e.cliente=v.cliente;prevision[k]=Object.assign(e,{id:v.id});return true;}
+  if(k>=0){
+    const v=prevision[k];
+    if(e.estimado&&!v.estimado){guardarPlano(v,e);return true;} // el plano no sustituye a la hoja: se guarda para comparar
+    if(v.cliente&&(v.estimado||!e.cliente))e.cliente=v.cliente;
+    heredarPlano(e,v);
+    prevision[k]=Object.assign(e,{id:v.id});return true;
+  }
   const j=prevision.findIndex(x=>e.numero&&x.partes&&x.partes.some(p=>normNum(p.numero)===normNum(e.numero)));
-  if(j>=0){const ps=prevision[j].partes.map(p=>normNum(p.numero)===normNum(e.numero)?e:p);prevision[j]=Object.assign(juntarPrev(ps,prevision[j].tipo),{id:prevision[j].id});return true;}
+  if(j>=0&&e.estimado){const p=prevision[j].partes.find(p=>normNum(p.numero)===normNum(e.numero));if(!p.estimado){guardarPlano(p,e);return true;}}
+  if(j>=0){const ps=prevision[j].partes.map(p=>{if(normNum(p.numero)!==normNum(e.numero))return p;heredarPlano(e,p);return e;});prevision[j]=Object.assign(juntarPrev(ps,prevision[j].tipo),{id:prevision[j].id});return true;}
   prevision.push(e);return false;
 }
 // Envío compartido: varios pedidos que van en las mismas cajas. Se calculan juntos (colocación automática), con un bulto de
@@ -1183,7 +1221,7 @@ async function lotePrevision(files){
           const pz=piezasPlano(Object.assign({},d,{sinTipo:!d.tipologia}));if(!pz.length)return;
           hay++;
           const num=d.numero||d.oferta||'',k=normNum(num)||file.name+'#'+i;
-          if(grupos.has(k))return;
+          if(grupos.has(k)){const g0=grupos.get(k);if(!g0.estimado&&!g0.planoFilas){g0.planoFilas=pz;g0.clientePlano=d.referencia||'';}return;}
           grupos.set(k,{numero:num,cliente:d.referencia||'',filas:pz,estimado:true,notaPlano:d.medidasOCR?'medidas leídas con OCR: compruébalas':''});
           nPlanos++;
         });
@@ -1191,11 +1229,12 @@ async function lotePrevision(files){
         continue;
       }
       const k=normNum(cab.numero)||file.name;let g=grupos.get(k);
-      if(!g||g.estimado){g={numero:cab.numero||'',cliente:cab.nombre||'',filas:[]};if(grupos.has(k)&&grupos.get(k).estimado)nPlanos--;}
+      if(!g||g.estimado){const pl=g&&g.estimado?g:null;g={numero:cab.numero||'',cliente:cab.nombre||'',filas:[],planoFilas:pl?pl.filas:null,clientePlano:pl?pl.cliente:''};if(pl)nPlanos--;}
       g.filas.push(...filas);grupos.set(k,g);
     }catch(e){malas.push(file.name+' (no se ha podido leer)');}
   }
   let n=0,sust=0;
+  const aLineas=fs=>fs.flatMap(l=>{const p=perfiles.find(x=>String(x.ref).trim()===l.ref);return p&&l.largo&&l.cant?[{pid:p.id,largo:l.largo,cant:l.cant}]:[];});
   for(const g of grupos.values()){
     const lineas=[];let sin=0;
     for(const l of g.filas){
@@ -1204,11 +1243,13 @@ async function lotePrevision(files){
       else if(!p&&!base.montados.find(x=>String(x.ref).trim()===l.ref)) sin++;
     }
     const e=calcularPrev({id:nuevoId(),fecha:new Date().toISOString().slice(0,10),numero:g.numero,cliente:g.cliente,tipo:prevTipo||pedido.tipo,origen:'lote',lineas,comp:Object.assign({},componentes(),{n:1}),sinPerfil:sin,estimado:!!g.estimado,notaPlano:g.notaPlano||''});
+    if(g.planoFilas){e.plano={lineas:aLineas(g.planoFilas),comp:e.comp};compararPlano(e);if(g.clientePlano)e.cliente=g.clientePlano;}
     if(meterPrevision(e)) sust++;
     n++;
   }
   guardarPrevision();renderPrevision();
-  estado((n?`${n} ${n===1?'pedido añadido':'pedidos añadidos'} a la previsión`+(nPlanos?` (${nPlanos} desde el plano cliente, ${nPlanos===1?'estimación':'estimaciones'})`:'')+(sust?` (${sust} ya ${sust===1?'estaba y se ha sustituido':'estaban y se han sustituido'})`:'')+'.':'')+(malas.length?` No se ha leído: ${malas.join('; ')}.`:''));
+  const nd=noCoinciden().length;
+  estado((nd?`Ojo: ${nd===1?'en 1 pedido la hoja de corte no da':`en ${nd} pedidos la hoja de corte no da`} las mismas cajas que el plano. `:'')+(n?`${n} ${n===1?'pedido añadido':'pedidos añadidos'} a la previsión`+(nPlanos?` (${nPlanos} desde el plano cliente, ${nPlanos===1?'estimación':'estimaciones'})`:'')+(sust?` (${sust} ya ${sust===1?'estaba y se ha sustituido':'estaban y se han sustituido'})`:'')+'.':'')+(malas.length?` No se ha leído: ${malas.join('; ')}.`:''));
 }
 function totalesPrev(){
   const m=new Map();
@@ -1226,7 +1267,7 @@ function renderPrevision(){
   const tot=totalesPrev(),nc=tot.reduce((s,c)=>s+c.n,0),m3=prevision.reduce((s,e)=>s+(e.m3||0),0);
   el.innerHTML=`<div class="totals"><div><b>${prevision.length}</b> <span>${prevision.length===1?'pedido':'pedidos'}</span></div><div><b>${nc}</b> <span>${nc===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><span class="acciones"><button class="btn" type="button" data-act="prev-correo">Enviar por correo</button><button class="btn ghost" type="button" data-act="prev-excel">Guardar en Excel</button><button class="btn ${prevVaciar?'danger':'ghost'}" type="button" data-act="prev-vaciar">${prevVaciar?'¿Seguro? Pulsa otra vez':'Vaciar previsión'}</button></span></div>${leyenda}
     <h3>Cajas que hacen falta</h3><div class="scroll"><table><thead><tr><th>Modelo</th><th>Tipo</th><th>Exterior L×A×H <span class="u">(mm)</span></th><th class="n">Cantidad</th></tr></thead><tbody>${tot.map(c=>`<tr><td><b class="t-${esc(c.tipo)}">${esc(c.nombre)}</b></td><td>${tipoTxt(c.tipo)}</td><td>${c.ext.join(' × ')} mm</td><td class="n"><b class="t-${esc(c.tipo)}">${uds(c.n)}</b></td></tr>`).join('')}</tbody></table></div>
-    <h3>Pedidos</h3>${prevMarcas.size>=2?`<div class="manual">${prevMarcas.size} pedidos marcados. <button class="btn small" type="button" data-act="prev-juntar">Juntar en un envío</button> <button class="btn small ghost" type="button" data-act="prev-desmarcar">Quitar marcas</button></div>`:'<p class="sub">Si dos pedidos van en las mismas cajas, márcalos y pulsa «Juntar en un envío».</p>'}<div class="scroll"><table class="prev"><thead><tr><th></th><th>Fecha</th><th>Nº pedido</th><th>Cliente / pérgola</th><th>Embalaje</th><th>Cajas</th><th class="n">Total</th><th class="n">m³</th><th></th></tr></thead><tbody>${prevision.map((e,i)=>`<tr${e.partes?' class="compartido"':''}><td><input type="checkbox" data-pmarca="${esc(e.id)}"${prevMarcas.has(e.id)?' checked':''} aria-label="Marcar para juntar"></td><td>${fechaEs(e.fecha)}</td>${e.partes?`<td>${e.partes.map(p=>esc(p.numero||'sin nº')).join('<br>')}</td><td>${e.partes.map(p=>esc(p.cliente||'')).join('<br>')}</td>`:`<td><input class="prev-in" data-pi="${i}" data-pk="numero" value="${esc(e.numero)}" aria-label="Nº de pedido"></td><td><input class="prev-in ancho" data-pi="${i}" data-pk="cliente" value="${esc(e.cliente)}" title="${esc(e.cliente)}" placeholder="Cliente sin leer: escríbelo" aria-label="Cliente">${e.estimado?`<small class="marca">Estimación desde el plano${e.notaPlano?' · '+esc(e.notaPlano):''}</small>`:''}</td>`}<td><select class="prev-in t-${esc(e.tipo)}" data-pi="${i}" data-pk="tipo" aria-label="Tipo de embalaje">${Object.entries(TIPOS).map(([k,t])=>`<option value="${k}"${k===e.tipo?' selected':''}>${t}</option>`).join('')}</select></td><td>${e.sinCajas?`<span class="ojo">No hay cajas de ${esc(TIPOS[e.tipo].toLowerCase())} en el catálogo</span>`:e.cajas.map(c=>`<b class="t-${esc(c.tipo)}">${c.n} × ${esc(c.nombre)}</b>`).join(', ')}${e.fuera?` <span class="ojo">· ${e.fuera} ${e.fuera===1?'bulto no cabe':'bultos no caben'}</span>`:''}${e.sinPerfil?` <span class="ojo">· ${e.sinPerfil} ${e.sinPerfil===1?'línea sin perfil en el catálogo':'líneas sin perfil en el catálogo'}</span>`:''}${e.partes?` <span class="tag">Envío compartido · ${e.partes.length} pedidos</span>`:''}${e.origen==='pedido'?' <small class="sub">(del pedido, con sus retoques)</small>':''}</td><td class="n">${uds(e.total)}</td><td class="n">${(e.m3||0).toFixed(2)}</td><td class="act">${e.partes?`<button class="btn small ghost" type="button" data-act="prev-separar" data-i="${i}">Separar</button>`:''}<button class="btn small danger" type="button" data-act="prev-quitar" data-i="${i}">Quitar</button></td></tr>`).join('')}</tbody></table></div>
+    <h3>Pedidos</h3>${noCoinciden().length?`<div class="note" role="alert">⚠ ${noCoinciden().length===1?'En 1 pedido la hoja de corte no da':`En ${noCoinciden().length} pedidos la hoja de corte no da`} las mismas cajas que el plano: ${noCoinciden().map(p=>esc(p.numero)).join(', ')}. Mira el detalle en su fila.</div>`:''}${prevMarcas.size>=2?`<div class="manual">${prevMarcas.size} pedidos marcados. <button class="btn small" type="button" data-act="prev-juntar">Juntar en un envío</button> <button class="btn small ghost" type="button" data-act="prev-desmarcar">Quitar marcas</button></div>`:'<p class="sub">Si dos pedidos van en las mismas cajas, márcalos y pulsa «Juntar en un envío».</p>'}<div class="scroll"><table class="prev"><thead><tr><th></th><th>Fecha</th><th>Nº pedido</th><th>Cliente / pérgola</th><th>Embalaje</th><th>Cajas</th><th class="n">Total</th><th class="n">m³</th><th></th></tr></thead><tbody>${prevision.map((e,i)=>`<tr${e.partes?' class="compartido"':''}><td><input type="checkbox" data-pmarca="${esc(e.id)}"${prevMarcas.has(e.id)?' checked':''} aria-label="Marcar para juntar"></td><td>${fechaEs(e.fecha)}</td>${e.partes?`<td>${e.partes.map(p=>esc(p.numero||'sin nº')).join('<br>')}</td><td>${e.partes.map(p=>esc(p.cliente||'')).join('<br>')}</td>`:`<td><input class="prev-in" data-pi="${i}" data-pk="numero" value="${esc(e.numero)}" aria-label="Nº de pedido"></td><td><input class="prev-in ancho" data-pi="${i}" data-pk="cliente" value="${esc(e.cliente)}" title="${esc(e.cliente)}" placeholder="Cliente sin leer: escríbelo" aria-label="Cliente">${e.estimado?`<small class="marca">Estimación desde el plano${e.notaPlano?' · '+esc(e.notaPlano):''}</small>`:''}</td>`}<td><select class="prev-in t-${esc(e.tipo)}" data-pi="${i}" data-pk="tipo" aria-label="Tipo de embalaje">${Object.entries(TIPOS).map(([k,t])=>`<option value="${k}"${k===e.tipo?' selected':''}>${t}</option>`).join('')}</select></td><td>${e.sinCajas?`<span class="ojo">No hay cajas de ${esc(TIPOS[e.tipo].toLowerCase())} en el catálogo</span>`:e.cajas.map(c=>`<b class="t-${esc(c.tipo)}">${c.n} × ${esc(c.nombre)}</b>`).join(', ')}${e.fuera?` <span class="ojo">· ${e.fuera} ${e.fuera===1?'bulto no cabe':'bultos no caben'}</span>`:''}${e.sinPerfil?` <span class="ojo">· ${e.sinPerfil} ${e.sinPerfil===1?'línea sin perfil en el catálogo':'líneas sin perfil en el catálogo'}</span>`:''}${e.partes?` <span class="tag">Envío compartido · ${e.partes.length} pedidos</span>`:''}${e.origen==='pedido'?' <small class="sub">(del pedido, con sus retoques)</small>':''}${notaPlano(e)}</td><td class="n">${uds(e.total)}</td><td class="n">${(e.m3||0).toFixed(2)}</td><td class="act">${e.partes?`<button class="btn small ghost" type="button" data-act="prev-separar" data-i="${i}">Separar</button>`:''}<button class="btn small danger" type="button" data-act="prev-quitar" data-i="${i}">Quitar</button></td></tr>`).join('')}</tbody></table></div>
     <p class="sub">La previsión se guarda sola en este navegador. Los pedidos leídos de varias hojas usan la colocación automática; los que vienen de la pestaña Pedido guardan las cajas tal como estaban. Si cambias el embalaje de un pedido, se recalcula con la colocación automática. Un envío compartido cuenta sus cajas una sola vez; «Separar» vuelve a calcular cada pedido por su cuenta.</p>`;
 }
 function excelPrevision(){
@@ -1235,13 +1276,13 @@ function excelPrevision(){
   const tablaTot=[['Modelo','Tipo','Exterior L×A×H (mm)','Cantidad (uds.)'].map(v=>({v,s:'cab'})),
     ...tot.map(c=>[{v:c.nombre,s:c.tipo},{v:TIPOS[c.tipo]||c.tipo,s:c.tipo},c.ext.join(' × ')+' mm',{v:c.n,s:c.tipo}]),
     ['','','Total',{v:tot.reduce((s,c)=>s+c.n,0),s:'neg'}]];
-  const pedidos=[[{v:'Previsión de cajas · '+hoy,s:'titulo'}],[],['Fecha','Nº pedido','Cliente / pérgola','Embalaje','Cajas','Total cajas (uds.)','m³','Envío compartido'].map(v=>({v,s:'cab'})),
-    ...prevision.map(e=>[fechaEs(e.fecha),e.numero,e.cliente+(e.estimado?' (estimación desde el plano)':''),{v:TIPOS[e.tipo]||e.tipo,s:e.tipo},{v:cajasTxt(e)+(e.fuera?` (${e.fuera} sin caja)`:''),s:e.tipo},e.total,{v:Math.round((e.m3||0)*100)/100,s:'dec'},e.partes?`Sí, ${e.partes.length} pedidos en las mismas cajas`:'']),
+  const pedidos=[[{v:'Previsión de cajas · '+hoy,s:'titulo'}],[],['Fecha','Nº pedido','Cliente / pérgola','Embalaje','Cajas','Total cajas (uds.)','m³','Envío compartido','Frente al plano'].map(v=>({v,s:'cab'})),
+    ...prevision.map(e=>[fechaEs(e.fecha),e.numero,e.cliente+(e.estimado?' (estimación desde el plano)':''),{v:TIPOS[e.tipo]||e.tipo,s:e.tipo},{v:cajasTxt(e)+(e.fuera?` (${e.fuera} sin caja)`:''),s:e.tipo},e.total,{v:Math.round((e.m3||0)*100)/100,s:'dec'},e.partes?`Sí, ${e.partes.length} pedidos en las mismas cajas`:'',partesDe(e).filter(p=>coincidePlano(p)===false).map(p=>`${e.partes?p.numero+': ':''}No coincide: el plano daba ${cajasTxt(p.plano)}`).join('; ')||(partesDe(e).some(p=>coincidePlano(p))?'Coincide':'')]),
     ['','','','','Total',{v:prevision.reduce((s,e)=>s+e.total,0),s:'neg'},{v:Math.round(prevision.reduce((s,e)=>s+(e.m3||0),0)*100)/100,s:'decneg'}],
     // los totales por modelo van también debajo de los pedidos, para verlos sin cambiar de hoja (Andrés, 27/10/2026)
     [],[{v:'Cajas que hacen falta',s:'titulo'}],...tablaTot,...ley];
   const totales=[[{v:'Cajas que hacen falta · '+hoy,s:'titulo'}],[],...tablaTot,...ley];
-  const nombre=descargar(xlsx([{nombre:'Pedidos',anchos:[12,22,40,16,46,16,10,30],filas:pedidos},{nombre:'Total por modelo',anchos:[18,18,24,16],filas:totales}]),`Previsión de cajas ${hoy.replace(/\//g,'-')}.xlsx`);
+  const nombre=descargar(xlsx([{nombre:'Pedidos',anchos:[12,22,40,16,46,16,10,30,46],filas:pedidos},{nombre:'Total por modelo',anchos:[18,18,24,16],filas:totales}]),`Previsión de cajas ${hoy.replace(/\//g,'-')}.xlsx`);
   return nombre;
 }
 function textoPrevision(){
@@ -1261,7 +1302,7 @@ function textoPrevision(){
   $('prevision').addEventListener('change',e=>{
     if(e.target.dataset.pmarca){const id=e.target.dataset.pmarca;if(e.target.checked)prevMarcas.add(id);else prevMarcas.delete(id);renderPrevision();return;}
     const t=e.target,i=Number(t.dataset.pi),x=prevision[i];if(!x||!t.dataset.pk)return;
-    if(t.dataset.pk==='tipo'){x.tipo=t.value;x.origen='lote';if(x.partes)x.partes.forEach(p=>p.tipo=t.value);calcularPrev(x);} else x[t.dataset.pk]=t.value.trim();
+    if(t.dataset.pk==='tipo'){x.tipo=t.value;x.origen='lote';if(x.partes)x.partes.forEach(p=>{p.tipo=t.value;calcularPrev(p);});calcularPrev(x);} else x[t.dataset.pk]=t.value.trim();
     guardarPrevision();renderPrevision();
   });
   document.addEventListener('click',e=>{

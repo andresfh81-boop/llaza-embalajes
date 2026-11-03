@@ -257,3 +257,5 @@ details.plano{border:1px solid var(--line);border-radius:4px;padding:8px 10px}
 details.plano summary{cursor:pointer;font-weight:600;color:var(--accent)}
 details.plano[open] summary{margin-bottom:6px}
 details.plano .sub{margin:0 0 8px}
+.plano-ok{color:var(--t-cerrada);font-size:13px;font-weight:600}
+table.prev .ojo{display:block;font-size:13px}
