@@ -259,3 +259,10 @@ details.plano[open] summary{margin-bottom:6px}
 details.plano .sub{margin:0 0 8px}
 .plano-ok{color:var(--t-cerrada);font-size:13px;font-weight:600}
 table.prev .ojo{display:block;font-size:13px}
+.v3d{position:relative;width:100%}
+#c3d{display:block;width:100%;height:min(62vh,560px);cursor:grab;touch-action:none;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+#c3d:active{cursor:grabbing}
+.v3d-tip{position:absolute;z-index:2;pointer-events:none;padding:3px 8px;border-radius:4px;background:var(--fg);color:var(--panel);font:600 13px var(--body);white-space:nowrap}
+.v3d-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.v3d-ctl input[type=range]{flex:1 1 220px;width:auto;padding:0;border:0;background:none}
+#l3d{flex:1 1 100%;font-weight:500}

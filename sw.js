@@ -1,5 +1,5 @@
 // Guarda una copia de la app para que se pueda instalar y funcione sin conexión.
-const CACHE_NAME = 'embalajes-llaza-v7';
+const CACHE_NAME = 'embalajes-llaza-v8';
 const APP_SHELL = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const APP_SHELL = [
   './static/nucleo.js',
   './static/pdf.js',
   './static/xlsx.js',
+  './static/vista3d.js',
   './static/app.js',
   './vendor/pdfjs/pdf.min.js',
   './vendor/pdfjs/pdf.worker.min.js',

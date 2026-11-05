@@ -70,6 +70,19 @@ assert.ok(!apoyado(Object.assign(pz(2000,2500),{y:180}),cajaA));
  assert.ok(Math.max(...b[0].items.filter(p=>p.it.g==='estructura').map(p=>p.y))<=Math.min(...b[0].items.filter(p=>p.it.g==='lamas').map(p=>p.y)),'estructura abajo');
  const v=planGrupos([...gr('lamas',12,282,275,3855),...gr('estructura',8,236,138,4000)],[C5]).bins;
  assert.strictEqual(v[0].items[0].it.g,'estructura');assert.strictEqual(v[v.length-1].items[0].it.g,'lamas');}
+// Vista 3D: una lama con corcho son tres cuerpos sin solaparse, y en cualquier giro lo de delante se pinta después de lo de detrás.
+{const V=require(path.join(__dirname,'..','static','vista3d.js'));
+ const lama={it:{L:3000,cap:{l:600,w:155}},x:0,y:0,w:205,h:275,medio:155,off:0},cl=V.cuerpos3D(lama,5);
+ assert.strictEqual(cl.length,3);assert.strictEqual(cl[2].b[2]-cl[2].a[2],150);assert.strictEqual(cl[0].b[2]-cl[0].a[2],200);
+ assert.deepStrictEqual(V.cuerpos3D({it:{L:500},x:10,y:20,w:405,h:205,off:7},5)[0],{p:V.cuerpos3D({it:{L:500},x:10,y:20,w:405,h:205,off:7},5)[0].p,a:[7,20,10],b:[507,220,410]});
+ const b=[...Array(3)].map((_,i)=>({p:i,a:[0,i*100,0],b:[1000,i*100+100,100]})); // pila: desde arriba, el de arriba se pinta el último
+ assert.deepStrictEqual(V.ordenPintado(b,V.camara3D(.6,.5)).map(c=>c.p),[0,1,2]);
+ const fila=[...Array(3)].map((_,i)=>({p:i,a:[0,0,i*100],b:[1000,100,i*100+100]})); // fila a lo ancho, vista desde la derecha: el de más a la derecha, el último
+ assert.deepStrictEqual(V.ordenPintado(fila,V.camara3D(.3,.5)).map(c=>c.p),[0,1,2]);
+ assert.deepStrictEqual(V.ordenPintado(fila,V.camara3D(Math.PI-.3,.5)).map(c=>c.p),[2,1,0]);
+ for(const [yaw,esp] of [[Math.PI/2,[10,-20]],[0,[5,-20]]]){const q=V.camara3D(yaw,0).pr([5,20,10]);assert.ok(Math.abs(q[0]-esp[0])<1e-9&&Math.abs(q[1]-esp[1])<1e-9);} // de frente, la Z a la derecha; desde la derecha, el largo a la derecha
+ assert.deepStrictEqual(V.ordenCarga([{y:5,x:0},{y:0,x:9},{y:0,x:1}]).map(p=>p.x),[1,9,0]);
+ assert.strictEqual(V.bultoEn3D([{q:[[0,0],[10,0],[10,10],[0,10]],p:'a'},{q:[[5,5],[20,5],[20,20],[5,20]],p:'b'}],7,7),'b');assert.strictEqual(V.bultoEn3D([{q:[[0,0],[10,0],[10,10],[0,10]],p:'a'}],50,50),null);}
 // Un bulto solo en la caja va centrado.
 {const b=planGrupos(mk(1,180,180,2000),[C5]).bins[0];assert.strictEqual(b.items[0].off,1500);}
 console.log('alternadas: ok');
