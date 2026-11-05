@@ -276,15 +276,15 @@ function dibujoPlanta(b,i,col){
 // Huecos en la vista de lado: a lo largo, lo libre delante y detrás de cada bulto hasta la pared o el bulto de su misma calle
 // (mismo ancho y misma altura), como en la de arriba; y encima, lo libre hasta el bulto que tenga encima o hasta la tapa,
 // por tramos del largo. Solo los huecos que se ven vacíos en el dibujo; las cotas repetidas salen una vez.
-function huecosLado(b,k,ky,fc){
-  const M=b.model,out=[],vistos=new Set(),MIN=15,sol=(a1,a2,b1,b2)=>a1<b2-.01&&b1<a2-.01;
+function huecosLado(b,k,ky,fc,espejo){
+  const M=b.model,out=[],vistos=new Set(),MIN=15,sol=(a1,a2,b1,b2)=>a1<b2-.01&&b1<a2-.01,X=v=>(espejo?M.intL-v:v)*k;
   const z=p=>[p.off||0,(p.off||0)+p.it.L];
   const num_=(x,y,n,ff)=>`<text class="cota libre hueco" x="${x}" y="${y}" font-size="${ff}" text-anchor="middle" dominant-baseline="central">${n} mm</text>`;
   for(const p of b.items){
     const [z1,z2]=z(p),y1=p.y,y2=p.y+p.h,otros=b.items.filter(o=>o!==p);
     // solo se acotan los huecos que en el dibujo se ven vacíos: si otro bulto (delante o detrás) ocupa ese sitio, la cota lo pisaría
     const tapa=(a,c,h1,h2)=>otros.some(o=>sol(z(o)[0],z(o)[1],a,c)&&sol(o.y,o.y+o.h,h1,h2));
-    if(b.items.some(o=>o!==p&&o.x>=p.x+p.w-.01&&(o.off||0)<=z1+.01&&z(o)[1]>=z2-.01&&o.y<=y1+.01&&o.y+o.h>=y2-.01)) continue;
+    if(b.items.some(o=>o!==p&&(espejo?o.x+o.w<=p.x+.01:o.x>=p.x+p.w-.01)&&(o.off||0)<=z1+.01&&z(o)[1]>=z2-.01&&o.y<=y1+.01&&o.y+o.h>=y2-.01)) continue;
     // a lo largo
     const calle=b.items.filter(o=>o!==p&&sol(o.x,o.x+o.w,p.x,p.x+p.w)&&sol(o.y,o.y+o.h,y1,y2));
     const izq=Math.max(0,...calle.filter(o=>z(o)[1]<=z1+.01).map(o=>z(o)[1])),der=Math.min(M.intL,...calle.filter(o=>z(o)[0]>=z2-.01).map(o=>z(o)[0]));
@@ -293,7 +293,7 @@ function huecosLado(b,k,ky,fc){
       const lib=Math.round(c-a),clave=['L',Math.round(y1),Math.round(a),Math.round(c)].join();
       if(lib<MIN||vistos.has(clave)||tapa(a,c,y1,y2)) continue;
       vistos.add(clave);
-      out.push(`<line class="cota hueco" x1="${a*k}" x2="${c*k}" y1="${cy}" y2="${cy}" vector-effect="non-scaling-stroke"/>`+num_((a+c)/2*k,cy,lib,Math.min(fc,lib*k/((String(lib).length+3)*.62))));
+      out.push(`<line class="cota hueco" x1="${X(a)}" x2="${X(c)}" y1="${cy}" y2="${cy}" vector-effect="non-scaling-stroke"/>`+num_(X((a+c)/2),cy,lib,Math.min(fc,lib*k/((String(lib).length+3)*.62))));
     }
     // encima, por tramos del largo según lo que tenga encima en su mismo ancho
     const enc=b.items.filter(o=>o!==p&&o.y>=y2-.01&&sol(o.x,o.x+o.w,p.x,p.x+p.w)&&sol(z(o)[0],z(o)[1],z1,z2));
@@ -309,25 +309,26 @@ function huecosLado(b,k,ky,fc){
       const lib=Math.round(t.g-y2),clave=['H',Math.round(t.s),Math.round(t.e),Math.round(y2),Math.round(t.g)].join();
       if(lib<MIN||(t.e-t.s)*k<20||vistos.has(clave)||t.tap) continue;
       vistos.add(clave);
-      const cx=(t.s+t.e)/2*k,ya=(M.intH-t.g)*ky,yb=(M.intH-y2)*ky;
+      const cx=X((t.s+t.e)/2),ya=(M.intH-t.g)*ky,yb=(M.intH-y2)*ky;
       out.push(`<line class="cota hueco" x1="${cx}" x2="${cx}" y1="${ya}" y2="${yb}" vector-effect="non-scaling-stroke"/>`+num_(cx,ya+(yb-ya)*.3,lib,Math.min(fc,(yb-ya)*.5,(t.e-t.s)*k/((String(lib).length+3)*.6))));
     }
   }
   return out.join('');
 }
-function dibujoLateral(b,i,col){
+// izq: mirando desde la pared izquierda de la vista de frente: el frente queda a la derecha y lo más a la izquierda tapa lo de detrás.
+function dibujoLateral(b,i,col,izq){
   const M=b.model,W=PW,k=W/M.intL,ky=k*AMPLIA,H=M.intH*ky,mg=42,fc=13;
-  const ocL=Math.max(0,...b.items.map(p=>(p.off||0)+p.it.L)),ocH=Math.max(0,...b.items.map(p=>p.y+p.h));
+  const ocL=izq?M.intL-Math.min(M.intL,...b.items.map(p=>p.off||0)):Math.max(0,...b.items.map(p=>(p.off||0)+p.it.L)),ocH=Math.max(0,...b.items.map(p=>p.y+p.h));
   const pieza=p=>{
-    const c=`class="lado" fill="var(--p${col(p.it)})" ${trazo(p.it,1)} vector-effect="non-scaling-stroke"`,x0=(p.off||0)*k,L=p.it.L*k,y0=(M.intH-p.y-p.h)*ky,h=p.h*ky;
+    const c=`class="lado" fill="var(--p${col(p.it)})" ${trazo(p.it,1)} vector-effect="non-scaling-stroke"`,x0=(izq?M.intL-(p.off||0)-p.it.L:p.off||0)*k,L=p.it.L*k,y0=(M.intH-p.y-p.h)*ky,h=p.h*ky;
     let g;
     // lama girada con protección: el cuerpo es más bajo y los extremos llevan el alto entero
     if(p.medioH){const l=Math.min(p.it.cap.l,p.it.L/2)*k,hm=p.medioH*ky;g=`<rect x="${x0}" y="${y0+(h-hm)/2}" width="${L}" height="${hm}" ${c}/><rect x="${x0}" y="${y0}" width="${l}" height="${h}" ${c}/><rect x="${x0+L-l}" y="${y0}" width="${l}" height="${h}" ${c}/>`;}
     else g=`<rect x="${x0}" y="${y0}" width="${L}" height="${h}" ${c}/>`;
     return `<g><title>${esc(p.it.p.nombre)} · ${p.it.L} mm${varias(p.it)?' · '+piezas(p.it):''}${p.it.m?' · marcaje '+esc(p.it.m):''}</title>${g}${rotulo(p,x0,y0,L,h,p.h-num(pedido.holgura),fc)}</g>`;
   };
-  const ld=lados(W,H,mg,fc*.85,['ARRIBA','FONDO','SUELO','FRENTE']);
-  return `<svg class="planta" viewBox="${-mg-ld.bd} ${-ld.bd} ${W+mg+2*ld.bd} ${H+mg+2*ld.bd}" role="img" aria-label="Caja ${i+1} vista desde la derecha"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.slice().sort((u,v)=>u.x-v.x).map(pieza).join('')}${huecosLado(b,k,ky,fc)}${cota(M.intL,ocL,k,H,mg,fc,false)}${cota(M.intH,ocH,ky,H,mg,fc,true)}${ld.svg}</svg>`;
+  const ld=lados(W,H,mg,fc*.85,izq?['ARRIBA','FRENTE','SUELO','FONDO']:['ARRIBA','FONDO','SUELO','FRENTE']);
+  return `<svg class="planta" viewBox="${-mg-ld.bd} ${-ld.bd} ${W+mg+2*ld.bd} ${H+mg+2*ld.bd}" role="img" aria-label="Caja ${i+1} vista desde la ${izq?'izquierda':'derecha'}"><rect x="0" y="0" width="${W}" height="${H}" fill="var(--box)" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke"/>${b.items.slice().sort((u,v)=>izq?v.x-u.x:u.x-v.x).map(pieza).join('')}${huecosLado(b,k,ky,fc,izq)}${cota(M.intL,ocL,k,H,mg,fc,false)}${cota(M.intH,ocH,ky,H,mg,fc,true)}${ld.svg}</svg>`;
 }
 // Bultos de unas líneas de pedido más los de componentes (c = {n, L, A, H}).
 function bultosDe(lineas,c){
@@ -396,8 +397,8 @@ function renderResultado(recalcular){
     const cont=Object.values(g),gs=[...new Set(cont.map(c=>c.p.grupo||''))],gtxt=!cont.length?'Vacía':gs.length>1?'Mezcla':(GRUPOS[gs[0]]||'');
     lineasTxt.push(`Caja ${i+1}${gtxt?' · '+gtxt:''} · ${M.nombre} (ext. ${M.extL}×${M.extA}×${M.extH} mm): `+cont.map(c=>`${c.n} bulto${c.n>1?'s':''} ${c.mod?c.mod+' ':''}${c.p.nombre} ${c.L} mm${num(c.p.uds)>1?' ('+uds(c.pz)+')':''}${c.ms.length?' ['+c.ms.join(', ')+']':''}`).join(', '));
     const flot=b.items.filter(p=>!apoyado(p,b));if(flot.length)lineasTxt.push(`  OJO, sin apoyo: ${flot.map(nombreB).join(', ')}`);
-    return `<div class="boxcard${completa&&completa.has(i)?' vista':''}" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><span class="orden-caja"><button class="btn small ghost" type="button" data-act="mover-caja" data-i="${i}" data-d="-1" aria-label="Subir la caja ${i+1}"${i===0?' disabled':''}>▲ Subir</button><button class="btn small ghost" type="button" data-act="mover-caja" data-i="${i}" data-d="1" aria-label="Bajar la caja ${i+1}"${i===r.bins.length-1?' disabled':''}>▼ Bajar</button></span><label class="marca-caja"><input type="checkbox" data-marcar="${i}"${marcadas.has(i)?' checked':''}>Seleccionar</label>${cont.length?`<button class="btn small" type="button" data-act="auto-caja" data-i="${i}">Colocación automática</button>`:''}<button class="btn small ghost" type="button" data-act="imprimir-caja" data-i="${i}">Imprimir</button><button class="btn small ghost" type="button" data-act="completa" data-i="${i}">${completa?'Salir de pantalla completa':'Pantalla completa'}</button>${cont.length?'':`<button class="btn small danger" type="button" data-act="quitar-caja" data-i="${i}">Quitar caja</button>`}</div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}${visor(i,'f','De frente · ancho × alto',dibujoSeccion(b,i,col,hol))}<div><button class="btn small ghost" type="button" data-act="ver-planta" data-i="${i}">Ver desde arriba</button> <button class="btn small ghost" type="button" data-act="ver-lado" data-i="${i}">Ver de lado</button></div><div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %${txtPeso(b)}</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col(c)})"></span>${c.n} × ${c.mod?`<b class="mod">${esc(c.mod)}</b> `:''}${esc(c.p.nombre)} · ${c.L} mm${num(c.p.uds)>1?` · ${uds(c.pz)}`:''}${c.ms.length?` · <b class="marca">${esc(c.ms.join(', '))}</b>`:''} <select class="pasar-sel" data-de="${i}" data-g="${esc(c.p.id+'|'+c.L+'|'+c.mod)}" aria-label="Pasar un bulto de ${esc(c.p.nombre)} a otra caja"><option value="">Pasar 1 bulto a…</option>${r.bins.map((o,j)=>j===i?'':`<option value="${j}">Caja ${j+1} · ${esc(o.model.nombre)}</option>`).join('')}<option value="nueva">Caja nueva</option></select></li>`).join('')}</ul></div>`;
-  }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Con «▲ Subir» y «▼ Bajar» cambias una caja de sitio para dejar juntas las que quieras mover bultos entre ellas, y el desplegable «Pasar 1 bulto a…» de cada línea manda un bulto a la caja que elijas. Para pasar un bulto a una caja que no tienes a la vista, haz clic en él y elige la caja en la barra que sale abajo; también puedes arrastrarlo, y la página se desplaza sola al acercarte al borde. «Pantalla completa» abre una caja en grande; para ver varias a la vez, marca su casilla «Seleccionar» y pulsa «Ver en pantalla completa»: entre ellas se pueden arrastrar bultos. Con los botones − y + de cada dibujo lo reduces o amplías; ampliado, arrastra el fondo del dibujo para moverte por él. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; la vista desde arriba se abre con «Ver desde arriba» en una ventana, y en ella se mueve un bulto a lo largo y a lo ancho. «Ver de lado» abre la caja vista desde la derecha (largo × alto), solo para mirar; en la ventana se cambia de vista con sus botones. Alrededor de cada dibujo pone qué lado de la caja es. Si choca con otro o se sale, te aviso y se queda donde estaba. Para girar un bulto: clic derecho encima, o la tecla R mientras lo arrastras. Si te estorba un bulto para recolocar los demás, llévalo al «Aparcamiento» de arriba y devuélvelo después. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
+    return `<div class="boxcard${completa&&completa.has(i)?' vista':''}" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1}${gtxt?' · '+gtxt:''}</span><h3>${esc(M.nombre)}</h3></div><span class="orden-caja"><button class="btn small ghost" type="button" data-act="mover-caja" data-i="${i}" data-d="-1" aria-label="Subir la caja ${i+1}"${i===0?' disabled':''}>▲ Subir</button><button class="btn small ghost" type="button" data-act="mover-caja" data-i="${i}" data-d="1" aria-label="Bajar la caja ${i+1}"${i===r.bins.length-1?' disabled':''}>▼ Bajar</button></span><label class="marca-caja"><input type="checkbox" data-marcar="${i}"${marcadas.has(i)?' checked':''}>Seleccionar</label>${cont.length?`<button class="btn small" type="button" data-act="auto-caja" data-i="${i}">Colocación automática</button>`:''}<button class="btn small ghost" type="button" data-act="imprimir-caja" data-i="${i}">Imprimir</button><button class="btn small ghost" type="button" data-act="completa" data-i="${i}">${completa?'Salir de pantalla completa':'Pantalla completa'}</button>${cont.length?'':`<button class="btn small danger" type="button" data-act="quitar-caja" data-i="${i}">Quitar caja</button>`}</div>${flot.length?`<div class="note" role="alert">En el aire, sin apoyo debajo: ${esc(flot.map(nombreB).join(', '))}.</div>`:''}${visor(i,'f','De frente · ancho × alto',dibujoSeccion(b,i,col,hol))}<div><button class="btn small ghost" type="button" data-act="ver-planta" data-i="${i}">Ver desde arriba</button> <button class="btn small ghost" type="button" data-act="ver-lado" data-i="${i}">Ver lado derecho</button> <button class="btn small ghost" type="button" data-act="ver-lado-i" data-i="${i}">Ver lado izquierdo</button></div><div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm · exterior ${M.extL}×${M.extA}×${M.extH} mm · ocupado ${Math.round(usado*100)} %${txtPeso(b)}</div><ul>${cont.map(c=>`<li><span class="sw" style="background:var(--p${col(c)})"></span>${c.n} × ${c.mod?`<b class="mod">${esc(c.mod)}</b> `:''}${esc(c.p.nombre)} · ${c.L} mm${num(c.p.uds)>1?` · ${uds(c.pz)}`:''}${c.ms.length?` · <b class="marca">${esc(c.ms.join(', '))}</b>`:''} <select class="pasar-sel" data-de="${i}" data-g="${esc(c.p.id+'|'+c.L+'|'+c.mod)}" aria-label="Pasar un bulto de ${esc(c.p.nombre)} a otra caja"><option value="">Pasar 1 bulto a…</option>${r.bins.map((o,j)=>j===i?'':`<option value="${j}">Caja ${j+1} · ${esc(o.model.nombre)}</option>`).join('')}<option value="nueva">Caja nueva</option></select></li>`).join('')}</ul></div>`;
+  }).join('')+nuevaHtml+'</div><p class="sub">Las cotas dan lo ocupado, lo que queda <b class="libre">libre</b> y el total interior; en naranja, dentro del dibujo, el hueco libre encima y a la derecha de cada bulto. Con «▲ Subir» y «▼ Bajar» cambias una caja de sitio para dejar juntas las que quieras mover bultos entre ellas, y el desplegable «Pasar 1 bulto a…» de cada línea manda un bulto a la caja que elijas. Para pasar un bulto a una caja que no tienes a la vista, haz clic en él y elige la caja en la barra que sale abajo; también puedes arrastrarlo, y la página se desplaza sola al acercarte al borde. «Pantalla completa» abre una caja en grande; para ver varias a la vez, marca su casilla «Seleccionar» y pulsa «Ver en pantalla completa»: entre ellas se pueden arrastrar bultos. Con los botones − y + de cada dibujo lo reduces o amplías; ampliado, arrastra el fondo del dibujo para moverte por él. En el dibujo de frente puedes arrastrar un bulto a otro sitio o a otra caja y se queda donde lo sueltes; la vista desde arriba se abre con «Ver desde arriba» en una ventana, y en ella se mueve un bulto a lo largo y a lo ancho. «Ver lado derecho» o «Ver lado izquierdo» abre la caja vista desde la derecha (largo × alto), solo para mirar; en la ventana se cambia de vista con sus botones. Alrededor de cada dibujo pone qué lado de la caja es. Si choca con otro o se sale, te aviso y se queda donde estaba. Para girar un bulto: clic derecho encima, o la tecla R mientras lo arrastras. Si te estorba un bulto para recolocar los demás, llévalo al «Aparcamiento» de arriba y devuélvelo después. Si lo dejas en el aire, sin nada debajo, sale marcado en rojo.</p>';
   ultimoResumen=`${TIPOS[pedido.tipo]}: ${r.bins.length} cajas (${desg}), ${m3.toFixed(2)} m³\nBultos en total: ${nb+r.bins.length} (${nb} dentro + ${r.bins.length} cajas)\n`+lineasTxt.join('\n')+(r.aparcados.length?`\nAPARCADOS, sin caja: ${r.aparcados.map(it=>nombreB({it})).join(', ')}`:'');
   // Barra del bulto seleccionado: siempre a la vista abajo, para pasarlo a cualquier caja sin tener que arrastrar.
   if(sel){
@@ -416,10 +417,10 @@ function renderResultado(recalcular){
 // Vista desde arriba de una caja en una ventana (a petición, para ahorrar espacio en pantalla). Cuelga de #resultado para que
 // arrastrar y ampliar funcionen igual que en el dibujo de frente; el data-caja hace que soltar un bulto aquí cuente para esa caja.
 // Vistas de la ventana, cambiables con sus botones. La de frente usa la clave de aumento 'F' para no compartir recuadro con la de la tarjeta.
-const VISTAS_DLG={f:'De frente',a:'Desde arriba',l:'Desde la derecha'};
+const VISTAS_DLG={f:'De frente',a:'Desde arriba',l:'Desde la derecha',i:'Desde la izquierda'};
 function dialogoPlanta(i,col){
   const b=reparto.bins[i],M=b.model,v=vistaDlg;
-  const dib=v==='f'?visor(i,'F','Ancho × alto',dibujoSeccion(b,i,col,num(pedido.holgura))):v==='l'?visor(i,'l',`Largo × alto (alto ×${AMPLIA})`,dibujoLateral(b,i,col)):visor(i,'a',`Largo × ancho (ancho ×${AMPLIA})`,dibujoPlanta(b,i,col));
+  const dib=v==='f'?visor(i,'F','Ancho × alto',dibujoSeccion(b,i,col,num(pedido.holgura))):v==='l'||v==='i'?visor(i,v,`Largo × alto (alto ×${AMPLIA})`,dibujoLateral(b,i,col,v==='i')):visor(i,'a',`Largo × ancho (ancho ×${AMPLIA})`,dibujoPlanta(b,i,col));
   return `<dialog id="dlg-planta"><div class="boxcard" data-caja="${i}"><div class="cab"><div><span class="tag">Caja ${i+1} · ${VISTAS_DLG[v].toLowerCase()}</span><h3>${esc(M.nombre)}</h3></div><span class="vistas-dlg" role="group" aria-label="Vista">${Object.entries(VISTAS_DLG).map(([k,t])=>`<button class="btn small${k===v?'':' ghost'}" type="button" data-act="vista-dlg" data-v="${k}" aria-pressed="${k===v}">${t}</button>`).join('')}</span><button class="btn small" type="button" data-act="cerrar-planta">Cerrar</button></div>${dib}<div class="meta">Interior ${M.intL}×${M.intA}×${M.intH} mm${txtPeso(b)}</div></div></dialog>`;
 }
 
@@ -1051,7 +1052,7 @@ document.addEventListener('click',async e=>{
   else if(a==='exportar'){exportar();}
   else if(a==='auto'){renderResultado(true);}
   else if(a==='caja-vacia'){const m=cajas.find(c=>c.id===modeloNuevo);if(m){reparto.bins.push({model:m,free:[],items:[]});hecho();renderResultado();}}
-  else if(a==='ver-planta'||a==='ver-lado'){plantaAbierta=Number(b.dataset.i);vistaDlg=a==='ver-lado'?'l':'a';renderResultado();}
+  else if(a==='ver-planta'||a==='ver-lado'||a==='ver-lado-i'){plantaAbierta=Number(b.dataset.i);vistaDlg=a==='ver-lado'?'l':a==='ver-lado-i'?'i':'a';renderResultado();}
   else if(a==='cerrar-planta'){plantaAbierta=null;renderResultado();}
   else if(a==='vista-dlg'){vistaDlg=b.dataset.v;renderResultado();}
   else if(a==='mover-caja'){moverCaja(Number(b.dataset.i),Number(b.dataset.d));}
