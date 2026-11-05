@@ -266,3 +266,9 @@ table.prev .ojo{display:block;font-size:13px}
 .v3d-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
 .v3d-ctl input[type=range]{flex:1 1 220px;width:auto;padding:0;border:0;background:none}
 #l3d{flex:1 1 100%;font-weight:500}
+.vacios{font-size:14px}
+.vacios summary{cursor:pointer;font-weight:600}
+.vacios td,.vacios th{padding:4px 6px}
+.note.ahorro{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.v3d-hu{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+@media print{.vacios,.note.ahorro{display:none}}

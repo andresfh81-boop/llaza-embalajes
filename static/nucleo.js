@@ -446,6 +446,78 @@ function repartir(bin){
   return bin;
 }
 
+// Espacios vacíos de una caja, en 3D: los bloques libres más grandes que se pueden formar ([x1,x2,y1,y2,z1,z2], x=ancho, y=alto, z=largo).
+// Se solapan entre sí: son alternativas, no huecos que se puedan llenar todos a la vez. Los bultos cuentan con su holgura.
+function huecos3D(bin,min){
+  const M=bin.model,m=min||100;let E=[[0,M.intA,0,M.intH,0,M.intL]];
+  for(const p of bin.items) for(const c of cuerpos(p)){
+    const nx=[];
+    for(const e of E){
+      if(c[0]>=e[1]||c[1]<=e[0]||c[2]>=e[3]||c[3]<=e[2]||c[4]>=e[5]||c[5]<=e[4]){nx.push(e);continue;}
+      if(c[0]>e[0])nx.push([e[0],c[0],e[2],e[3],e[4],e[5]]);
+      if(c[1]<e[1])nx.push([c[1],e[1],e[2],e[3],e[4],e[5]]);
+      if(c[2]>e[2])nx.push([e[0],e[1],e[2],c[2],e[4],e[5]]);
+      if(c[3]<e[3])nx.push([e[0],e[1],c[3],e[3],e[4],e[5]]);
+      if(c[4]>e[4])nx.push([e[0],e[1],e[2],e[3],e[4],c[4]]);
+      if(c[5]<e[5])nx.push([e[0],e[1],e[2],e[3],c[5],e[5]]);
+    }
+    const g=nx.filter(e=>e[1]-e[0]>=m&&e[3]-e[2]>=m&&e[5]-e[4]>=m);
+    E=g.filter((a,i)=>!g.some((b,j)=>i!==j&&b[0]<=a[0]&&b[1]>=a[1]&&b[2]<=a[2]&&b[3]>=a[3]&&b[4]<=a[4]&&b[5]>=a[5]&&(j<i||b.join()!==a.join())));
+  }
+  return E;
+}
+// Apoyo firme para recolocar un bulto en un hueco: en el suelo, o con al menos la mitad de su largo sobre otros bultos y con su centro encima de lo que lo sostiene.
+function apoyoFirme(p,bin){
+  if(p.y<=1) return true;
+  const z=p.off||0,L=p.it.L,t=[];
+  for(const o of bin.items) if(o!==p&&Math.abs(o.y+o.h-p.y)<=1&&o.x<p.x+p.w-HOLG&&p.x<o.x+o.w-HOLG){
+    const a=Math.max(z,o.off||0),b=Math.min(z+L,(o.off||0)+o.it.L);if(b>a)t.push([a,b]);
+  }
+  if(!t.length) return false;
+  t.sort((u,v)=>u[0]-v[0]);
+  let tot=0,fin=-Infinity;for(const [a,b] of t){if(b>fin){tot+=b-Math.max(a,fin);fin=b;}}
+  const c=z+L/2;
+  return tot>=L*.5&&t[0][0]<=c&&fin>=c;
+}
+// Sitio para un bulto en los huecos de una caja: apoyado firme y sin poner estructura encima de lamas (la estructura va primero).
+function sitio3D(it,bin,soloHueco){
+  const es=soloHueco?[soloHueco]:huecos3D(bin,100).sort((a,b)=>a[2]-b[2]||a[4]-b[4]);
+  const lamas=grupoDe(it)==='lamas';
+  for(const e of es) for(const [w,h] of it.cap?[[it.w,it.h]]:[[it.w,it.h],[it.h,it.w]]){
+    if(w>e[1]-e[0]||h>e[3]-e[2]||it.L>e[5]-e[4]) continue;
+    for(const off of [e[4],e[5]-it.L]) for(const x of [e[0],e[1]-w]){
+      const p={it,x,y:e[2],w,h,off};if(it.cap)p.medio=it.cap.w;
+      if(!libre(p,bin)||!apoyoFirme(p,bin)) continue;
+      if(!lamas&&bin.items.some(o=>grupoDe(o.it)==='lamas'&&o.y+o.h<=p.y+1&&o.x<p.x+p.w-HOLG&&p.x<o.x+o.w-HOLG&&(o.off||0)<off+it.L-HOLG&&off<(o.off||0)+o.it.L-HOLG)) continue;
+      return p;
+    }
+  }
+  return null;
+}
+// Intenta quitar cajas pasando todos sus bultos a los huecos de las demás, empezando por las que llevan menos. No toca el reparto que recibe:
+// devuelve las cajas resultantes, cuántas sobran y qué se ha movido.
+function ahorrarCajas(bins){
+  let act=bins.map(b=>({model:b.model,free:[],items:b.items.slice()})),quitadas=0;const mov=[];
+  for(let seguir=act.length>1;seguir;){
+    seguir=false;
+    for(const i of act.map((b,k)=>k).sort((a,c)=>act[a].items.length-act[c].items.length)){
+      if(!act[i].items.length) continue;
+      const c=act.map(b=>({model:b.model,free:[],items:b.items.slice()})),pasos=[];let ok=true;
+      for(const p of c[i].items.slice().sort((u,v)=>v.w*v.h*v.it.L-u.w*u.h*u.it.L)){
+        let puesto=false;
+        for(let j=0;j<c.length&&!puesto;j++){
+          if(j===i) continue;
+          const q=sitio3D(p.it,c[j]);
+          if(q){c[j].items.push(q);pasos.push({it:p.it,a:c[j]});puesto=true;}
+        }
+        if(!puesto){ok=false;break;}
+      }
+      if(ok){c.splice(i,1);act=c;quitadas++;mov.push(...pasos);seguir=act.length>1;break;}
+    }
+  }
+  return {bins:act,quitadas,mov};
+}
+
 // Reparto por grupos (estructura, lamas…): cada grupo va en sus propias cajas.
 // Solo se juntan dos cajas de grupos distintos si caben en una sola y así sobra una.
 // Dos bultos se pisan en el dibujo de frente (sección ancho × alto), aunque a lo largo no coincidan. El reparto automático nunca
@@ -557,4 +629,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={encajar,clienteCajetin,repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={huecos3D,apoyoFirme,sitio3D,ahorrarCajas,encajar,clienteCajetin,repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};

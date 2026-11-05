@@ -88,6 +88,13 @@ function pintar3D(cv,op){
       x.fillStyle=pfg;x.font='600 12px "Barlow Semi Condensed","Arial Narrow",Arial,sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(t,mejor.cx,mejor.cy);
     }
   }
+  // espacio vacío elegido, en verde transparente
+  if(op.hueco){
+    const e=op.hueco,a=[e[4],e[2],e[0]],b=[e[5],e[3],e[1]],vd='rgba(30,150,80,';
+    if(V[1]>1e-6) poli([[a[0],b[1],a[2]],[b[0],b[1],a[2]],[b[0],b[1],b[2]],[a[0],b[1],b[2]]].map(pt),vd+'.28)',vd+'.95)',1.6);
+    if(Math.abs(V[0])>1e-6){const k=V[0]>0?b[0]:a[0];poli([[k,a[1],a[2]],[k,b[1],a[2]],[k,b[1],b[2]],[k,a[1],b[2]]].map(pt),vd+'.38)',vd+'.95)',1.6);}
+    if(Math.abs(V[2])>1e-6){const k=V[2]>0?b[2]:a[2];poli([[a[0],a[1],k],[b[0],a[1],k],[b[0],b[1],k],[a[0],b[1],k]].map(pt),vd+'.33)',vd+'.95)',1.6);}
+  }
   // las nueve aristas de delante, por encima: la caja se ve como una jaula transparente
   const tres=[L,Hh,An];
   for(const c of esquinas3D(A0,B0)) for(const e of [0,1,2]) if(c[e]===0){

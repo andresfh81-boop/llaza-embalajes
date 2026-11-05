@@ -83,6 +83,22 @@ assert.ok(!apoyado(Object.assign(pz(2000,2500),{y:180}),cajaA));
  for(const [yaw,esp] of [[Math.PI/2,[10,-20]],[0,[5,-20]]]){const q=V.camara3D(yaw,0).pr([5,20,10]);assert.ok(Math.abs(q[0]-esp[0])<1e-9&&Math.abs(q[1]-esp[1])<1e-9);} // de frente, la Z a la derecha; desde la derecha, el largo a la derecha
  assert.deepStrictEqual(V.ordenCarga([{y:5,x:0},{y:0,x:9},{y:0,x:1}]).map(p=>p.x),[1,9,0]);
  assert.strictEqual(V.bultoEn3D([{q:[[0,0],[10,0],[10,10],[0,10]],p:'a'},{q:[[5,5],[20,5],[20,20],[5,20]],p:'b'}],7,7),'b');assert.strictEqual(V.bultoEn3D([{q:[[0,0],[10,0],[10,10],[0,10]],p:'a'}],50,50),null);}
+// Espacios vacíos y aprovecharlos: una caja larga con una viga en el suelo deja hueco; un pilar de otra caja entra ahí y sobra esa caja.
+{const {libre:N_libre,huecos3D,apoyoFirme,sitio3D,ahorrarCajas}=require(path.join(__dirname,'..','static','nucleo.js'));
+ const M={nombre:'X',id:'x',intL:6000,intA:600,intH:500,extL:6000,extA:600,extH:500},P=(it,x,y,off)=>({it,x,y,w:it.w,h:it.h,off});
+ const vi={p:{id:'v'},g:'estructura',L:3000,w:200,h:200},pi={p:{id:'p'},g:'estructura',L:2000,w:200,h:200},la={p:{id:'l'},g:'lamas',L:3000,w:200,h:200};
+ const c1={model:M,items:[P(vi,0,0,0)]},c2={model:M,items:[P(pi,0,0,0)]};
+ const hs=huecos3D(c1,100);
+ assert.ok(hs.some(e=>e[1]-e[0]===400&&e[3]-e[2]===500&&e[5]-e[4]===6000),'a la derecha de la viga');assert.ok(hs.some(e=>e[0]===0&&e[2]===0&&e[4]===3000&&e[5]===6000),'detrás de la viga');
+ const a=ahorrarCajas([c1,c2]);assert.strictEqual(a.quitadas,1);assert.strictEqual(a.bins.length,1);assert.strictEqual(a.bins[0].items.length,2);
+ assert.strictEqual(c1.items.length,1); // no toca el reparto original
+ const p2=a.bins[0].items[1];assert.ok(N_libre(p2,a.bins[0],p2)&&p2.y===0);
+ // apoyo firme: sobre menos de la mitad de su largo, no; con más, sí
+ const base={model:M,items:[P({p:{},g:'estructura',L:1000,w:200,h:200},0,0,0)]};
+ assert.ok(!apoyoFirme({it:{L:3000},x:0,y:200,w:200,h:200,off:0},base));assert.ok(apoyoFirme({it:{L:1500},x:0,y:200,w:200,h:200,off:0},base));
+ // la estructura no se pone encima de lamas: si solo cabe encima, no entra
+ const llena={model:{...M,intA:200,intL:3000},items:[P(la,0,0,0)]};
+ assert.strictEqual(sitio3D(vi,llena),null);assert.ok(sitio3D(la,llena));}
 // Un bulto solo en la caja va centrado.
 {const b=planGrupos(mk(1,180,180,2000),[C5]).bins[0];assert.strictEqual(b.items[0].off,1500);}
 console.log('alternadas: ok');
