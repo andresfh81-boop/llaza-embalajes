@@ -455,7 +455,13 @@ function bloque3D(i){
   return `<div class="vcab"><span class="tag">Arrastra para girar · rueda o − y + para acercar · Mayús + arrastrar para desplazar</span><span class="zbot"><button class="btn small ghost" type="button" data-act="3d-zoom" data-d="-1" aria-label="Reducir">−</button><button class="btn small ghost" type="button" data-act="3d-zoom" data-d="1" aria-label="Ampliar">+</button><button class="btn small ghost" type="button" data-act="3d-ini">Vista inicial</button></span></div>
     <div class="v3d"><canvas id="c3d" role="img" aria-label="Caja ${i+1} en 3D"></canvas><div id="t3d" class="v3d-tip" hidden></div></div>
     <div class="v3d-ctl"><button class="btn small ghost" type="button" data-act="3d-capa" data-d="-1" aria-label="Quitar un bulto">−</button><input id="r3d" type="range" min="0" max="${tot}" step="1" value="${v3d.n===null?tot:v3d.n}" aria-label="Bultos a la vista"><button class="btn small ghost" type="button" data-act="3d-capa" data-d="1" aria-label="Poner un bulto">+</button><span id="l3d"></span></div>
-    <div class="v3d-hu"><span class="tag">Espacios vacíos</span>${vaciosCaja(reparto.bins[i],reparto).map((h,k)=>`<button class="btn small${v3d.hueco===k?'':' ghost'}" type="button" data-act="3d-hueco" data-k="${k}" title="${esc(h.caben.map(t=>corto(t.it.p)+' '+t.it.L+' mm').join(', ')||'Ahí no cabe ningún bulto de otra caja')}">${txtHueco(h.e)} mm</button>`).join('')||'<span class="sub">ninguno aprovechable</span>'}</div>`;
+    <div class="v3d-hu"><span class="tag">Espacios vacíos</span>${vaciosCaja(reparto.bins[i],reparto).map((h,k)=>`<button class="btn small${v3d.hueco===k?'':' ghost'}" type="button" data-act="3d-hueco" data-k="${k}" title="${esc(h.caben.map(t=>corto(t.it.p)+' '+t.it.L+' mm').join(', ')||'Ahí no cabe ningún bulto de otra caja')}">${txtHueco(h.e)} mm</button>`).join('')||'<span class="sub">ninguno aprovechable</span>'}</div><div id="h3d" role="status"></div>`;
+}
+// Lo que cabría en el espacio vacío elegido, escrito debajo de sus botones.
+function textoHueco3D(i){
+  const el=$('h3d');if(!el)return;
+  const h=v3d.hueco===null||v3d.hueco===undefined?null:vaciosCaja(reparto.bins[i],reparto)[v3d.hueco];
+  el.textContent=!h?'Pulsa un espacio para verlo en verde y saber qué cabe en él.':h.caben.length?`Aquí cabría, de uno en uno: ${h.caben.map(t=>`${corto(t.it.p)} de ${t.it.L} mm (hay ${t.n} en otras cajas)`).join('; ')}.`:'Aquí no cabe ningún bulto de otra caja.';
 }
 function medidas3D(p){const h=num(pedido.holgura);return `${Math.round(p.w-h)} × ${Math.round(p.h-h)} × ${p.it.L} mm`;}
 function pintarVista3D(){
@@ -464,6 +470,7 @@ function pintarVista3D(){
   const col=paleta(),ms=modulos();
   caras3D=pintar3D(cv,Object.assign({},v3d,{M:b.model,items:orden.slice(0,n),hol:num(pedido.holgura),resalta:n<tot&&n>0?orden[n-1]:null,css,hueco:v3d.hueco!==null&&v3d.hueco!==undefined&&vaciosCaja(b,reparto)[v3d.hueco]?vaciosCaja(b,reparto)[v3d.hueco].e:null,
     color:it=>css('--p'+col(it)),borde:it=>{const k=ms.indexOf(modTxt(it));return ms.length>1&&k>=0?css('--m'+(k%4)):'';},texto:it=>corto(it.p)}));
+  textoHueco3D(plantaAbierta);
   const u=orden[n-1];
   $('l3d').textContent=n===tot?`Caja completa: ${tot} ${tot===1?'bulto':'bultos'}. Mueve el deslizador para ver cómo se va llenando.`:n===0?'Caja vacía.':`Nº ${n} de ${tot}: ${nombreB(u)} · ${medidas3D(u)} · a ${Math.round(u.y)} mm del suelo`;
 }

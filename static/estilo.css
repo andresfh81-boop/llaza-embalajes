@@ -273,3 +273,4 @@ table.prev .ojo{display:block;font-size:13px}
 .v3d-hu{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 @media print{.vacios,.note.ahorro{display:none}}
 .desglose{font-weight:700;font-size:17px;color:var(--fg)}
+#h3d{font-weight:500}
