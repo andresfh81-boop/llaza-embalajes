@@ -274,3 +274,6 @@ table.prev .ojo{display:block;font-size:13px}
 @media print{.vacios,.note.ahorro{display:none}}
 .desglose{font-weight:700;font-size:17px;color:var(--fg)}
 #h3d{font-weight:500}
+.vistas{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.vistas .btn{font-size:16px;padding:10px 18px;min-height:44px}
+@media print{.vistas{display:none}}
