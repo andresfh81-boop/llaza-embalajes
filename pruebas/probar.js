@@ -69,7 +69,7 @@ assert.ok(!apoyado(Object.assign(pz(2000,2500),{y:180}),cajaA));
  const b=planGrupos([...lam,...est],[C5]).bins;assert.strictEqual(b.length,1);
  assert.ok(Math.max(...b[0].items.filter(p=>p.it.g==='estructura').map(p=>p.y))<=Math.min(...b[0].items.filter(p=>p.it.g==='lamas').map(p=>p.y)),'estructura abajo');
  const v=planGrupos([...gr('lamas',12,282,275,3855),...gr('estructura',8,236,138,4000)],[C5]).bins;
- assert.strictEqual(v[0].items[0].it.g,'estructura');assert.strictEqual(v[v.length-1].items[0].it.g,'lamas');}
+ assert.strictEqual(v[0].items[0].it.g,'estructura');assert.ok(v.every(b=>{const g=b.items.map(p=>p.it.g);return g.lastIndexOf('estructura')<(g.indexOf('lamas')<0?Infinity:g.indexOf('lamas'));}));}
 // Vista 3D: una lama con corcho son tres cuerpos sin solaparse, y en cualquier giro lo de delante se pinta después de lo de detrás.
 {const V=require(path.join(__dirname,'..','static','vista3d.js'));
  const lama={it:{L:3000,cap:{l:600,w:155}},x:0,y:0,w:205,h:275,medio:155,off:0},cl=V.cuerpos3D(lama,5);
@@ -99,6 +99,11 @@ assert.ok(!apoyado(Object.assign(pz(2000,2500),{y:180}),cajaA));
  // la estructura no se pone encima de lamas: si solo cabe encima, no entra
  const llena={model:{...M,intA:200,intL:3000},items:[P(la,0,0,0)]};
  assert.strictEqual(sitio3D(vi,llena),null);assert.ok(sitio3D(la,llena));}
+// Colocar desde cero una caja con piezas cortas una detrás de otra: entran aunque no quepan como si ocuparan todo el largo.
+{const {encajar3D,encajar,libre:lb}=require(path.join(__dirname,'..','static','nucleo.js'));
+ const M={id:'x',intL:6000,intA:200,intH:200,extL:6000,extA:200,extH:200},cortas=[0,1].map(()=>({p:{id:'c'},g:'estructura',L:2900,w:200,h:200}));
+ assert.strictEqual(encajar(M,cortas),null);const b3=encajar3D(M,cortas);assert.ok(b3&&b3.items.length===2&&b3.items.every(p=>lb(p,b3,p)));
+ assert.strictEqual(encajar3D(M,[...cortas,{p:{id:'c'},g:'estructura',L:2900,w:200,h:200}]),null);}
 // Un bulto solo en la caja va centrado.
 {const b=planGrupos(mk(1,180,180,2000),[C5]).bins[0];assert.strictEqual(b.items[0].off,1500);}
 console.log('alternadas: ok');

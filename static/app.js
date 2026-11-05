@@ -379,7 +379,7 @@ function renderResultado(recalcular){
   const todos=r.bins.flatMap(b=>b.items),secB=todos.reduce((s,p)=>s+(p.medio||p.w)*p.h,0)+r.unfit.reduce((s,it)=>s+it.w*it.h,0),secC=r.bins.reduce((s,b)=>s+b.model.intA*b.model.intH,0),minC=Math.max(1,Math.ceil(secB/Math.max(...modelos.map(m=>m.intA*m.intH))));
   if(secC) html+=`<div class="sub">Sección aprovechada: <b>${Math.round(secB/secC*100)} %</b>. ${r.bins.length<=minC?'Con estas cajas no se puede hacer con menos.':`Solo por superficie cabría en ${minC} ${minC===1?'caja':'cajas'}, pero las piezas no se pueden partir ni encajar sin huecos: es un mínimo teórico, no un fallo.`}</div>`;
   html+=pend;
-  {const a=ahorro();if(a.quitadas) html+=`<div class="note ahorro">Aprovechando los huecos, entrando bultos cortos detrás de otros, ${a.quitadas===1?'sobra 1 caja':`sobran ${a.quitadas} cajas`}: ${r.bins.length} → ${a.bins.length}. <button class="btn" type="button" data-act="ahorrar">Aprovechar huecos</button></div>`;}
+  {const a=ahorro();if(a.quitadas) html+=`<div class="note ahorro">Con tus retoques, aprovechando los huecos ${a.quitadas===1?'sobra 1 caja':`sobran ${a.quitadas} cajas`}: ${r.bins.length} → ${a.bins.length}. <button class="btn" type="button" data-act="ahorrar">Aprovechar huecos</button></div>`;}
   if((pedido.hojas||[]).some(h=>h.plano)) html+=`<div class="note">Estimación desde el plano cliente: los largos y el nº de lamas salen de las reglas de las hojas de corte, no de la hoja de este pedido.${pedido.hojas.find(h=>h.plano).medidasOCR?' <b>Comprueba las medidas</b>: se han leído del plano con OCR, no del nombre del archivo.':''}${(pedido.hojas.find(h=>h.plano).supuestos||[]).length?' Supuesto, porque el plano no lo trae: <b>'+esc(pedido.hojas.find(h=>h.plano).supuestos.join(', '))+'</b>; si lo sabes, corrígelo en «Calcular desde el plano cliente», o suelta también la ficha de fabricación (PLANO.pdf, en la misma carpeta del pedido), que trae los pilares. Con la altura de los pilares puede cambiar el nº de cajas.':''} Cuando tengas la hoja de corte, cárgala y sustituye a la estimación.</div>`;
   if(r.aparcados.length) html+=`<div class="note">${r.aparcados.length} ${r.aparcados.length===1?'bulto aparcado':'bultos aparcados'}: no ${r.aparcados.length===1?'está':'están'} en ninguna caja. Vuelve a ${r.aparcados.length===1?'meterlo':'meterlos'} antes de dar el reparto por bueno.</div>`;
   if(marcadas.size) html+=`<div class="manual">${marcadas.size} ${marcadas.size===1?'caja seleccionada':'cajas seleccionadas'}. <button class="btn small" type="button" data-act="ver-marcadas">Ver en pantalla completa</button> <button class="btn small ghost" type="button" data-act="desmarcar">Quitar selección</button></div>`;
@@ -556,7 +556,7 @@ function pdfSolicitud(){
 // Lista de embalaje para imprimir: una hoja de resumen y una hoja por caja, con su contenido y sus dos dibujos.
 // Tabla con la posición de cada bulto de una caja, uno por fila, en el orden en que se carga (de abajo arriba y de izquierda a derecha).
 function posiciones(b){
-  const hol=num(pedido.holgura),f=b.items.slice().sort((p,q)=>p.y-q.y||p.x-q.x||(p.off||0)-(q.off||0));
+  const hol=num(pedido.holgura),f=ordenCarga(b.items);
   return `<h2>Posición de cada bulto</h2><p class="tot">En milímetros, desde la esquina inferior izquierda de la caja vista de frente. «Desde el fondo» es lo que el bulto va adelantado a lo largo. Orden: de abajo arriba y de izquierda a derecha.</p>
     <table><thead><tr><th class="n">Nº</th><th>Bulto</th><th>Módulo</th><th>Marcaje</th><th class="n">Largo <span class="u">(mm)</span></th><th class="n">Ancho × alto <span class="u">(mm)</span></th><th class="n">Desde la izquierda <span class="u">(mm)</span></th><th class="n">Altura <span class="u">(mm)</span></th><th class="n">Desde el fondo <span class="u">(mm)</span></th></tr></thead><tbody>${f.map((p,j)=>`<tr><td class="n">${j+1}</td><td>${esc(corto(p.it.p))}${varias(p.it)?' · '+piezas(p.it):''}</td><td>${esc(p.it.mod||'')}</td><td>${esc(p.it.m||'')}</td><td class="n">${p.it.L}</td><td class="n">${p.w-hol}×${p.h-hol}</td><td class="n">${Math.round(p.x)}</td><td class="n">${Math.round(p.y)}</td><td class="n">${Math.round(p.off||0)}</td></tr>`).join('')}</tbody></table>`;
 }
@@ -650,8 +650,8 @@ function soltarSeccion(de,k,a,x,y,rot){
 // y reparte su peso a lo largo. No cambia qué bultos van en la caja. Si no caben todos, no toca nada y avisa.
 function colocarCaja(n){
   const b=reparto.bins[n];if(!b||!b.items.length)return;
-  const nb=encajar(b.model,b.items.map(p=>p.it));
-  if(nb){hecho();reparto.bins[n]=bajar(repartir(nb));estado(`Caja ${n+1} colocada automáticamente.`);}
+  const its=b.items.map(p=>p.it),nb=encajar(b.model,its),n3=nb?null:encajar3D(b.model,its); // si lleva piezas una detrás de otra, se coloca en sus huecos
+  if(nb||n3){hecho();reparto.bins[n]=nb?bajar(repartir(nb)):n3;estado(`Caja ${n+1} colocada automáticamente.`);}
   else{sel=null;avisoMov=`Caja ${n+1}: los bultos que tiene ahora no caben todos con la colocación automática. La dejo como estaba; pasa alguno a otra caja o al aparcamiento y vuelve a probar.`;}
   renderResultado();
 }

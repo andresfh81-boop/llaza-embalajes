@@ -11,8 +11,8 @@ function cuerpos3D(p,hol){
   if(L>2*l) out.push(caja(z+l,z+L-l,my,my+mh,mz,mz+mw));
   return out;
 }
-// Orden de carga: de abajo arriba y de izquierda a derecha, el mismo de la tabla «Posición de cada bulto».
-function ordenCarga(items){return items.slice().sort((p,q)=>p.y-q.y||p.x-q.x||(p.off||0)-(q.off||0));}
+// Orden de carga: de abajo arriba y, a la misma altura, la estructura antes que las lamas y de izquierda a derecha. Es el de la tabla «Posición de cada bulto».
+function ordenCarga(items){const l=p=>p.it&&p.it.g==='lamas'?1:0;return items.slice().sort((p,q)=>p.y-q.y||l(p)-l(q)||p.x-q.x||(p.off||0)-(q.off||0));}
 function camara3D(yaw,pitch){
   const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
   return {V:[-sy*cp,sp,cy*cp],pr:P=>{const d=-P[0]*sy+P[2]*cy;return [P[0]*cy+P[2]*sy,-(P[1]*cp-d*sp)];}};

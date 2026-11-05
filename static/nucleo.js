@@ -496,23 +496,39 @@ function sitio3D(it,bin,soloHueco){
 }
 // Intenta quitar cajas pasando todos sus bultos a los huecos de las demás, empezando por las que llevan menos. No toca el reparto que recibe:
 // devuelve las cajas resultantes, cuántas sobran y qué se ha movido.
+// Coloca desde cero los bultos de una caja en sus huecos, sin suponer que cada uno ocupa todo el largo: la estructura primero y lo más largo antes.
+// Hace falta para las cajas que llevan piezas cortas detrás de otras. null si no caben.
+function encajar3D(model,items){
+  const bin={model,free:[],items:[]},l=it=>grupoDe(it)==='lamas';
+  for(const it of items.slice().sort((a,b)=>l(a)-l(b)||b.L-a.L||b.w*b.h-a.w*a.h)){
+    const p=sitio3D(it,bin);if(!p) return null;
+    bin.items.push(p);
+  }
+  return bin;
+}
 function ahorrarCajas(bins){
   let act=bins.map(b=>({model:b.model,free:[],items:b.items.slice()})),quitadas=0;const mov=[];
+  // el resultado depende del orden: se prueba con los bultos de mayor a menor y de menor a mayor, y llenando las cajas en un sentido y en el otro
+  const vol=p=>p.w*p.h*p.it.L,variantes=[[1,1],[1,-1],[-1,1],[-1,-1]];
+  const vaciar=(i,sb,sc)=>{
+    const c=act.map(b=>({model:b.model,free:[],items:b.items.slice()})),pasos=[];
+    const cajas=c.map((_,k)=>k).filter(k=>k!==i);if(sc<0)cajas.reverse();
+    for(const p of c[i].items.slice().sort((u,v)=>sb*(vol(v)-vol(u)))){
+      let puesto=false;
+      for(const j of cajas){const q=sitio3D(p.it,c[j]);if(q){c[j].items.push(q);pasos.push({it:p.it});puesto=true;break;}}
+      if(!puesto) return null;
+    }
+    c.splice(i,1);
+    return {c,pasos};
+  };
   for(let seguir=act.length>1;seguir;){
     seguir=false;
-    for(const i of act.map((b,k)=>k).sort((a,c)=>act[a].items.length-act[c].items.length)){
+    busca: for(const i of act.map((b,k)=>k).sort((x,y)=>act[x].items.length-act[y].items.length)){
       if(!act[i].items.length) continue;
-      const c=act.map(b=>({model:b.model,free:[],items:b.items.slice()})),pasos=[];let ok=true;
-      for(const p of c[i].items.slice().sort((u,v)=>v.w*v.h*v.it.L-u.w*u.h*u.it.L)){
-        let puesto=false;
-        for(let j=0;j<c.length&&!puesto;j++){
-          if(j===i) continue;
-          const q=sitio3D(p.it,c[j]);
-          if(q){c[j].items.push(q);pasos.push({it:p.it,a:c[j]});puesto=true;}
-        }
-        if(!puesto){ok=false;break;}
+      for(const [sb,sc] of variantes){
+        const r=vaciar(i,sb,sc);
+        if(r){act=r.c;quitadas++;mov.push(...r.pasos);seguir=act.length>1;break busca;}
       }
-      if(ok){c.splice(i,1);act=c;quitadas++;mov.push(...pasos);seguir=act.length>1;break;}
     }
   }
   return {bins:act,quitadas,mov};
@@ -595,7 +611,7 @@ function voltear(bin){
 }
 function planGrupos(items,models){
   const gs=[...new Set(items.map(grupoDe))].sort(); // «estructura» antes que «lamas»
-  if(gs.length<2){const r=plan(items,models);r.bins.forEach(b=>bajar(repartir(b)));return r;}
+  if(gs.length<2){const r=plan(items,models);r.bins.forEach(b=>bajar(repartir(b)));r.bins=ahorrarCajas(r.bins).bins;return r;}
   let bins=[],unfit=[];
   for(const g of gs){const r=plan(items.filter(it=>grupoDe(it)===g),models);bins=bins.concat(r.bins);unfit=unfit.concat(r.unfit);}
   const coste=costeDe(models),asc=models.slice().sort((a,b)=>coste(a)-coste(b)),de=b=>[...new Set(b.items.map(p=>grupoDe(p.it)))].sort().join();
@@ -615,6 +631,10 @@ function planGrupos(items,models){
   const rango=b=>{const l=b.items.filter(p=>grupoDe(p.it)==='lamas').length;return !l?0:l<b.items.length?1:2;};
   bins=bins.map((b,i)=>[b,i]).sort((a,c)=>rango(a[0])-rango(c[0])||a[1]-c[1]).map(a=>a[0]);
   bins.forEach(b=>bajar(repartir(b)));
+  // por último se aprovechan los huecos a lo largo: si los bultos de una caja entran en las demás, esa caja sobra
+  bins=ahorrarCajas(bins).bins;
+  bins=bins.map((b,i)=>[b,i]).sort((a,c)=>rango(a[0])-rango(c[0])||a[1]-c[1]).map(a=>a[0]);
+  bins.forEach(b=>{b.items=b.items.map((p,i)=>[p,i]).sort((u,v)=>(grupoDe(u[0].it)==='lamas')-(grupoDe(v[0].it)==='lamas')||u[1]-v[1]).map(u=>u[0]);}); // en la lista de cada caja, también la estructura primero
   return {bins,unfit};
 }
 
@@ -629,4 +649,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={huecos3D,apoyoFirme,sitio3D,ahorrarCajas,encajar,clienteCajetin,repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={encajar3D,huecos3D,apoyoFirme,sitio3D,ahorrarCajas,encajar,clienteCajetin,repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};
