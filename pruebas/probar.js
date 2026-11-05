@@ -64,6 +64,12 @@ assert.ok(!apoyado(Object.assign(pz(2000,2500),{y:180}),cajaA));
 {const pes=[...mk(1,200,200,4000),...mk(1,200,200,1000),...mk(1,200,200,1000)];pes[0].kg=10;pes[1].kg=200;pes[2].kg=200;
  const b=planGrupos(pes,[C7]).bins[0],cdg=b.items.reduce((s,p)=>s+p.it.kg*(p.off+p.it.L/2),0)/410;
  assert.ok(Math.abs(cdg-C7.intL/2)<C7.intL*.12,'cdg con kg '+Math.round(cdg));assert.notStrictEqual(b.items.find(p=>p.it===pes[1]).off,b.items.find(p=>p.it===pes[2]).off);}
+// Orden de llenado: primero la estructura, también dentro de una caja mezclada, y las cajas de estructura delante.
+{const est=gr('estructura',2,180,180,2000),lam=gr('lamas',2,282,275,2000);
+ const b=planGrupos([...lam,...est],[C5]).bins;assert.strictEqual(b.length,1);
+ assert.ok(Math.max(...b[0].items.filter(p=>p.it.g==='estructura').map(p=>p.y))<=Math.min(...b[0].items.filter(p=>p.it.g==='lamas').map(p=>p.y)),'estructura abajo');
+ const v=planGrupos([...gr('lamas',12,282,275,3855),...gr('estructura',8,236,138,4000)],[C5]).bins;
+ assert.strictEqual(v[0].items[0].it.g,'estructura');assert.strictEqual(v[v.length-1].items[0].it.g,'lamas');}
 // Un bulto solo en la caja va centrado.
 {const b=planGrupos(mk(1,180,180,2000),[C5]).bins[0];assert.strictEqual(b.items[0].off,1500);}
 console.log('alternadas: ok');

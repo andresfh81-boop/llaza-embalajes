@@ -306,7 +306,13 @@ function tryPlace(bin,it){
 }
 // Órdenes en que se van colocando los bultos: por sección, por alto, por ancho y por lado mayor. El reparto prueba todos.
 const ORDENES=[(a,b)=>b.w*b.h-a.w*a.h||b.L-a.L,(a,b)=>b.h-a.h||b.w-a.w||b.L-a.L,(a,b)=>b.w-a.w||b.h-a.h||b.L-a.L,(a,b)=>Math.max(b.w,b.h)-Math.max(a.w,a.h)||b.L-a.L];
-function orden(items,cmp){return items.slice().sort(cmp||ORDENES[0]);}
+// Orden de llenado: primero la estructura (todo lo que no son lamas) y después las lamas; dentro de cada parte, el orden que toque.
+const grupoDe=it=>(it.fila?it.fila[0]:it).g==='lamas'?'lamas':'estructura';
+// modo (solo para encajar, ver abajo): 'lamas' = las lamas primero; 'libre' = sin mirar el grupo.
+function orden(items,cmp,modo){
+  const c=cmp||ORDENES[0],l=it=>grupoDe(it)==='lamas';
+  return items.slice().sort(modo==='libre'?c:modo==='lamas'?(a,b)=>l(b)-l(a)||c(a,b):(a,b)=>l(a)-l(b)||c(a,b));
+}
 // Bultos con protección en los extremos (porexpan): it.cap={l,w} = largo de cada protección y ancho del bulto en el medio (con holgura).
 // Poniéndolos en fila, uno adelantado y el siguiente atrasado, las protecciones no coinciden y caben más a lo ancho.
 // Cada bulto va recto y con la protección centrada: n en fila ocupan (n-1)·(ancho+medio)/2 + ancho, y la fila mide L + protección de largo.
@@ -327,9 +333,9 @@ function filas(model,items){
   }
   return out;
 }
-function packWith(model,items,cmp){
+function packWith(model,items,cmp,modo){
   const bins=[],unfit=[];
-  for(const it of orden(filas(model,items),cmp)){
+  for(const it of orden(filas(model,items),cmp,modo)){
     if(bins.some(b=>tryPlace(b,it))) continue;
     const nb=newBin(model);
     if(tryPlace(nb,it)) bins.push(nb); else unfit.push(...(it.fila||[it]));
@@ -448,7 +454,7 @@ function repartir(bin){
 function solapan(a,b){
   const sol=(x1,w1,x2,w2)=>x1<x2+w2-1e-6&&x2<x1+w1-1e-6;
   if(!(a.y<b.y+b.h-1e-6&&b.y<a.y+a.h-1e-6)) return false;
-  if(a.medio&&b.medio&&(a.off||0)!==(b.off||0)){const m=p=>[p.x+(p.w-p.medio)/2,p.medio],[ax,aw]=m(a),[bx,bw]=m(b);return sol(a.x,a.w,bx,bw)||sol(ax,aw,b.x,b.w);}
+  if(a.medio&&b.medio&&(a.off||0)!==(b.off||0)) return chocan(a,b); // alternados: solo se libran si los corchos no coinciden a lo largo
   return sol(a.x,a.w,b.x,b.w);
 }
 const cabe=(p,bin)=>dentro(p,bin.model)&&!bin.items.some(o=>o!==p&&solapan(p,o));
@@ -495,12 +501,32 @@ function bajar(bin){
   return bin;
 }
 
+// Una sola caja con bultos de los dos grupos. Primero se intenta llenar con la estructura primero. A veces así no caben y al revés
+// sí (la estructura pequeña encaja encima de las lamas): entonces se coloca al revés y se da la vuelta a la pila, con lo que la
+// estructura queda abajo y no hace falta otra caja. null si no caben de ninguna manera.
+function encajar(model,items){
+  const sale=(cmp,modo)=>{const r=packWith(model,items,cmp,modo);return r.bins.length===1&&!r.unfit.length?r.bins[0]:null;};
+  for(const c of ORDENES){const b=sale(c);if(b)return b;}
+  for(const modo of ['lamas','libre']) for(const c of ORDENES){const b=sale(c,modo);if(b)return voltear(b);}
+  return null;
+}
+// Da la vuelta a la pila de una caja y deja caer cada bulto hasta lo que tenga debajo.
+function voltear(bin){
+  const H=bin.model.intH,puestos=[];
+  bin.items.forEach(p=>{p.y=H-p.y-p.h;});
+  for(const p of bin.items.slice().sort((a,b)=>a.y-b.y)){
+    const y0=p.y,ys=[0,...puestos.map(o=>o.y+o.h)].filter(y=>y<=y0).sort((a,b)=>a-b);
+    for(const y of ys){p.y=y;if(!puestos.some(o=>solapan(p,o)))break;p.y=y0;}
+    puestos.push(p);
+  }
+  return bin;
+}
 function planGrupos(items,models){
-  const gs=[...new Set(items.map(it=>it.g||''))].sort();
+  const gs=[...new Set(items.map(grupoDe))].sort(); // «estructura» antes que «lamas»
   if(gs.length<2){const r=plan(items,models);r.bins.forEach(b=>bajar(repartir(b)));return r;}
   let bins=[],unfit=[];
-  for(const g of gs){const r=plan(items.filter(it=>(it.g||'')===g),models);bins=bins.concat(r.bins);unfit=unfit.concat(r.unfit);}
-  const coste=costeDe(models),asc=models.slice().sort((a,b)=>coste(a)-coste(b)),de=b=>[...new Set(b.items.map(p=>p.it.g||''))].sort().join();
+  for(const g of gs){const r=plan(items.filter(it=>grupoDe(it)===g),models);bins=bins.concat(r.bins);unfit=unfit.concat(r.unfit);}
+  const coste=costeDe(models),asc=models.slice().sort((a,b)=>coste(a)-coste(b)),de=b=>[...new Set(b.items.map(p=>grupoDe(p.it)))].sort().join();
   for(let seguir=true;seguir;){
     seguir=false;
     for(let i=0;i<bins.length&&!seguir;i++) for(let j=i+1;j<bins.length&&!seguir;j++){
@@ -508,11 +534,14 @@ function planGrupos(items,models){
       const its=bins[i].items.concat(bins[j].items).map(p=>p.it);
       for(const m of asc){
         if(coste(m)>=coste(bins[i].model)+coste(bins[j].model)) break;
-        const r=packWith(m,its);
-        if(r.bins.length===1&&!r.unfit.length){bins[i]=r.bins[0];bins.splice(j,1);seguir=true;break;}
+        const nb=encajar(m,its);
+        if(nb){bins[i]=nb;bins.splice(j,1);seguir=true;break;}
       }
     }
   }
+  // las cajas también van en ese orden: las de estructura, las mezcladas y las de lamas
+  const rango=b=>{const l=b.items.filter(p=>grupoDe(p.it)==='lamas').length;return !l?0:l<b.items.length?1:2;};
+  bins=bins.map((b,i)=>[b,i]).sort((a,c)=>rango(a[0])-rango(c[0])||a[1]-c[1]).map(a=>a[0]);
   bins.forEach(b=>bajar(repartir(b)));
   return {bins,unfit};
 }
@@ -528,4 +557,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={clienteCajetin,repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={encajar,clienteCajetin,repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};
