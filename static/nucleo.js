@@ -589,6 +589,104 @@ function bajar(bin){
   return bin;
 }
 
+// Parte de la base de un bulto (largo × ancho) que tiene algo justo debajo: 1 = toda; en el suelo, 1.
+function soporte(p,items){
+  if(p.y<=1) return 1;
+  const z=p.off||0,L=p.it.L,r=[];
+  for(const o of items) if(o!==p&&Math.abs(o.y+o.h-p.y)<=1){
+    const x1=Math.max(p.x,o.x),x2=Math.min(p.x+p.w,o.x+o.w),z1=Math.max(z,o.off||0),z2=Math.min(z+L,(o.off||0)+o.it.L);
+    if(x2>x1+HOLG&&z2>z1+HOLG) r.push([x1,x2,z1,z2]);
+  }
+  if(!r.length) return 0;
+  const xs=[...new Set(r.flatMap(q=>[q[0],q[1]]))].sort((u,v)=>u-v);let area=0;
+  for(let i=0;i+1<xs.length;i++){
+    const t=r.filter(q=>q[0]<=xs[i]&&q[1]>=xs[i+1]).map(q=>[q[2],q[3]]).sort((u,v)=>u[0]-v[0]);
+    let tot=0,fin=-Infinity;for(const [a,b] of t){if(b>fin){tot+=b-Math.max(a,fin);fin=b;}}
+    area+=tot*(xs[i+1]-xs[i]);
+  }
+  return Math.min(1,area/(L*p.w));
+}
+// Asienta la carga (Andrés, 08/11/2026: «teniendo espacio suficiente, están suspendidas»). El encaje de la sección supone que cada bulto
+// ocupa todo el largo, y al repartirlos a lo largo un bulto podía quedar apoyado en un trozo corto, con el resto en el aire. Aquí se
+// recoloca cada bulto de abajo arriba, sin moverlo de lado: se prueba a lo largo (a un extremo, al otro, alineado con lo de debajo…),
+// se deja caer hasta lo que tenga debajo en 3D y se elige el sitio con más largo apoyado, después el más bajo y después el que deja
+// el peso más centrado. Nunca pone estructura encima de lamas. Si algo no cabe, deja la caja como estaba.
+function asentar(bin){
+  const M=bin.model,orig=bin.items.map(p=>[p,p.x,p.y,p.off||0,p.w,p.h]);
+  const conKg=bin.items.every(p=>p.it.kg>0),peso=p=>conKg?p.it.kg:p.it.L*(p.medio||p.w)*p.h,lama=p=>grupoDe(p.it)==='lamas';
+  const menor=(a,c)=>{for(let i=0;i<a.length;i++)if(Math.abs(a[i]-c[i])>1e-6)return a[i]<c[i];return false;};
+  const sobre=(p,o)=>o.x<p.x+p.w-HOLG&&p.x<o.x+o.w-HOLG&&(o.off||0)<(p.off||0)+p.it.L-HOLG&&(p.off||0)<(o.off||0)+o.it.L-HOLG;
+  const malos=its=>its.filter(p=>!lama(p)&&its.some(o=>lama(o)&&o.y+o.h<=p.y+1&&sobre(p,o))).length;
+  // nota de una colocación: estructura sobre lamas, largo sin apoyo, alto de la carga, descentrado
+  const nota=()=>{const its=bin.items;let m=0,mm=0;its.forEach(p=>{m+=peso(p);mm+=peso(p)*((p.off||0)+p.it.L/2);});
+    return [malos(its),Math.round(its.reduce((s,p)=>s+(1-soporte(p,its))*p.it.L*p.w,0)/1e5),Math.max(0,...its.map(p=>p.y+p.h)),m?Math.abs(mm/m-M.intL/2):0];};
+  const foto=()=>bin.items.map(p=>[p,p.x,p.y,p.off||0,p.w,p.h]),poner=f=>f.forEach(([p,x,y,off,w,h])=>{p.x=x;p.y=y;p.off=off;p.w=w;p.h=h;});
+  // unidades: cada bulto suelto, o una fila de bultos alternados (lamas con protección), que se mueve en bloque
+  const grupos={};
+  bin.items.forEach((p,i)=>{const k=p.medio?['f',p.y,p.it.L,p.h].join():'u'+i;(grupos[k]=grupos[k]||[]).push(p);});
+  const base=Object.values(grupos).map(its=>{const z0=Math.min(...its.map(p=>p.off||0)),x0=Math.min(...its.map(p=>p.x));
+    return {its,rz:its.map(p=>(p.off||0)-z0),rx:its.map(p=>p.x-x0),y:Math.min(...its.map(p=>p.y)),x:x0,z:z0,
+      w:Math.max(...its.map(p=>p.x+p.w))-x0,span:Math.max(...its.map(p=>(p.off||0)-z0+p.it.L)),L:Math.max(...its.map(p=>p.it.L)),lama:its.some(lama)};});
+  const probar=(orden,moverX,pegar,col)=>{
+    const cortosX=[],anchoX=r=>{const t=r.slice().sort((a,b)=>a[0]-b[0]);let s=0,f=-Infinity;for(const [a,b] of t){if(b>f){s+=b-Math.max(a,f);f=b;}}return s;};
+    const us=base.slice().sort(orden==='y'?(a,b)=>a.y-b.y||a.x-b.x:(a,b)=>a.lama-b.lama||b.L-a.L||a.y-b.y||a.x-b.x);
+    const puestos=[];let masa=0,mom=0;
+    const cae=p=>{let y=0;const cp=cuerpos(Object.assign({},p,{y:0}));
+      for(const o of puestos) for(const bo of cuerpos(o)) for(const bp of cp) if(bp[0]<bo[1]-HOLG&&bo[0]<bp[1]-HOLG&&bp[4]<bo[5]-HOLG&&bo[4]<bp[5]-HOLG) y=Math.max(y,bo[3]-bp[2]);
+      return y;};
+    for(const u of us){
+      const max=M.intL-u.span,zs=new Set([0,u.z]),xs=new Set([u.x]);
+      if(us.length===1) zs.add(Math.round(max/2)); // un bulto solo va centrado
+      if(max>0) zs.add(max);
+      for(const o of puestos){const oz=o.off||0;u.its.forEach((p,i)=>[oz,oz+o.it.L-p.it.L,oz+o.it.L,oz-p.it.L].forEach(v=>zs.add(Math.round(v-u.rz[i]))));}
+      if(moverX) for(const o of puestos){xs.add(o.x+o.w);xs.add(o.x);}
+      let mejor=null;
+      // en la variante «en columna», las piezas cortas de estructura se pueden tumbar y se juntan en el menor ancho posible, para dejar el suelo libre a lo largo
+      const solo=u.its.length===1&&!u.its[0].it.cap&&!u.its[0].medio&&!u.its[0].medioH,p0=u.its[0],corto=col&&!u.lama&&u.span<=M.intL/2;
+      const dims=col&&solo&&p0.w!==p0.h?[[p0.w,p0.h],[p0.h,p0.w]]:[[p0.w,p0.h]];
+      for(const [dw,dh] of dims){
+      if(solo){p0.w=dw;p0.h=dh;u.w=dw;}
+      if(moverX){xs.add(0);xs.add(M.intA-u.w);for(const o of puestos){xs.add(o.x-u.w);xs.add(o.x+o.w-u.w);}}
+      for(const bx of xs){
+        if(bx<-HOLG||bx+u.w>M.intA+HOLG) continue;
+        for(const bz of zs){
+          if(bz<-HOLG||bz>max+HOLG) continue;
+          let ok=true,n=0;
+          u.its.forEach((p,i)=>{p.off=bz+u.rz[i];p.x=bx+u.rx[i];});
+          for(const p of u.its){p.y=cae(p);puestos.push(p);n++;if(p.y+p.h>M.intH+HOLG){ok=false;break;}}
+          let k=null,m=0,mm=0;
+          if(ok){
+            m=u.its.reduce((s,p)=>s+peso(p),0);mm=u.its.reduce((s,p)=>s+peso(p)*(p.off+p.it.L/2),0);
+            const mal=u.its.filter(p=>!lama(p)&&puestos.some(o=>lama(o)&&o.y+o.h<=p.y+1&&sobre(p,o))).length;
+            const sop=u.its.reduce((s,p)=>s+soporte(p,puestos),0)/u.its.length;
+            const alto=Math.max(...u.its.map(p=>p.y+p.h)),cen=Math.abs((mom+mm)/(masa+m)-M.intL/2);
+            k=corto?[mal,-Math.round(sop*20),anchoX([...cortosX,[bx,bx+u.w]]),alto,bz]:[mal,-Math.round(sop*20),alto,pegar?bz:cen];
+          }
+          puestos.splice(puestos.length-n,n);
+          if(k&&(!mejor||menor(k,mejor.k))) mejor={bx,bz,k,m,mm,dw,dh};
+        }
+      }
+      }
+      if(!mejor) return false;
+      if(solo){p0.w=mejor.dw;p0.h=mejor.dh;u.w=mejor.dw;}
+      if(corto) cortosX.push([mejor.bx,mejor.bx+u.w]);
+      u.its.forEach((p,i)=>{p.off=mejor.bz+u.rz[i];p.x=mejor.bx+u.rx[i];});
+      for(const p of u.its){p.y=cae(p);puestos.push(p);}
+      masa+=mejor.m;mom+=mejor.mm;
+    }
+    return bin.items.every(p=>libre(p,bin,p));
+  };
+  let mejor={k:nota(),f:orig};
+  const variantes=[];for(const orden of ['y','largo']) for(const mx of [false,true]) for(const pg of [false,true]) variantes.push([orden,mx,pg,false]);
+  variantes.push(['largo',true,false,true],['largo',true,true,true]);
+  for(const [orden,mx,pg,col] of variantes){
+    base.forEach(u=>{u.w=Math.max(...u.its.map(p=>p.x+p.w))-u.x;});
+    if(probar(orden,mx,pg,col)){const k=nota();if(menor(k,mejor.k))mejor={k,f:foto()};}
+    poner(orig);
+  }
+  poner(mejor.f);
+  return bin;
+}
 // Una sola caja con bultos de los dos grupos. Primero se intenta llenar con la estructura primero. A veces así no caben y al revés
 // sí (la estructura pequeña encaja encima de las lamas): entonces se coloca al revés y se da la vuelta a la pila, con lo que la
 // estructura queda abajo y no hace falta otra caja. null si no caben de ninguna manera.
@@ -611,7 +709,7 @@ function voltear(bin){
 }
 function planGrupos(items,models){
   const gs=[...new Set(items.map(grupoDe))].sort(); // «estructura» antes que «lamas»
-  if(gs.length<2){const r=plan(items,models);r.bins.forEach(b=>bajar(repartir(b)));r.bins=ahorrarCajas(r.bins).bins;return r;}
+  if(gs.length<2){const r=plan(items,models);r.bins.forEach(b=>bajar(repartir(b)));r.bins=ahorrarCajas(r.bins).bins;r.bins.forEach(asentar);return r;}
   let bins=[],unfit=[];
   for(const g of gs){const r=plan(items.filter(it=>grupoDe(it)===g),models);bins=bins.concat(r.bins);unfit=unfit.concat(r.unfit);}
   const coste=costeDe(models),asc=models.slice().sort((a,b)=>coste(a)-coste(b)),de=b=>[...new Set(b.items.map(p=>grupoDe(p.it)))].sort().join();
@@ -634,6 +732,7 @@ function planGrupos(items,models){
   // por último se aprovechan los huecos a lo largo: si los bultos de una caja entran en las demás, esa caja sobra
   bins=ahorrarCajas(bins).bins;
   bins=bins.map((b,i)=>[b,i]).sort((a,c)=>rango(a[0])-rango(c[0])||a[1]-c[1]).map(a=>a[0]);
+  bins.forEach(asentar);
   bins.forEach(b=>{b.items=b.items.map((p,i)=>[p,i]).sort((u,v)=>(grupoDe(u[0].it)==='lamas')-(grupoDe(v[0].it)==='lamas')||u[1]-v[1]).map(u=>u[0]);}); // en la lista de cada caja, también la estructura primero
   return {bins,unfit};
 }
@@ -649,4 +748,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={encajar3D,huecos3D,apoyoFirme,sitio3D,ahorrarCajas,encajar,clienteCajetin,repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={asentar,soporte,encajar3D,huecos3D,apoyoFirme,sitio3D,ahorrarCajas,encajar,clienteCajetin,repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};

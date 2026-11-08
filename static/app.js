@@ -446,7 +446,7 @@ function ahorro(){
 function aprovecharHuecos(){
   const a=ahorro();if(!a.quitadas)return;
   const n=a.quitadas,hoy=reparto.bins.length,txt=a.mov.map(m=>`${corto(m.it.p)} ${m.it.L} mm → caja ${a.bins.findIndex(b=>b.items.some(q=>q.it===m.it))+1}`).join('; ');
-  reparto.bins=a.bins;hecho();renderResultado();
+  reparto.bins=a.bins.map(asentar);hecho();renderResultado();
   estado(`De ${hoy} a ${reparto.bins.length} cajas (${n} menos). Movido: ${txt}. Si no te convence, «Volver al reparto automático de todo» lo deshace.`);
 }
 function bloque3D(i){
@@ -658,7 +658,7 @@ function soltarSeccion(de,k,a,x,y,rot){
 function colocarCaja(n){
   const b=reparto.bins[n];if(!b||!b.items.length)return;
   const its=b.items.map(p=>p.it),nb=encajar(b.model,its),n3=nb?null:encajar3D(b.model,its); // si lleva piezas una detrás de otra, se coloca en sus huecos
-  if(nb||n3){hecho();reparto.bins[n]=nb?bajar(repartir(nb)):n3;estado(`Caja ${n+1} colocada automáticamente.`);}
+  if(nb||n3){hecho();reparto.bins[n]=asentar(nb?bajar(repartir(nb)):n3);estado(`Caja ${n+1} colocada automáticamente.`);}
   else{sel=null;avisoMov=`Caja ${n+1}: los bultos que tiene ahora no caben todos con la colocación automática. La dejo como estaba; pasa alguno a otra caja o al aparcamiento y vuelve a probar.`;}
   renderResultado();
 }

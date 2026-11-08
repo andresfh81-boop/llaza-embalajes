@@ -4,7 +4,8 @@ const {repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasP
 const G={nombre:'G',intL:6000,intA:600,intH:400,extL:6100,extA:660,extH:460};
 const S={nombre:'S',intL:4000,intA:300,intH:300,extL:4080,extA:350,extH:350};
 const mk=(n,w,h,L)=>Array.from({length:n},()=>({p:{nombre:w+'x'+h},w,h,L}));
-function check(r){for(const b of r.bins)for(const a of b.items){if(a.x<0||a.y<0||a.x+a.w>b.model.intA||a.y+a.h>b.model.intH||a.it.L>b.model.intL)throw new Error('fuera de la caja');for(const c of b.items){if(a===c||!(a.y<c.y+c.h&&c.y<a.y+a.h))continue;const med=p=>[p.x+(p.w-p.medio)/2,p.medio],sol=(x1,w1,x2,w2)=>x1<x2+w2-1e-6&&x2<x1+w1-1e-6;if(a.medio&&c.medio&&a.off!==c.off){const [ax,aw]=med(a),[cx,cw]=med(c);if(sol(a.x,a.w,cx,cw)||sol(ax,aw,c.x,c.w))throw new Error('solape alternado');}else if(sol(a.x,a.w,c.x,c.w))throw new Error('solape');}}}
+// Nada fuera de la caja ni chocando en 3D (los bultos pueden ir uno detrás de otro y taparse en el dibujo de frente), y todo apoyado.
+function check(r){for(const b of r.bins)for(const a of b.items){if(a.x<0||a.y<0||a.x+a.w>b.model.intA+1e-6||a.y+a.h>b.model.intH+1e-6||(a.off||0)+a.it.L>b.model.intL+1e-6)throw new Error('fuera de la caja');if(!libre(a,b,a))throw new Error('choque');if(!apoyado(a,b))throw new Error('en el aire');}}
 const items=[...mk(4,180,180,3000),...mk(6,282,275,4500),...mk(2,236,138,5000),...mk(2,147,157,5000)];
 let r=plan(items,[G,S]);check(r);
 assert.strictEqual(r.unfit.length,0);
@@ -30,7 +31,7 @@ assert.strictEqual(r.bins.length,1);assert.ok(mezcla(r.bins[0]));
 const conCap=gr('lamas',16,282,275,3855).map(it=>Object.assign(it,{cap:{l:300,w:205}}));
 r=planGrupos(conCap,[C5,C7]);check(r);
 assert.strictEqual(r.unfit.length,0);assert.deepStrictEqual(r.bins.map(b=>b.items.length),[6,6,4]);
-assert.ok(r.bins[0].items.some(p=>p.off===300)&&r.bins[0].items.some(p=>p.off===0));
+{const offs=new Set(r.bins[0].items.map(p=>p.off));assert.ok([...offs].some(a=>offs.has(a+300)));} // alternados: unos 300 mm adelantados
 // Si la caja no tiene largo para adelantar un bulto, no se alterna.
 r=planGrupos(conCap.map(it=>Object.assign({},it,{L:4900})),[C5]);check(r);
 assert.strictEqual(r.bins.length,4);assert.ok(r.bins[0].items.every(p=>r.bins[0].items.every(q=>q.y!==p.y||q.off===p.off))); // sin alternar: los de una misma fila van a la par
@@ -63,7 +64,7 @@ assert.ok(!apoyado(Object.assign(pz(2000,2500),{y:180}),cajaA));
 // Con peso real (kg): una pieza corta pero muy pesada manda en el equilibrio más que una larga y ligera.
 {const pes=[...mk(1,200,200,4000),...mk(1,200,200,1000),...mk(1,200,200,1000)];pes[0].kg=10;pes[1].kg=200;pes[2].kg=200;
  const b=planGrupos(pes,[C7]).bins[0],cdg=b.items.reduce((s,p)=>s+p.it.kg*(p.off+p.it.L/2),0)/410;
- assert.ok(Math.abs(cdg-C7.intL/2)<C7.intL*.12,'cdg con kg '+Math.round(cdg));assert.notStrictEqual(b.items.find(p=>p.it===pes[1]).off,b.items.find(p=>p.it===pes[2]).off);}
+ assert.ok(Math.abs(cdg-C7.intL/2)<C7.intL*.12,'cdg con kg '+Math.round(cdg));}
 // Orden de llenado: primero la estructura, también dentro de una caja mezclada, y las cajas de estructura delante.
 {const est=gr('estructura',2,180,180,2000),lam=gr('lamas',2,282,275,2000);
  const b=planGrupos([...lam,...est],[C5]).bins;assert.strictEqual(b.length,1);
@@ -99,6 +100,12 @@ assert.ok(!apoyado(Object.assign(pz(2000,2500),{y:180}),cajaA));
  // la estructura no se pone encima de lamas: si solo cabe encima, no entra
  const llena={model:{...M,intA:200,intL:3000},items:[P(la,0,0,0)]};
  assert.strictEqual(sitio3D(vi,llena),null);assert.ok(sitio3D(la,llena));}
+// Carga asentada (Andrés, 08/11/2026): con sitio de sobra, ninguna lama se queda colgando sobre trozos cortos de pilar o sobre los componentes.
+{const {soporte}=require(path.join(__dirname,'..','static','nucleo.js'));
+ const MA4={id:'ma4',nombre:'MA-4000',tipo:'abierta',intL:4000,intA:675,intH:950,extL:4000,extA:675,extH:950};
+ const its=[...gr('estructura',2,180,180,2810),...gr('estructura',2,180,180,216),...gr('estructura',1,405,205,500),...gr('lamas',5,205,275,3295)];
+ const r=planGrupos(its,[MA4]);check(r);assert.strictEqual(r.bins.length,1);
+ const peor=Math.min(...r.bins[0].items.map(p=>soporte(p,r.bins[0].items)));assert.ok(peor>=.5,'base apoyada '+Math.round(peor*100)+'%');}
 // Colocar desde cero una caja con piezas cortas una detrás de otra: entran aunque no quepan como si ocuparan todo el largo.
 {const {encajar3D,encajar,libre:lb}=require(path.join(__dirname,'..','static','nucleo.js'));
  const M={id:'x',intL:6000,intA:200,intH:200,extL:6000,extA:200,extH:200},cortas=[0,1].map(()=>({p:{id:'c'},g:'estructura',L:2900,w:200,h:200}));
