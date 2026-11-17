@@ -111,6 +111,14 @@ assert.ok(!apoyado(Object.assign(pz(2000,2500),{y:180}),cajaA));
  const r=planGrupos(gr('lamas',5,205,275,3795),ab);assert.deepStrictEqual(r.bins.map(b=>b.model.nombre),['MA-4000']);
  const r2=planGrupos(gr('lamas',5,205,275,4500),ab);assert.deepStrictEqual(r2.bins.map(b=>b.model.nombre),['MA-5000']);
  console.log('caja más corta: ok');}
+// Pedido 54007677 en cartón: la estructura cabe en una sola C-4000 con los componentes detrás de los pilares → 3 cajas, no 4.
+{const cat=require(path.join(__dirname,'..','datos','catalogo.json')),ct=cat.cajas.filter(c=>c.tipo==='carton');
+ const its=[...gr('estructura',2,140,235,3700),...gr('estructura',2,215,235,3700),...[2754,2805,2748,2710].flatMap(L=>gr('estructura',1,180,180,L)),...gr('estructura',2,150,160,3700),
+   ...gr('lamas',1,205,275,3771),...gr('lamas',10,205,275,3795),...gr('estructura',1,405,205,500)];
+ its.filter(it=>it.g==='lamas').forEach(it=>it.cap={l:600,w:155});
+ const r=planGrupos(its,ct);assert.strictEqual(r.unfit.length,0);assert.deepStrictEqual(r.bins.map(b=>b.model.nombre),['C-4000','C-4000','C-4000']);
+ check(r);
+ console.log('54007677 en 3 cajas: ok');}
 // Colocar desde cero una caja con piezas cortas una detrás de otra: entran aunque no quepan como si ocuparan todo el largo.
 {const {encajar3D,encajar,libre:lb}=require(path.join(__dirname,'..','static','nucleo.js'));
  const M={id:'x',intL:6000,intA:200,intH:200,extL:6000,extA:200,extH:200},cortas=[0,1].map(()=>({p:{id:'c'},g:'estructura',L:2900,w:200,h:200}));

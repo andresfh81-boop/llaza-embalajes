@@ -761,9 +761,27 @@ function voltear(bin){
   }
   return bin;
 }
+// Dos cajas que, colocando los bultos también uno detrás de otro (en 3D), caben en una sola más barata: se juntan (17/11/2026).
+// Pedido 54007677: la estructura iba en C-3000 + C-4000 y cabe toda en una C-4000 poniendo los componentes detrás de los pilares;
+// el encaje por sección (`encajar`) no lo ve porque cada bulto ocupa todo el largo. Vale también para dos cajas del mismo grupo.
+function juntar3D(bins,models){
+  const coste=costeDe(models),asc=models.slice().sort((a,b)=>coste(a)-coste(b));
+  for(let seguir=true;seguir;){
+    seguir=false;
+    for(let i=0;i<bins.length&&!seguir;i++) for(let j=i+1;j<bins.length&&!seguir;j++){
+      const its=bins[i].items.concat(bins[j].items).map(p=>p.it);
+      for(const m of asc){
+        if(coste(m)>=coste(bins[i].model)+coste(bins[j].model)) break;
+        const nb=encajar3D(m,its);
+        if(nb){bins[i]=nb;bins.splice(j,1);seguir=true;break;}
+      }
+    }
+  }
+  return bins;
+}
 function planGrupos(items,models){
   const gs=[...new Set(items.map(grupoDe))].sort(); // «estructura» antes que «lamas»
-  if(gs.length<2){const r=plan(items,models);r.bins.forEach(b=>bajar(repartir(b)));r.bins=ahorrarCajas(r.bins).bins;r.bins.forEach(asentar);return r;}
+  if(gs.length<2){const r=plan(items,models);r.bins.forEach(b=>bajar(repartir(b)));r.bins=juntar3D(ahorrarCajas(r.bins).bins,models);r.bins.forEach(asentar);return r;}
   let bins=[],unfit=[];
   for(const g of gs){const r=plan(items.filter(it=>grupoDe(it)===g),models);bins=bins.concat(r.bins);unfit=unfit.concat(r.unfit);}
   const coste=costeDe(models),asc=models.slice().sort((a,b)=>coste(a)-coste(b)),de=b=>[...new Set(b.items.map(p=>grupoDe(p.it)))].sort().join();
@@ -784,7 +802,7 @@ function planGrupos(items,models){
   bins=bins.map((b,i)=>[b,i]).sort((a,c)=>rango(a[0])-rango(c[0])||a[1]-c[1]).map(a=>a[0]);
   bins.forEach(b=>bajar(repartir(b)));
   // por último se aprovechan los huecos a lo largo: si los bultos de una caja entran en las demás, esa caja sobra
-  bins=ahorrarCajas(bins).bins;
+  bins=juntar3D(ahorrarCajas(bins).bins,models);
   bins=bins.map((b,i)=>[b,i]).sort((a,c)=>rango(a[0])-rango(c[0])||a[1]-c[1]).map(a=>a[0]);
   bins.forEach(asentar);
   bins.forEach(b=>{b.items=b.items.map((p,i)=>[p,i]).sort((u,v)=>(grupoDe(u[0].it)==='lamas')-(grupoDe(v[0].it)==='lamas')||u[1]-v[1]).map(u=>u[0]);}); // en la lista de cada caja, también la estructura primero
