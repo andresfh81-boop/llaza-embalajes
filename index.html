@@ -8,7 +8,7 @@
   <link rel="icon" href="static/favicon.ico">
   <link rel="apple-touch-icon" href="static/icon-180.png">
   <meta name="theme-color" content="#0b5c8a">
-  <link rel="stylesheet" href="static/estilo.css?v=95">
+  <link rel="stylesheet" href="static/estilo.css?v=96">
 </head>
 <body>
 <div class="wrap">
@@ -67,12 +67,7 @@
       </form>
       <div id="lineas"></div>
       <label>Holgura por bulto <span class="u">(mm)</span><input id="holgura" type="number" min="0" step="1"></label>
-      <fieldset class="comp"><legend>Bulto componentes e instrucciones</legend><div class="row">
-        <label>Cantidad<input id="comp-n" type="number" min="0" step="1"></label>
-        <label>Largo <span class="u">(mm)</span><input id="comp-l" type="number" min="1" step="10"></label>
-        <label>Ancho <span class="u">(mm)</span><input id="comp-a" type="number" min="1" step="10"></label>
-        <label>Alto <span class="u">(mm)</span><input id="comp-h" type="number" min="1" step="10"></label>
-      </div></fieldset>
+      <div class="comp-resumen"><span id="comp-txt"></span><button class="btn small ghost" type="button" data-act="comp-editar">Editar componentes</button></div>
       <label>Referencia del pedido (sale en la lista y en la solicitud)<input id="ref-pedido"></label>
       <button class="btn" type="button" data-act="solicitar">Solicitud de cajas al almacén</button>
     </div>
@@ -150,6 +145,19 @@
     <button class="btn ghost" type="button" data-act="prev-cerrar">Cerrar</button>
   </div>
 </dialog>
+<dialog id="dlg-comp">
+  <h2>Bulto de componentes e instrucciones</h2>
+  <p class="sub">Toda pérgola lleva al menos uno y va dentro de las cajas con la estructura. Las medidas se recuerdan para el siguiente pedido; la cantidad vuelve a 1 ud. en cada pedido nuevo. Con 0 uds. no se mete ninguno.</p>
+  <div class="row">
+    <label>Cantidad <span class="u">(uds.)</span><input id="comp-n" type="number" min="0" step="1"></label>
+    <label>Largo <span class="u">(mm)</span><input id="comp-l" type="number" min="1" step="10"></label>
+    <label>Ancho <span class="u">(mm)</span><input id="comp-a" type="number" min="1" step="10"></label>
+    <label>Alto <span class="u">(mm)</span><input id="comp-h" type="number" min="1" step="10"></label>
+  </div>
+  <div class="acciones">
+    <button class="btn" type="button" data-act="comp-cerrar">Hecho</button>
+  </div>
+</dialog>
 <dialog id="dlg-sol">
   <h2>Solicitud de cajas al almacén</h2>
   <p class="sub">Copia el asunto y el texto y pégalos en un correo nuevo. Puedes retocar el texto aquí antes de copiarlo.</p>
@@ -166,10 +174,10 @@
 <div id="imprimir"></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script src="static/nucleo.js?v=95"></script>
-<script src="static/pdf.js?v=95"></script>
-<script src="static/xlsx.js?v=95"></script>
-<script src="static/vista3d.js?v=95"></script>
-<script src="static/app.js?v=95"></script>
+<script src="static/nucleo.js?v=96"></script>
+<script src="static/pdf.js?v=96"></script>
+<script src="static/xlsx.js?v=96"></script>
+<script src="static/vista3d.js?v=96"></script>
+<script src="static/app.js?v=96"></script>
 </body>
 </html>

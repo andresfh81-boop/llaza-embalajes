@@ -207,10 +207,10 @@ fieldset.comp .row{grid-template-columns:repeat(4,minmax(0,1fr))}
 .boxcard.comp svg{max-height:170px;cursor:default}
 fieldset.comp{border:2px solid var(--accent)}
 fieldset.comp legend{color:var(--accent)}
-dialog#dlg-sol{width:min(760px,calc(100vw - 24px));border:1px solid var(--line);border-radius:8px;padding:18px;background:var(--panel);color:var(--fg)}
-dialog#dlg-sol[open]{display:flex;flex-direction:column;gap:12px}
-dialog#dlg-sol::backdrop{background:rgba(0,0,0,.5)}
-dialog#dlg-sol h2{margin:0}
+dialog#dlg-sol,dialog#dlg-comp{width:min(760px,calc(100vw - 24px));border:1px solid var(--line);border-radius:8px;padding:18px;background:var(--panel);color:var(--fg)}
+dialog#dlg-sol[open],dialog#dlg-comp[open]{display:flex;flex-direction:column;gap:12px}
+dialog#dlg-sol::backdrop,dialog#dlg-comp::backdrop{background:rgba(0,0,0,.5)}
+dialog#dlg-sol h2,dialog#dlg-comp h2{margin:0}
 textarea{font:400 15px/1.45 var(--body);padding:10px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--fg);width:100%;resize:vertical;text-transform:none;letter-spacing:0}
 #sol-aviso{color:var(--accent);font-weight:600;min-height:1.3em}
 @media print{dialog{display:none!important}}
@@ -277,3 +277,9 @@ table.prev .ojo{display:block;font-size:13px}
 .vistas{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .vistas .btn{font-size:16px;padding:10px 18px;min-height:44px}
 @media print{.vistas{display:none}}
+
+/* Componentes: resumen en el pedido y ventana para editarlos (17/11/2026) */
+.comp-resumen{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px}
+dialog#dlg-comp{width:min(560px,calc(100vw - 24px))}
+dialog#dlg-comp .row{grid-template-columns:repeat(auto-fit,minmax(110px,1fr))}
+dialog#dlg-comp .acciones{display:flex;justify-content:flex-end}

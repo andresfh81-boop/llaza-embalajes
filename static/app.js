@@ -51,9 +51,12 @@ function componentes(){
 // El bulto de componentes se trata como un perfil más (va con la estructura) para encajarlo dentro de las cajas.
 function perfilComp(){const c=componentes();return {id:'_comp',ref:'',nombre:'Bulto componentes e instrucciones',corto:'Componentes',grupo:'estructura',ancho:c.A,alto:c.H,uds:1};}
 const perfilDe=pid=>pid==='_comp'?perfilComp():perfiles.find(x=>x.id===pid);
+// Resumen del bulto de componentes en el pedido; se edita en la ventana «Editar componentes».
+function pintarComp(){const cp=componentes();$('comp-txt').innerHTML=cp.n?`<b>Componentes:</b> ${cp.n} ${cp.n===1?'ud.':'uds.'} de ${cp.L} × ${cp.A} × ${cp.H} mm`:'<b>Componentes:</b> ninguno (0 uds.)';}
 function renderPedido(){
   const cp=componentes();
   for(const [id,k] of [['comp-n','n'],['comp-l','L'],['comp-a','A'],['comp-h','H']]) if(document.activeElement!==$(id)) $(id).value=cp[k];
+  pintarComp();
   document.querySelectorAll('#tipos input').forEach(x=>x.checked=x.value===pedido.destino);
   $('destino').classList.toggle('falta',!pedido.destino&&pedido.lineas.length>0);
   if(document.activeElement!==$('lugar')) $('lugar').value=lugarPend!==null?lugarPend:pedido.lugar||'';
@@ -1155,7 +1158,7 @@ $('lugar').addEventListener('input',e=>{
 for(const [id,k] of [['comp-n','n'],['comp-l','L'],['comp-a','A'],['comp-h','H']]) $(id).addEventListener('input',e=>{
   componentes();pedido.comp[k]=num(e.target.value);
   try{localStorage.setItem('componentes-embalaje',JSON.stringify({L:pedido.comp.L,A:pedido.comp.A,H:pedido.comp.H}));}catch(err){}
-  guardarPedido();renderResultado();
+  guardarPedido();pintarComp();renderResultado();
 });
 $('ref-pedido').addEventListener('input',e=>{pedido.ref=e.target.value.trim();guardarPedido();});
 $('holgura').addEventListener('input',e=>{pedido.holgura=num(e.target.value);guardarPedido();renderResultado();});
@@ -1233,6 +1236,8 @@ document.addEventListener('click',async e=>{
   else if(a==='sol-asunto'){copiarSolicitud('sol-asunto','Asunto');}
   else if(a==='sol-pdf'){pdfSolicitud();}
   else if(a==='sol-cerrar'){$('dlg-sol').close();}
+  else if(a==='comp-editar'){$('dlg-comp').showModal();$('comp-n').focus();$('comp-n').select();}
+  else if(a==='comp-cerrar'){$('dlg-comp').close();}
   else if(a==='auto-caja'){colocarCaja(Number(b.dataset.i));}
   else if(a==='imprimir-caja'){imprimirLista(Number(b.dataset.i));}
   else if(a==='completa'){completa=completa?null:new Set([Number(b.dataset.i)]);renderResultado();}
