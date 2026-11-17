@@ -455,6 +455,19 @@ function cuerpos(p){
 }
 const HOLG=0.01;
 function chocan(a,b){return cuerpos(a).some(u=>cuerpos(b).some(v=>u[0]<v[1]-HOLG&&v[0]<u[1]-HOLG&&u[2]<v[3]-HOLG&&v[2]<u[3]-HOLG&&u[4]<v[5]-HOLG&&v[4]<u[5]-HOLG));}
+// Al mover un bulto a mano no se queda en el aire (Andrés, 17/11/2026): baja hasta la superficie más cercana que tenga debajo,
+// la de otro bulto o el suelo. Mira los cuerpos de verdad (con protecciones) en ancho y a lo largo. salvo = el bulto que se mueve,
+// si sigue en la lista de la caja. Si al bajarlo chocara con algo, se queda donde estaba.
+function aposar(p,bin,salvo){
+  const pc=cuerpos(p),y0=p.y;let y=0;
+  for(const o of bin.items){
+    if(o===salvo||o===p) continue;
+    for(const c of cuerpos(o)) for(const u of pc)
+      if(c[0]<u[1]-HOLG&&u[0]<c[1]-HOLG&&c[4]<u[5]-HOLG&&u[4]<c[5]-HOLG&&c[3]<=u[2]+HOLG) y=Math.max(y,c[3]-(u[2]-p.y));
+  }
+  if(y<y0){p.y=y;if(!libre(p,bin,salvo))p.y=y0;}
+  return p;
+}
 function dentro(p,M){const z=p.off||0;return p.x>=-HOLG&&p.y>=-HOLG&&z>=-HOLG&&p.x+p.w<=M.intA+HOLG&&p.y+p.h<=M.intH+HOLG&&z+p.it.L<=M.intL+HOLG;}
 // ¿Puede estar el bulto p así colocado en la caja? (salvo = el propio bulto en su sitio anterior)
 function libre(p,bin,salvo){return dentro(p,bin.model)&&!bin.items.some(o=>o!==salvo&&chocan(p,o));}
@@ -533,11 +546,21 @@ function apoyoFirme(p,bin){
   const c=z+L/2;
   return tot>=L*.5&&t[0][0]<=c&&fin>=c;
 }
+// Posturas de un bulto. Los perfiles van siempre a lo largo de la caja; el bulto de componentes (it.gira = {d:[largo,ancho,alto], hol})
+// puede ir en cualquier sentido, también de pie (Andrés, 17/11/2026: «hay que aprovechar todos los espacios»). Cada postura es una
+// copia del bulto con su largo, ancho y alto; la holgura va en ancho y alto, como en los demás bultos.
+function posturas(it){
+  if(!it.gira) return [it];
+  const [a,b,c]=it.gira.d,h=it.gira.hol,vs=[it],ya=new Set([it.L+'|'+it.w+'|'+it.h]);
+  for(const [L,w,hh] of [[a,b,c],[b,a,c],[c,a,b],[a,c,b],[b,c,a],[c,b,a]]){const k=L+'|'+(w+h)+'|'+(hh+h);if(ya.has(k))continue;ya.add(k);vs.push(Object.assign({},it,{L,w:w+h,h:hh+h}));}
+  return vs;
+}
 // Sitio para un bulto en los huecos de una caja: apoyado firme y sin poner estructura encima de lamas (la estructura va primero).
 function sitio3D(it,bin,soloHueco){
   const es=soloHueco?[soloHueco]:huecos3D(bin,100).sort((a,b)=>a[2]-b[2]||a[4]-b[4]);
-  const lamas=grupoDe(it)==='lamas';
-  for(const e of es) for(const [w,h] of it.cap?[[it.w,it.h]]:[[it.w,it.h],[it.h,it.w]]){
+  const lamas=grupoDe(it)==='lamas',vs=posturas(it);
+  for(const e of es) for(const v of vs) for(const [w,h] of v.cap?[[v.w,v.h]]:[[v.w,v.h],[v.h,v.w]]){
+    it=v;
     if(w>e[1]-e[0]||h>e[3]-e[2]||it.L>e[5]-e[4]) continue;
     for(const off of [e[4],e[5]-it.L]) for(const x of [e[0],e[1]-w]){
       const p={it,x,y:e[2],w,h,off};if(it.cap)p.medio=it.cap.w;
@@ -560,6 +583,21 @@ function encajar3D(model,items){
   }
   return bin;
 }
+// La misma caja con la carga corrida al fondo y al frente (copias): toda junta y, además, cada piso (bultos a la misma altura)
+// pegado a ese extremo por separado, porque el reparto deja los pisos escalonados y así el hueco del extremo llega hasta arriba.
+// Solo las copias en las que nada choca ni se sale; las que no cambian nada no se repiten.
+function corridas(bin){
+  if(!bin.items.length) return [];
+  const M=bin.model,ini=p=>p.off||0,fin=p=>(p.off||0)+p.it.L,pisos={};
+  bin.items.forEach(p=>{(pisos[Math.round(p.y)]=pisos[Math.round(p.y)]||[]).push(p);});
+  const mueve=f=>({model:M,free:[],items:bin.items.map(p=>Object.assign({},p,{off:ini(p)+f(p)}))});
+  const z0=Math.min(...bin.items.map(ini)),z1=Math.max(...bin.items.map(fin));
+  const piso=p=>pisos[Math.round(p.y)];
+  const vs=[mueve(()=>-z0),mueve(()=>M.intL-z1),mueve(p=>-Math.min(...piso(p).map(ini))),mueve(p=>M.intL-Math.max(...piso(p).map(fin)))];
+  const vistas=new Set([bin.items.map(ini).join()]);
+  return vs.filter(v=>{const k=v.items.map(ini).join();if(vistas.has(k))return false;vistas.add(k);
+    return v.items.every((p,i)=>dentro(p,M)&&v.items.slice(i+1).every(o=>!chocan(p,o))&&(p.y<=1||apoyado(p,v)));});
+}
 function ahorrarCajas(bins){
   let act=bins.map(b=>({model:b.model,free:[],items:b.items.slice()})),quitadas=0;const mov=[];
   // el resultado depende del orden: se prueba con los bultos de mayor a menor y de menor a mayor, y llenando las cajas en un sentido y en el otro
@@ -569,7 +607,12 @@ function ahorrarCajas(bins){
     const cajas=c.map((_,k)=>k).filter(k=>k!==i);if(sc<0)cajas.reverse();
     for(const p of c[i].items.slice().sort((u,v)=>sb*(vol(v)-vol(u)))){
       let puesto=false;
-      for(const j of cajas){const q=sitio3D(p.it,c[j]);if(q){c[j].items.push(q);pasos.push({it:p.it});puesto=true;break;}}
+      for(const j of cajas){
+        let q=sitio3D(p.it,c[j]);
+        // si no cabe, se prueba con toda la carga de esa caja corrida a un extremo: junta los huecos de los dos extremos en uno
+        if(!q) for(const cb of corridas(c[j])){q=sitio3D(p.it,cb);if(q){c[j]=cb;break;}}
+        if(q){c[j].items.push(q);pasos.push({it:q.it});puesto=true;break;}
+      }
       if(!puesto) return null;
     }
     c.splice(i,1);
@@ -820,4 +863,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={codigoCliente,leerClientes,destinoDeCliente,lugarDeCliente,normCodigo,asentar,soporte,encajar3D,huecos3D,apoyoFirme,sitio3D,ahorrarCajas,encajar,clienteCajetin,repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={aposar,posturas,juntar3D,codigoCliente,leerClientes,destinoDeCliente,lugarDeCliente,normCodigo,asentar,soporte,encajar3D,huecos3D,apoyoFirme,sitio3D,ahorrarCajas,encajar,clienteCajetin,repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};

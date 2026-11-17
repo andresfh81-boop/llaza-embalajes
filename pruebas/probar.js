@@ -119,6 +119,30 @@ assert.ok(!apoyado(Object.assign(pz(2000,2500),{y:180}),cajaA));
  const r=planGrupos(its,ct);assert.strictEqual(r.unfit.length,0);assert.deepStrictEqual(r.bins.map(b=>b.model.nombre),['C-4000','C-4000','C-4000']);
  check(r);
  console.log('54007677 en 3 cajas: ok');}
+// El bulto de componentes puede ir en cualquier sentido (17/11/2026): en los 205 mm que dejan las lamas de 3795 mm al final de
+// una caja de 4 m entra de canto (200 mm a lo largo); sin poder girar, no entra.
+{const {sitio3D,posturas}=require(path.join(__dirname,'..','static','nucleo.js'));
+ const C4={nombre:'C-4000',intL:4000,intA:700,intH:620,extL:4000,extA:700,extH:620};
+ const bin={model:C4,free:[],items:[{it:{p:{},g:'estructura',L:3795,w:700,h:620},x:0,y:0,w:700,h:620,off:0}]};
+ const comp={p:{id:'_comp'},g:'estructura',L:500,w:405,h:205,gira:{d:[500,400,200],hol:5}};
+ assert.strictEqual(posturas(comp).length,6);
+ const q=sitio3D(comp,bin);assert.ok(q&&q.it.L===200&&q.off>=3795,'componentes de canto al final');
+ assert.strictEqual(sitio3D(Object.assign({},comp,{gira:null}),bin),null);
+ console.log('componentes en cualquier sentido: ok');}
+// Sin caja propia para los componentes: con 6 bultos de lamas de 3795 mm van de canto al final de la misma C-4000.
+{const cat=require(path.join(__dirname,'..','datos','catalogo.json')),ct=cat.cajas.filter(c=>c.tipo==='carton');
+ const its=gr('lamas',6,205,275,3795);its.forEach(it=>it.cap={l:600,w:155});
+ its.push(Object.assign(gr('estructura',1,405,205,500)[0],{p:{id:'_comp',nombre:'Comp'},gira:{d:[500,400,200],hol:5}}));
+ const r=planGrupos(its,ct);check(r);assert.deepStrictEqual(r.bins.map(b=>b.model.nombre+':'+b.items.length),['C-4000:7']);
+ console.log('componentes sin caja propia: ok');}
+// Al moverlo a mano, un bulto baja hasta lo que tiene debajo (o el suelo), no se queda en el aire.
+{const {aposar}=require(path.join(__dirname,'..','static','nucleo.js'));
+ const C4={nombre:'C-4000',intL:4000,intA:700,intH:620,extL:4000,extA:700,extH:620};
+ const abajo={it:{p:{},L:3000},x:0,y:0,w:300,h:200,off:0},bin={model:C4,items:[abajo]};
+ const p={it:{p:{},L:500},x:100,y:400,w:200,h:100,off:0};aposar(p,bin);assert.strictEqual(p.y,200);
+ const q={it:{p:{},L:500},x:400,y:400,w:200,h:100,off:0};aposar(q,bin);assert.strictEqual(q.y,0);
+ const r={it:{p:{},L:500},x:100,y:400,w:200,h:100,off:3200};aposar(r,bin);assert.strictEqual(r.y,0);
+ console.log('sin quedarse en el aire: ok');}
 // Colocar desde cero una caja con piezas cortas una detrás de otra: entran aunque no quepan como si ocuparan todo el largo.
 {const {encajar3D,encajar,libre:lb}=require(path.join(__dirname,'..','static','nucleo.js'));
  const M={id:'x',intL:6000,intA:200,intH:200,extL:6000,extA:200,extH:200},cortas=[0,1].map(()=>({p:{id:'c'},g:'estructura',L:2900,w:200,h:200}));

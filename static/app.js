@@ -162,6 +162,7 @@ function cargarReparto(clave,modelos){
       if(!bin.model) return null;
       for(const [pid,L,x,y,w,h,off,m,n,mod,ped] of b.its){
         const i=it([pid,L,m,n,mod,ped]),p={it:i,x,y,w,h,off};
+        if(pid==='_comp'){const c=componentes();i.gira={d:[c.L,c.A,c.H],hol:num(pedido.holgura)};i.w=w;i.h=h;}
         if(i.cap&&w===i.w) p.medio=i.cap.w; else if(i.cap&&w===i.h) p.medioH=i.cap.w;
         if(!libre(p,bin)) return null;
         bin.items.push(p);
@@ -344,7 +345,7 @@ function bultosDe(lineas,c){
     for(let i=0;i<n;i++) items.push(bulto(p,l.largo,(l.marcas||[]).slice(i*u,(i+1)*u).join(' '),Math.min(u,l.cant-i*u),l.mod,pedDe(l)));
   }
   const pc={id:'_comp',ref:'',nombre:'Bulto componentes e instrucciones',corto:'Componentes',grupo:'estructura',ancho:c.A,alto:c.H,uds:1};
-  for(let i=0;i<c.n;i++) items.push(bulto(pc,c.L,'',1,''));
+  for(let i=0;i<c.n;i++) items.push(Object.assign(bulto(pc,c.L,'',1,''),{gira:{d:[num(c.L),num(c.A),num(c.H)],hol:num(pedido.holgura)}})); // puede ir en cualquier sentido (posturas)
   return items;
 }
 function renderResultado(recalcular){
@@ -629,7 +630,7 @@ function girado(p,rot){return rot?Object.assign({},p,{w:p.h,h:p.w,medio:p.medioH
 function girarBulto(b,k){
   const bin=reparto.bins[b],orig=bin.items[k],M=bin.model;
   const p=girado(orig,true);p.x=Math.max(0,Math.min(p.x,M.intA-p.w));p.y=Math.max(0,Math.min(p.y,M.intH-p.h));
-  if(libre(p,bin,orig)){hecho();bin.items[k]=p;}
+  if(libre(p,bin,orig)){aposar(p,bin,orig);hecho();bin.items[k]=p;}
   else{const o=bin.items.find(o=>o!==orig&&chocan(p,o));avisoMov=o?`Girado no cabe ahí: choca con ${nombreB(o)}.`:`Girado no cabe ahí: ${nombreB(orig)} se sale de la caja ${b+1}.`;}
   renderResultado();
 }
@@ -653,7 +654,7 @@ function soltarSeccion(de,k,a,x,y,rot){
     avisoMov=c?`Ahí no cabe: choca con ${nombreB(c)}.`:`Ahí no cabe: ${nombreB(src)} se sale de la caja ${a+1}.`;
     return renderResultado();
   }
-  hecho();
+  aposar(p,bin,orig);hecho();
   if(a===de) bin.items[k]=p; else{bin.items.push(p);quitarBulto(de,k);}
   renderResultado();
 }
@@ -695,7 +696,7 @@ function soltarAuto(de,k,a){
   let p=null;
   busca: for(const off of zs) for(const y of ys) for(const x of xs){const c=Object.assign({},src,{x,y,off});if(libre(c,bin)){p=c;break busca;}}
   if(!p){avisoMov=`No cabe: en la caja ${a+1} (${bin.model.nombre}) no queda sitio para ${nombreB(src)}.`;return renderResultado();}
-  hecho();bin.items.push(p);if(a==='nueva')B.push(bin);quitarBulto(de,k);
+  aposar(p,bin);hecho();bin.items.push(p);if(a==='nueva')B.push(bin);quitarBulto(de,k);
   renderResultado();
 }
 // Soltado en la vista desde arriba de la caja a: off = cuánto va adelantado a lo largo, x = posición a lo ancho.
@@ -718,7 +719,7 @@ function soltarPlanta(de,k,a,off,x,rot){
     avisoMov=o?`Ahí no cabe: choca con ${nombreB(o)}.`:`Ahí no cabe: ${nombreB(src)} se sale de la caja ${a+1}.`;
     return renderResultado();
   }
-  hecho();
+  aposar(p,bin,orig);hecho();
   if(a===de) bin.items[k]=p; else{bin.items.push(p);quitarBulto(de,k);}
   renderResultado();
 }
