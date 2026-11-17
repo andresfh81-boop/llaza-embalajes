@@ -43,16 +43,22 @@ function renderHojas(){
 // Bulto de componentes e instrucciones: toda pérgola lleva al menos uno. Es un bulto más, que va dentro de las cajas
 // grandes con los perfiles. Medidas (mm) y cantidad editables;
 // las medidas se recuerdan en el navegador para el siguiente pedido.
-const COMP_DEF={n:1,L:500,A:400,H:200};
+const COMP_DEF={n:0,L:500,A:400,H:200}; // de inicio sin componentes (Andrés, 17/11/2026: «en caso de necesitarla la añadiré yo con un clic»)
 function componentes(){
-  if(!pedido.comp){let g=null;try{g=JSON.parse(localStorage.getItem('componentes-embalaje')||'null');}catch(e){}pedido.comp=Object.assign({},COMP_DEF,g||{},{n:1});}
+  if(!pedido.comp){let g=null;try{g=JSON.parse(localStorage.getItem('componentes-embalaje')||'null');}catch(e){}pedido.comp=Object.assign({},COMP_DEF,g||{},{n:0});}
   const c=pedido.comp;return {n:num(c.n),L:num(c.L),A:num(c.A),H:num(c.H)};
 }
 // El bulto de componentes se trata como un perfil más (va con la estructura) para encajarlo dentro de las cajas.
 function perfilComp(){const c=componentes();return {id:'_comp',ref:'',nombre:'Bulto componentes e instrucciones',corto:'Componentes',grupo:'estructura',ancho:c.A,alto:c.H,uds:1};}
 const perfilDe=pid=>pid==='_comp'?perfilComp():perfiles.find(x=>x.id===pid);
 // Resumen del bulto de componentes en el pedido; se edita en la ventana «Editar componentes».
-function pintarComp(){const cp=componentes();$('comp-txt').innerHTML=cp.n?`<b>Componentes:</b> ${cp.n} ${cp.n===1?'ud.':'uds.'} de ${cp.L} × ${cp.A} × ${cp.H} mm`:'<b>Componentes:</b> ninguno (0 uds.)';}
+function pintarComp(){
+  const cp=componentes();
+  $('comp-txt').innerHTML=cp.n?`<b>Componentes:</b> ${cp.n} ${cp.n===1?'ud.':'uds.'} de ${cp.L} × ${cp.A} × ${cp.H} mm`:'<b>Componentes:</b> ninguno';
+  $('comp-btns').innerHTML=(cp.n?'<button class="btn small ghost" type="button" data-act="comp-quitar">Quitar</button>':'<button class="btn small" type="button" data-act="comp-anadir">Añadir componentes</button>')+'<button class="btn small ghost" type="button" data-act="comp-editar">Editar</button>';
+}
+// Un clic: pone o quita el bulto de componentes (1 ud. o ninguno) y recalcula.
+function ponerComp(n){componentes();pedido.comp.n=n;$('comp-n').value=n;guardarPedido();pintarComp();renderResultado();estado(n?'Bulto de componentes añadido.':'Bulto de componentes quitado.');}
 function renderPedido(){
   const cp=componentes();
   for(const [id,k] of [['comp-n','n'],['comp-l','L'],['comp-a','A'],['comp-h','H']]) if(document.activeElement!==$(id)) $(id).value=cp[k];
@@ -1237,6 +1243,8 @@ document.addEventListener('click',async e=>{
   else if(a==='sol-asunto'){copiarSolicitud('sol-asunto','Asunto');}
   else if(a==='sol-pdf'){pdfSolicitud();}
   else if(a==='sol-cerrar'){$('dlg-sol').close();}
+  else if(a==='comp-anadir'){ponerComp(1);}
+  else if(a==='comp-quitar'){ponerComp(0);}
   else if(a==='comp-editar'){$('dlg-comp').showModal();$('comp-n').focus();$('comp-n').select();}
   else if(a==='comp-cerrar'){$('dlg-comp').close();}
   else if(a==='auto-caja'){colocarCaja(Number(b.dataset.i));}
@@ -1372,7 +1380,7 @@ function aPrevision(){
   const hs=pedido.hojas||[],peds=pedidosDe(),hoy=new Date().toISOString().slice(0,10);
   const lin=ls=>ls.map(l=>({pid:l.pid,largo:l.largo,cant:l.cant}));
   // con varios números, cada uno es una parte (con un bulto de componentes) para poder separarlos en la previsión
-  const partes=peds.length>1?peds.map(n=>calcularPrev({id:nuevoId(),fecha:hoy,numero:n,cliente:(hs.find(x=>x.numero===n)||{}).nombre||'',tipo:pedido.tipo,origen:'lote',lineas:lin(pedido.lineas.filter(l=>pedDe(l)===n)),comp:Object.assign({},componentes(),{n:1})})):null;
+  const partes=peds.length>1?peds.map(n=>calcularPrev({id:nuevoId(),fecha:hoy,numero:n,cliente:(hs.find(x=>x.numero===n)||{}).nombre||'',tipo:pedido.tipo,origen:'lote',lineas:lin(pedido.lineas.filter(l=>pedDe(l)===n)),comp:Object.assign({},componentes(),{n:componentes().n?1:0})})):null;
   const e=Object.assign({id:nuevoId(),fecha:hoy,numero:peds.length>1?peds.join(' + '):h.numero||'',cliente:peds.length>1?[...new Set(hs.map(x=>x.nombre).filter(Boolean))].join(' + '):h.nombre||pedido.ref||'',tipo:pedido.tipo,origen:'pedido',estimado:hs.some(x=>x.plano),
     lineas:lin(pedido.lineas),comp:componentes()},resumenCajas(r),partes?{partes}:{});
   const ya=meterPrevision(e);guardarPrevision();renderPrevision();
@@ -1423,7 +1431,7 @@ async function lotePrevision(files){
       if(p&&l.largo&&l.cant) lineas.push({pid:p.id,largo:l.largo,cant:l.cant});
       else if(!p&&!base.montados.find(x=>String(x.ref).trim()===l.ref)) sin++;
     }
-    const e=calcularPrev({id:nuevoId(),fecha:new Date().toISOString().slice(0,10),numero:g.numero,cliente:g.cliente,tipo:g.tipoCli||prevTipo||pedido.tipo,origen:'lote',lineas,comp:Object.assign({},componentes(),{n:1}),sinPerfil:sin,estimado:!!g.estimado,notaPlano:g.notaPlano||'',notaCliente:g.notaCliente||''});
+    const e=calcularPrev({id:nuevoId(),fecha:new Date().toISOString().slice(0,10),numero:g.numero,cliente:g.cliente,tipo:g.tipoCli||prevTipo||pedido.tipo,origen:'lote',lineas,comp:Object.assign({},componentes(),{n:componentes().n?1:0}),sinPerfil:sin,estimado:!!g.estimado,notaPlano:g.notaPlano||'',notaCliente:g.notaCliente||''});
     if(g.planoFilas){e.plano={lineas:aLineas(g.planoFilas),comp:e.comp};compararPlano(e);if(g.clientePlano)e.cliente=g.clientePlano;}
     if(meterPrevision(e)) sust++;
     n++;

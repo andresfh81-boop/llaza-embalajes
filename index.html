@@ -8,7 +8,7 @@
   <link rel="icon" href="static/favicon.ico">
   <link rel="apple-touch-icon" href="static/icon-180.png">
   <meta name="theme-color" content="#0b5c8a">
-  <link rel="stylesheet" href="static/estilo.css?v=98">
+  <link rel="stylesheet" href="static/estilo.css?v=99">
 </head>
 <body>
 <div class="wrap">
@@ -67,7 +67,7 @@
       </form>
       <div id="lineas"></div>
       <label>Holgura por bulto <span class="u">(mm)</span><input id="holgura" type="number" min="0" step="1"></label>
-      <div class="comp-resumen"><span id="comp-txt"></span><button class="btn small ghost" type="button" data-act="comp-editar">Editar componentes</button></div>
+      <div class="comp-resumen"><span id="comp-txt"></span><span id="comp-btns" class="acciones"></span></div>
       <label>Referencia del pedido (sale en la lista y en la solicitud)<input id="ref-pedido"></label>
       <button class="btn" type="button" data-act="solicitar">Solicitud de cajas al almacén</button>
     </div>
@@ -147,7 +147,7 @@
 </dialog>
 <dialog id="dlg-comp">
   <h2>Bulto de componentes e instrucciones</h2>
-  <p class="sub">Toda pérgola lleva al menos uno y va dentro de las cajas con la estructura. Las medidas se recuerdan para el siguiente pedido; la cantidad vuelve a 1 ud. en cada pedido nuevo. Con 0 uds. no se mete ninguno.</p>
+  <p class="sub">Va dentro de las cajas con la estructura. Cada pedido empieza sin él: añádelo con «Añadir componentes» o pon aquí la cantidad. Las medidas se recuerdan para el siguiente pedido.</p>
   <div class="row">
     <label>Cantidad <span class="u">(uds.)</span><input id="comp-n" type="number" min="0" step="1"></label>
     <label>Largo <span class="u">(mm)</span><input id="comp-l" type="number" min="1" step="10"></label>
@@ -174,10 +174,10 @@
 <div id="imprimir"></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script src="static/nucleo.js?v=98"></script>
-<script src="static/pdf.js?v=98"></script>
-<script src="static/xlsx.js?v=98"></script>
-<script src="static/vista3d.js?v=98"></script>
-<script src="static/app.js?v=98"></script>
+<script src="static/nucleo.js?v=99"></script>
+<script src="static/pdf.js?v=99"></script>
+<script src="static/xlsx.js?v=99"></script>
+<script src="static/vista3d.js?v=99"></script>
+<script src="static/app.js?v=99"></script>
 </body>
 </html>
