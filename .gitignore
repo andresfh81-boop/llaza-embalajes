@@ -3,3 +3,7 @@ Thumbs.db
 *.log
 .claude/
 *.zip
+
+# Base de clientes de Llaza: solo en su servidor, nunca en el repo público
+datos/clientes.json
+datos/clientes.csv

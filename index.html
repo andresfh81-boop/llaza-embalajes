@@ -8,7 +8,7 @@
   <link rel="icon" href="static/favicon.ico">
   <link rel="apple-touch-icon" href="static/icon-180.png">
   <meta name="theme-color" content="#0b5c8a">
-  <link rel="stylesheet" href="static/estilo.css?v=92">
+  <link rel="stylesheet" href="static/estilo.css?v=94">
 </head>
 <body>
 <div class="wrap">
@@ -22,6 +22,7 @@
       <button role="tab" data-tab="cajas" aria-selected="false">Cajas</button>
       <button role="tab" data-tab="perfiles" aria-selected="false">Perfiles</button>
       <button role="tab" data-tab="prevision" aria-selected="false">Previsión</button>
+      <button role="tab" data-tab="clientes" aria-selected="false">Clientes</button>
     </div>
   </header>
   <div id="estado" role="status"></div>
@@ -31,6 +32,7 @@
     <div class="panel">
       <div class="cab-pedido"><h2>Pedido</h2><button class="btn danger" id="vaciar" type="button">Limpiar pantalla</button></div>
       <fieldset class="destino" id="destino"><legend>Destino de la pérgola</legend>
+        <label>Nº de cliente<input id="cod-cliente" inputmode="numeric" placeholder="104530" autocomplete="off"></label>
         <label>País o ciudad<input id="lugar" placeholder="Francia, Mallorca, Madrid…" autocomplete="off"></label>
         <button class="btn ghost" id="act-destino" type="button">Actualizar destino</button>
         <small id="lugar-nota" class="sub">Al escribirlo se elige solo el embalaje (salimos de Alcover, Tarragona).</small>
@@ -114,6 +116,16 @@
     <div id="lista-perfiles" class="scroll"></div>
   </section>
 
+  <section id="tab-clientes" class="panel" hidden>
+    <h2>Clientes</h2>
+    <p class="sub">Con el nº de cliente del plano (en el cajetín, «CLIENTE: 104530») la app busca aquí la ciudad y el país del cliente y elige sola el embalaje: en el pedido y en la Previsión. También se puede escribir el nº a mano en el pedido. La base de clientes no va en la app publicada: o la pone Llaza en su servidor, como <code>datos/clientes.json</code> o <code>datos/clientes.csv</code>, y la ve todo el equipo, o cada uno la importa aquí y se guarda solo en su navegador.</p>
+    <div id="cli-estado" class="note"></div>
+    <div class="acciones"><label class="btn small ghost imp"><input type="file" id="cli-file" accept=".csv,.txt,.json,text/csv,application/json">Importar clientes (CSV o JSON)</label><span id="cli-quitar"></span></div>
+    <p class="sub">Formato: una fila por cliente con cabecera. Columnas reconocidas: código (o «nº cliente», «cliente»), nombre (o «razón social»), ciudad (o «población», «localidad»), provincia, país, código postal y, si se quiere forzar el embalaje de un cliente, «embalaje» (cartón, madera cerrada, madera abierta). Separado por punto y coma, coma o tabulador: el CSV que saca Excel con «Guardar como → CSV» vale.</p>
+    <label>Buscar<input id="cli-buscar" placeholder="Nº, nombre, ciudad o país" autocomplete="off"></label>
+    <div id="lista-clientes" class="scroll"></div>
+  </section>
+
   <section id="tab-prevision" class="panel" hidden>
     <h2>Previsión de cajas</h2>
     <p class="sub">Para saber con tiempo cuántas cajas van a hacer falta: junta aquí los pedidos que vienen y te da la lista por pedido y el total de cada modelo. Se guarda en este navegador.</p>
@@ -154,10 +166,10 @@
 <div id="imprimir"></div>
 
 <script src="vendor/pdfjs/pdf.min.js"></script>
-<script src="static/nucleo.js?v=92"></script>
-<script src="static/pdf.js?v=92"></script>
-<script src="static/xlsx.js?v=92"></script>
-<script src="static/vista3d.js?v=92"></script>
-<script src="static/app.js?v=92"></script>
+<script src="static/nucleo.js?v=94"></script>
+<script src="static/pdf.js?v=94"></script>
+<script src="static/xlsx.js?v=94"></script>
+<script src="static/vista3d.js?v=94"></script>
+<script src="static/app.js?v=94"></script>
 </body>
 </html>

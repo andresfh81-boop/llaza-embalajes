@@ -106,6 +106,11 @@ assert.ok(!apoyado(Object.assign(pz(2000,2500),{y:180}),cajaA));
  const its=[...gr('estructura',2,180,180,2810),...gr('estructura',2,180,180,216),...gr('estructura',1,405,205,500),...gr('lamas',5,205,275,3295)];
  const r=planGrupos(its,[MA4]);check(r);assert.strictEqual(r.bins.length,1);
  const peor=Math.min(...r.bins[0].items.map(p=>soporte(p,r.bins[0].items)));assert.ok(peor>=.5,'base apoyada '+Math.round(peor*100)+'%');}
+// La caja más corta que sirva, aunque lleve más madera (17/11/2026): 5 bultos de lamas de 3795 mm van en MA-4000, no en MA-5000.
+{const cat=require(path.join(__dirname,'..','datos','catalogo.json')),ab=cat.cajas.filter(c=>c.tipo==='abierta');
+ const r=planGrupos(gr('lamas',5,205,275,3795),ab);assert.deepStrictEqual(r.bins.map(b=>b.model.nombre),['MA-4000']);
+ const r2=planGrupos(gr('lamas',5,205,275,4500),ab);assert.deepStrictEqual(r2.bins.map(b=>b.model.nombre),['MA-5000']);
+ console.log('caja más corta: ok');}
 // Colocar desde cero una caja con piezas cortas una detrás de otra: entran aunque no quepan como si ocuparan todo el largo.
 {const {encajar3D,encajar,libre:lb}=require(path.join(__dirname,'..','static','nucleo.js'));
  const M={id:'x',intL:6000,intA:200,intH:200,extL:6000,extA:200,extH:200},cortas=[0,1].map(()=>({p:{id:'c'},g:'estructura',L:2900,w:200,h:200}));
@@ -214,3 +219,18 @@ const orden=(x,y)=>x.id<y.id?-1:1;
 assert.deepStrictEqual(aplicar(base,d).sort(orden),mio.slice().sort(orden));
 assert.deepStrictEqual(diferencia(base,aplicar(base,{})),{});
 console.log('catálogo: ok');
+
+// Base de clientes: nº del cajetín → lugar → embalaje (14/11/2026)
+{
+  const {codigoCliente,leerClientes,destinoDeCliente,lugarDeCliente}=require(path.join(__dirname,'..','static','nucleo.js'));
+  assert.strictEqual(codigoCliente('CLIENTE:\n104530\nREFERENCIA:\nLIUBOV USENKO TRUSH'),'104530');
+  assert.strictEqual(codigoCliente('CLIENTE: 0104530 REFERENCIA'),'104530');
+  assert.strictEqual(codigoCliente('OFERTA 54007677\nCLIENTE:\nREFERENCIA:'),'');
+  assert.strictEqual(datosPlano('54007677_4000x4000_TESTA.pdf','CLIENTE:\n104530').codCliente,'104530');
+  const cl=leerClientes('Código;Razón social;Población;Provincia;País\n104530;"USENKO; TRUSH";Lyon;Rhône;Francia\n2;B;Palma;Illes Balears;España\n3;C;Reus;Tarragona;España\n4;D;Reus;;España;');
+  assert.deepStrictEqual(cl.map(destinoDeCliente),['abierta','cerrada','carton','carton']);
+  assert.strictEqual(cl[0].nombre,'USENKO; TRUSH');
+  assert.strictEqual(lugarDeCliente(cl[0]),'Lyon, Rhône, Francia');
+  assert.strictEqual(destinoDeCliente(leerClientes('[{"codigo":5,"ciudad":"Cork","pais":"Irlanda","embalaje":"Madera abierta"}]')[0]),'abierta');
+  console.log('clientes: ok');
+}

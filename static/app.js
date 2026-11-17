@@ -57,6 +57,7 @@ function renderPedido(){
   document.querySelectorAll('#tipos input').forEach(x=>x.checked=x.value===pedido.destino);
   $('destino').classList.toggle('falta',!pedido.destino&&pedido.lineas.length>0);
   if(document.activeElement!==$('lugar')) $('lugar').value=lugarPend!==null?lugarPend:pedido.lugar||'';
+  if(document.activeElement!==$('cod-cliente')) $('cod-cliente').value=pedido.codCliente||'';
   notaLugar();
   if(document.activeElement!==$('holgura')) $('holgura').value=pedido.holgura;
   if(document.activeElement!==$('ref-pedido')) $('ref-pedido').value=pedido.ref||'';
@@ -837,8 +838,9 @@ function rellenarPlano(d,malas,extra){
   $('pl-mod').value=d.modulos||'';$('pl-ancho').value=d.ancho||'';$('pl-proy').value=d.proy||'';
   $('pl-pil').value=d.pilares?d.pilares.join(', '):'';$('pl-lamas').value=d.lamas||'';$('pl-num').value=d.numero||d.oferta||'';
   lamasSegunAncho();
+  if(d.codCliente) aplicarCliente(d.codCliente);
   const leido=`Leído ${d.archivos.join(' y ')}`+(malas.length?` (no se ha leído: ${malas.join('; ')})`:'');
-  calcularPlano();estado(leido+'. '+$('estado').textContent+(extra?` Este PDF trae ${extra+1} planos y se ha usado el primero: para calcularlos todos, suéltalo en la pestaña Previsión.`:''));
+  calcularPlano();const cn=d.codCliente?' '+notaCliente():'';estado(leido+'. '+$('estado').textContent+cn+(extra?` Este PDF trae ${extra+1} planos y se ha usado el primero: para calcularlos todos, suéltalo en la pestaña Previsión.`:''));
 }
 function volcarLeidas(){
   const ok=leidas.filter(l=>l.pid&&l.largo&&l.cant),mont=leidas.filter(l=>!l.pid&&l.montado).length;
@@ -987,7 +989,47 @@ function renderPerfiles(){
   $('lista-perfiles').innerHTML=perfiles.length?`<table><thead><tr><th>Nombre</th><th>Ref.</th><th>Grupo</th><th class="n">Ancho <span class="u">(mm)</span></th><th class="n">Alto <span class="u">(mm)</span></th><th class="n">Piezas/bulto</th><th class="n">Ancho en medio <span class="u">(mm)</span></th><th class="n">Protección <span class="u">(mm)</span></th><th class="n">kg/m</th><th></th></tr></thead><tbody>${perfiles.map(p=>`<tr><td>${esc(p.nombre)}</td><td>${esc(p.ref)}</td><td>${GRUPOS[p.grupo]||''}</td><td class="n">${num(p.ancho)}</td><td class="n">${num(p.alto)}</td><td class="n">${num(p.uds)||1}</td><td class="n">${num(p.anchoMedio)||''}</td><td class="n">${num(p.capL)||''}</td><td class="n">${Number(p.kgm)>0?String(p.kgm).replace('.',','):''}</td><td class="act">${botones('perfil',p.id)}</td></tr>`).join('')}</tbody></table>`
     :'<div class="empty">Aún no hay perfiles. Guarda aquí la sección de cada perfil ya envuelto.</div>';
 }
-function renderTodo(){renderPedido();renderCajas();renderPerfiles();renderCatalogo();renderPrevision();}
+function renderTodo(){renderPedido();renderCajas();renderPerfiles();renderCatalogo();renderPrevision();renderClientes();}
+// Pestaña Clientes: estado de la base, importar y buscar.
+const sinTildes=x=>String(x||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+function renderClientes(){
+  const nb=clientesBase.length,np=clientesProp.length;
+  $('cli-estado').textContent=!nb&&!np?'No hay base de clientes cargada: el embalaje se elige por el país o la ciudad que se escriba en el pedido.'
+    :[nb?`${nb} clientes de la base común (${clientesFuente})`:'',np?`${np} importados en este navegador`:''].filter(Boolean).join(' y ')+'.';
+  $('cli-quitar').innerHTML=!np?'':cliConfirmar?'<button class="btn small danger" type="button" data-cli="quitar">Confirmar: quitar los importados</button> <button class="btn small ghost" type="button" data-cli="no">No</button>'
+    :'<button class="btn small danger" type="button" data-cli="pedir">Quitar los importados</button>';
+  const q=sinTildes(cliBusca).trim();
+  if(!clientesIdx.size){$('lista-clientes').innerHTML='';return;}
+  if(!q){$('lista-clientes').innerHTML='<div class="empty">Escribe arriba un nº, nombre, ciudad o país para buscar.</div>';return;}
+  const l=[...clientesIdx.values()].filter(c=>sinTildes([c.codigo,c.nombre,c.ciudad,c.provincia,c.pais].join(' ')).includes(q)).slice(0,100);
+  const nom=d=>d?`${DESTINOS[d]} · ${TIPOS[d].toLowerCase()}`:'Sin reconocer: se elige a mano';
+  $('lista-clientes').innerHTML=l.length?`<table><thead><tr><th>Nº</th><th>Nombre</th><th>Lugar</th><th>Embalaje</th></tr></thead><tbody>${l.map(c=>`<tr><td>${esc(c.codigo)}</td><td>${esc(c.nombre||'')}</td><td>${esc(lugarDeCliente(c))}</td><td>${esc(nom(destinoDeCliente(c)))}${c.embalaje?' <small>(fijado)</small>':''}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Ningún cliente coincide.</div>';
+}
+$('cli-buscar').addEventListener('input',e=>{cliBusca=e.target.value;renderClientes();});
+$('cli-file').addEventListener('change',async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{
+    const l=leerClientes(await f.text());
+    if(!l.length) throw new Error('vacío');
+    localStorage.setItem(CLAVE_CLI,JSON.stringify(l));clientesProp=l;indexarClientes();
+    const sin=l.filter(c=>!destinoDeCliente(c)).length;
+    estado(`Importados ${l.length} clientes de ${f.name}.`+(sin?` De ${sin} no se reconoce el lugar: con ellos el embalaje se elige a mano (o pon la columna «embalaje»).`:''));
+  }catch(err){estado(err&&err.name==='QuotaExceededError'?'La base de clientes no cabe en este navegador: pídele a Llaza que la ponga en el servidor (datos/clientes.json).':'No se han encontrado clientes en ese archivo: hace falta una fila de cabecera con al menos la columna del código (y ciudad o país).');}
+  renderPedido();renderClientes();
+});
+$('cli-quitar').addEventListener('click',e=>{
+  const a=e.target.closest('[data-cli]');if(!a)return;
+  if(a.dataset.cli==='pedir')cliConfirmar=true;
+  else if(a.dataset.cli==='no')cliConfirmar=false;
+  else{cliConfirmar=false;clientesProp=[];try{localStorage.removeItem(CLAVE_CLI);}catch(err){}indexarClientes();renderPedido();estado('Quitados los clientes importados en este navegador.');}
+  renderClientes();
+});
+(async()=>{
+  for(const a of ['datos/clientes.json','datos/clientes.csv']){
+    try{const r=await fetch(a,{cache:'no-cache'});if(!r.ok)continue;const l=leerClientes(await r.text());if(l.length){clientesBase=l;clientesFuente=a;break;}}catch(e){}
+  }
+  indexarClientes();renderClientes();if(pedido.codCliente)renderPedido();
+})();
 
 // Catálogo: el común del repo (datos/catalogo.json) más los cambios guardados en este navegador.
 const CLAVE_CAT='catalogo-embalaje';
@@ -1038,23 +1080,50 @@ async function importar(file){
 document.querySelector('.tabs').addEventListener('click',e=>{
   const b=e.target.closest('[data-tab]');if(!b)return;
   document.querySelectorAll('[data-tab]').forEach(x=>x.setAttribute('aria-selected',x===b));
-  ['pedido','cajas','perfiles','prevision'].forEach(t=>$('tab-'+t).hidden=t!==b.dataset.tab);
-  $('cat-bar').hidden=b.dataset.tab==='pedido'||b.dataset.tab==='prevision';
+  ['pedido','cajas','perfiles','prevision','clientes'].forEach(t=>$('tab-'+t).hidden=t!==b.dataset.tab);
+  $('cat-bar').hidden=!['cajas','perfiles'].includes(b.dataset.tab);
 });
 function elegirDestino(t,auto){if(!TIPOS[t])return;pedido.tipo=pedido.destino=t;pedido.destinoAuto=!!auto;if(lugarPend!==null){pedido.lugar=lugarPend;lugarPend=null;}guardarPedido();renderPedido();}
 // Sin destino todavía, el lugar lo elige al escribirlo. Con destino ya elegido no cambia solo: cambiar el embalaje rehace el
 // reparto, así que el lugar nuevo queda pendiente (lugarPend) hasta pulsar «Actualizar destino» o Intro (Andrés, 01/11/2026).
+// Base de clientes (traspaso a Llaza, 14/11/2026): la común, si Llaza la pone en su servidor (datos/clientes.json o .csv, que no
+// van en el repo público), más la importada en este navegador (CLAVE_CLI), que manda si un código está en las dos.
+const CLAVE_CLI='clientes-embalaje';
+let clientesBase=[],clientesProp=[],clientesFuente='',cliBusca='',cliConfirmar=false;
+try{clientesProp=JSON.parse(localStorage.getItem(CLAVE_CLI)||'[]')||[];}catch(e){}
+let clientesIdx=new Map();
+function indexarClientes(){clientesIdx=new Map();for(const c of clientesBase.concat(clientesProp)) clientesIdx.set(normCodigo(c.codigo),c);}
+indexarClientes();
+const buscarCliente=cod=>clientesIdx.get(normCodigo(cod))||null;
+// El cliente puede llevar el embalaje forzado (columna «embalaje»): manda sobre lo que diga su lugar.
+function destinoDeTexto(v){const c=buscarCliente(pedido.codCliente);return c&&v&&v===lugarDeCliente(c)?destinoDeCliente(c)||destinoDeLugar(v):destinoDeLugar(v);}
+function notaCliente(){
+  const k=pedido.codCliente;if(!k)return '';
+  const c=buscarCliente(k);
+  if(!clientesIdx.size) return `Cliente ${k}: no hay base de clientes cargada (pestaña Clientes).`;
+  if(!c) return `El cliente ${k} no está en la base de clientes: escribe el país o la ciudad.`;
+  return `Cliente ${k}${c.nombre?' ('+c.nombre+')':''}: ${lugarDeCliente(c)||'sin ciudad ni país en la base'}.`;
+}
+// Pone el nº de cliente y, si está en la base, su lugar: sin destino elegido, lo elige; con destino, queda pendiente como al escribirlo.
+function aplicarCliente(cod){
+  pedido.codCliente=normCodigo(cod);
+  const c=buscarCliente(pedido.codCliente),v=lugarDeCliente(c);
+  if(!c||!v){guardarPedido();renderPedido();return '';}
+  if(!pedido.destino){lugarPend=null;pedido.lugar=v;const d=destinoDeTexto(v);if(d){elegirDestino(d,true);return d;}guardarPedido();renderPedido();return '';}
+  lugarPend=v===(pedido.lugar||'')?null:v;guardarPedido();renderPedido();return '';
+}
 function notaLugar(){
-  const v=lugarPend!==null?lugarPend:pedido.lugar||'',d=destinoDeLugar(v),nom=t=>`${DESTINOS[t].toLowerCase()} (${TIPOS[t].toLowerCase()})`;
+  const v=lugarPend!==null?lugarPend:pedido.lugar||'',d=destinoDeTexto(v),nom=t=>`${DESTINOS[t].toLowerCase()} (${TIPOS[t].toLowerCase()})`;
   const pend=lugarPend!==null&&!!pedido.destino;
   $('act-destino').classList.toggle('ghost',!pend);
   $('lugar-nota').textContent=pend?(d&&d!==pedido.destino?`«${v}» corresponde a ${nom(d)}; ahora está en ${nom(pedido.destino)}. Pulsa «Actualizar destino».`:d?'Pulsa «Actualizar destino» para guardar el lugar.':`No reconozco «${v}»: si cambia el embalaje, elígelo abajo.`)
     :pedido.destino&&pedido.destinoAuto?`Elegido por el lugar: ${nom(pedido.destino)}. Si va de otra forma, cámbialo abajo.`
     :pedido.destino?'Embalaje elegido a mano. Para que lo elija el lugar, escríbelo y pulsa «Actualizar destino».'
     :v?'No reconozco ese lugar: elige el embalaje abajo.':'Al escribirlo se elige solo el embalaje (salimos de Alcover, Tarragona).';
+  const cn=notaCliente();if(cn)$('lugar-nota').textContent=cn+' '+$('lugar-nota').textContent;
 }
 function actualizarDestino(){
-  const v=$('lugar').value.trim(),d=destinoDeLugar(v),antes=pedido.destino;
+  const v=$('lugar').value.trim(),d=destinoDeTexto(v),antes=pedido.destino;
   if(!v){lugarPend=null;pedido.lugar='';guardarPedido();renderPedido();estado('Escribe el país o la ciudad de destino, o elige el embalaje abajo.');return;}
   lugarPend=v;
   if(!d){pedido.lugar=v;lugarPend=null;guardarPedido();renderPedido();$('lugar-nota').textContent=`No reconozco «${v}»${antes?`: sigue en ${DESTINOS[antes].toLowerCase()} (${TIPOS[antes].toLowerCase()})`:''}. Elige el embalaje abajo si va de otra forma.`;estado(`No reconozco «${v}»: elige el embalaje a mano.`);return;}
@@ -1062,6 +1131,10 @@ function actualizarDestino(){
   estado(d===antes?`Destino actualizado: ${v}. El embalaje no cambia: ${DESTINOS[d].toLowerCase()} (${TIPOS[d].toLowerCase()}).`:`Destino actualizado: ${v} → ${DESTINOS[d].toLowerCase()} (${TIPOS[d].toLowerCase()}).`+(pedido.lineas.length?' Cajas recalculadas.':''));
 }
 $('act-destino').addEventListener('click',actualizarDestino);
+$('cod-cliente').addEventListener('change',e=>{
+  const d=aplicarCliente(e.target.value),c=buscarCliente(pedido.codCliente);
+  estado(!pedido.codCliente?'Sin nº de cliente.':c?`Cliente ${pedido.codCliente}: ${lugarDeCliente(c)||'sin lugar en la base'}`+(d?` → ${DESTINOS[d].toLowerCase()} (${TIPOS[d].toLowerCase()}).`:lugarPend!==null?'. Pulsa «Actualizar destino» para cambiar el embalaje.':'.'):notaCliente());
+});
 $('lugar').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();actualizarDestino();}});
 const aMano=t=>{elegirDestino(t);estado(`Embalaje elegido a mano: ${DESTINOS[t].toLowerCase()} (${TIPOS[t].toLowerCase()}).`);};
 $('tipos').addEventListener('change',e=>aMano(e.target.value));
@@ -1072,7 +1145,7 @@ $('lugar').addEventListener('input',e=>{
   const v=e.target.value.trim();
   if(!pedido.destino){
     lugarPend=null;pedido.lugar=v;
-    const d=destinoDeLugar(v);
+    const d=destinoDeTexto(v);
     if(d){elegirDestino(d,true);estado(`Destino: ${v} → ${DESTINOS[d].toLowerCase()} (${TIPOS[d].toLowerCase()}).`);} else{guardarPedido();notaLugar();renderHojas();}
     return;
   }
@@ -1092,7 +1165,7 @@ $('f-linea').addEventListener('submit',e=>{
   if(!pid||!largo||!cant)return;
   pedido.lineas.push({pid,largo,cant,marcas:$('l-marcas').value.split(',').map(x=>x.trim()).filter(Boolean)});$('l-marcas').value='';guardarPedido();renderPedido();
 });
-$('vaciar').addEventListener('click',()=>{pedido.comp=null;pedido.lineas=[];pedido.hojas=[];pedido.ref='';pedido.destino='';pedido.destinoAuto=false;planoLeido={};pedido.lugar='';$('lugar').value='';lugarPend=null;for(const x of ['pl-mod','pl-ancho','pl-proy','pl-pil','pl-lamas','pl-num'])$(x).value='';lamasSegunAncho();leidas=[];leidasHojas=[];guardarPedido();renderLeidas();renderPedido();estado('Pantalla limpia: puedes empezar otro pedido.');});
+$('vaciar').addEventListener('click',()=>{pedido.comp=null;pedido.lineas=[];pedido.hojas=[];pedido.ref='';pedido.destino='';pedido.destinoAuto=false;planoLeido={};pedido.lugar='';pedido.codCliente='';$('lugar').value='';$('cod-cliente').value='';lugarPend=null;for(const x of ['pl-mod','pl-ancho','pl-proy','pl-pil','pl-lamas','pl-num'])$(x).value='';lamasSegunAncho();leidas=[];leidasHojas=[];guardarPedido();renderLeidas();renderPedido();estado('Pantalla limpia: puedes empezar otro pedido.');});
 $('f-caja').addEventListener('submit',e=>{
   e.preventDefault();
   const d={nombre:$('c-nombre').value.trim(),tipo:$('c-tipo').value,intL:num($('c-il').value),intA:num($('c-ia').value),intH:num($('c-ih').value),extL:num($('c-el').value),extA:num($('c-ea').value),extH:num($('c-eh').value)};
@@ -1299,6 +1372,12 @@ function aPrevision(){
   const ya=meterPrevision(e);guardarPrevision();renderPrevision();
   estado(`${ya?'Pedido sustituido':'Pedido añadido'} en la previsión${e.numero?' ('+e.numero+')':''}: ${e.total} ${e.total===1?'caja':'cajas'}. Está en la pestaña Previsión.`);
 }
+// Embalaje de un plano por su nº de cliente: si está en la base, manda sobre el destino elegido arriba de la Previsión.
+function tipoCliente(cod){
+  const k=normCodigo(cod);if(!k)return {};
+  const c=buscarCliente(k),d=destinoDeCliente(c);
+  return c&&d?{tipoCli:d,notaCliente:`Cliente ${k}: ${lugarDeCliente(c)} → ${TIPOS[d].toLowerCase()}`}:{notaCliente:`Cliente ${k}: ${c?'no se reconoce su lugar':'no está en la base de clientes'}`};
+}
 // Varias hojas de corte a la vez: las que tienen el mismo nº de hoja son un solo pedido (una por módulo).
 async function lotePrevision(files){
   files=[...(files||[])].filter(Boolean);if(!files.length)return;
@@ -1317,15 +1396,15 @@ async function lotePrevision(files){
           const pz=piezasPlano(Object.assign({},d,{sinTipo:!d.tipologia}));if(!pz.length)return;
           hay++;
           const num=d.numero||d.oferta||'',k=normNum(num)||file.name+'#'+i;
-          if(grupos.has(k)){const g0=grupos.get(k);if(!g0.estimado&&!g0.planoFilas){g0.planoFilas=pz;g0.clientePlano=d.referencia||'';}return;}
-          grupos.set(k,{numero:num,cliente:d.referencia||'',filas:pz,estimado:true,notaPlano:d.medidasOCR?'medidas leídas con OCR: compruébalas':''});
+          if(grupos.has(k)){const g0=grupos.get(k);if(!g0.estimado&&!g0.planoFilas){g0.planoFilas=pz;g0.clientePlano=d.referencia||'';Object.assign(g0,tipoCliente(d.codCliente));}return;}
+          grupos.set(k,Object.assign({numero:num,cliente:d.referencia||'',filas:pz,estimado:true,notaPlano:d.medidasOCR?'medidas leídas con OCR: compruébalas':''},tipoCliente(d.codCliente)));
           nPlanos++;
         });
         if(!hay) malas.push(file.name+(ds.length?' (ficha de fabricación sin medidas: suelta el plano cliente)':' (no se ha encontrado ni hoja de corte ni plano cliente)'));
         continue;
       }
       const k=normNum(cab.numero)||file.name;let g=grupos.get(k);
-      if(!g||g.estimado){const pl=g&&g.estimado?g:null;g={numero:cab.numero||'',cliente:cab.nombre||'',filas:[],planoFilas:pl?pl.filas:null,clientePlano:pl?pl.cliente:''};if(pl)nPlanos--;}
+      if(!g||g.estimado){const pl=g&&g.estimado?g:null;g={numero:cab.numero||'',cliente:cab.nombre||'',filas:[],planoFilas:pl?pl.filas:null,clientePlano:pl?pl.cliente:'',tipoCli:pl?pl.tipoCli:'',notaCliente:pl?pl.notaCliente:''};if(pl)nPlanos--;}
       g.filas.push(...filas);grupos.set(k,g);
     }catch(e){malas.push(file.name+' (no se ha podido leer)');}
   }
@@ -1338,7 +1417,7 @@ async function lotePrevision(files){
       if(p&&l.largo&&l.cant) lineas.push({pid:p.id,largo:l.largo,cant:l.cant});
       else if(!p&&!base.montados.find(x=>String(x.ref).trim()===l.ref)) sin++;
     }
-    const e=calcularPrev({id:nuevoId(),fecha:new Date().toISOString().slice(0,10),numero:g.numero,cliente:g.cliente,tipo:prevTipo||pedido.tipo,origen:'lote',lineas,comp:Object.assign({},componentes(),{n:1}),sinPerfil:sin,estimado:!!g.estimado,notaPlano:g.notaPlano||''});
+    const e=calcularPrev({id:nuevoId(),fecha:new Date().toISOString().slice(0,10),numero:g.numero,cliente:g.cliente,tipo:g.tipoCli||prevTipo||pedido.tipo,origen:'lote',lineas,comp:Object.assign({},componentes(),{n:1}),sinPerfil:sin,estimado:!!g.estimado,notaPlano:g.notaPlano||'',notaCliente:g.notaCliente||''});
     if(g.planoFilas){e.plano={lineas:aLineas(g.planoFilas),comp:e.comp};compararPlano(e);if(g.clientePlano)e.cliente=g.clientePlano;}
     if(meterPrevision(e)) sust++;
     n++;
@@ -1363,7 +1442,7 @@ function renderPrevision(){
   const tot=totalesPrev(),nc=tot.reduce((s,c)=>s+c.n,0),m3=prevision.reduce((s,e)=>s+(e.m3||0),0);
   el.innerHTML=`<div class="totals"><div><b>${prevision.length}</b> <span>${prevision.length===1?'pedido':'pedidos'}</span></div><div><b>${nc}</b> <span>${nc===1?'caja':'cajas'}</span></div><div><b>${m3.toFixed(2)}</b> <span>m³ de transporte</span></div><span class="acciones"><button class="btn" type="button" data-act="prev-correo">Enviar por correo</button><button class="btn ghost" type="button" data-act="prev-excel">Guardar en Excel</button><button class="btn ${prevVaciar?'danger':'ghost'}" type="button" data-act="prev-vaciar">${prevVaciar?'¿Seguro? Pulsa otra vez':'Vaciar previsión'}</button></span></div>${leyenda}
     <h3>Cajas que hacen falta</h3><div class="scroll"><table><thead><tr><th>Modelo</th><th>Tipo</th><th>Exterior L×A×H <span class="u">(mm)</span></th><th class="n">Cantidad</th></tr></thead><tbody>${tot.map(c=>`<tr><td><b class="t-${esc(c.tipo)}">${esc(c.nombre)}</b></td><td>${tipoTxt(c.tipo)}</td><td>${c.ext.join(' × ')} mm</td><td class="n"><b class="t-${esc(c.tipo)}">${uds(c.n)}</b></td></tr>`).join('')}</tbody></table></div>
-    <h3>Pedidos</h3>${noCoinciden().length?`<div class="note" role="alert">⚠ ${noCoinciden().length===1?'En 1 pedido la hoja de corte no da':`En ${noCoinciden().length} pedidos la hoja de corte no da`} las mismas cajas que el plano: ${noCoinciden().map(p=>esc(p.numero)).join(', ')}. Mira el detalle en su fila.</div>`:''}${prevMarcas.size>=2?`<div class="manual">${prevMarcas.size} pedidos marcados. <button class="btn small" type="button" data-act="prev-juntar">Juntar en un envío</button> <button class="btn small ghost" type="button" data-act="prev-desmarcar">Quitar marcas</button></div>`:'<p class="sub">Si dos pedidos van en las mismas cajas, márcalos y pulsa «Juntar en un envío».</p>'}<div class="scroll"><table class="prev"><thead><tr><th></th><th>Fecha</th><th>Nº pedido</th><th>Cliente / pérgola</th><th>Embalaje</th><th>Cajas</th><th class="n">Total</th><th class="n">m³</th><th></th></tr></thead><tbody>${prevision.map((e,i)=>`<tr${e.partes?' class="compartido"':''}><td><input type="checkbox" data-pmarca="${esc(e.id)}"${prevMarcas.has(e.id)?' checked':''} aria-label="Marcar para juntar"></td><td>${fechaEs(e.fecha)}</td>${e.partes?`<td>${e.partes.map(p=>esc(p.numero||'sin nº')).join('<br>')}</td><td>${e.partes.map(p=>esc(p.cliente||'')).join('<br>')}</td>`:`<td><input class="prev-in" data-pi="${i}" data-pk="numero" value="${esc(e.numero)}" aria-label="Nº de pedido"></td><td><input class="prev-in ancho" data-pi="${i}" data-pk="cliente" value="${esc(e.cliente)}" title="${esc(e.cliente)}" placeholder="Cliente sin leer: escríbelo" aria-label="Cliente">${e.estimado?`<small class="marca">Estimación desde el plano${e.notaPlano?' · '+esc(e.notaPlano):''}</small>`:''}</td>`}<td><select class="prev-in t-${esc(e.tipo)}" data-pi="${i}" data-pk="tipo" aria-label="Tipo de embalaje">${Object.entries(TIPOS).map(([k,t])=>`<option value="${k}"${k===e.tipo?' selected':''}>${t}</option>`).join('')}</select></td><td>${e.sinCajas?`<span class="ojo">No hay cajas de ${esc(TIPOS[e.tipo].toLowerCase())} en el catálogo</span>`:e.cajas.map(c=>`<b class="t-${esc(c.tipo)}">${c.n} × ${esc(c.nombre)}</b>`).join(', ')}${e.fuera?` <span class="ojo">· ${e.fuera} ${e.fuera===1?'bulto no cabe':'bultos no caben'}</span>`:''}${e.sinPerfil?` <span class="ojo">· ${e.sinPerfil} ${e.sinPerfil===1?'línea sin perfil en el catálogo':'líneas sin perfil en el catálogo'}</span>`:''}${e.partes?` <span class="tag">Envío compartido · ${e.partes.length} pedidos</span>`:''}${e.origen==='pedido'?' <small class="sub">(del pedido, con sus retoques)</small>':''}${notaPlano(e)}</td><td class="n">${uds(e.total)}</td><td class="n">${(e.m3||0).toFixed(2)}</td><td class="act">${e.partes?`<button class="btn small ghost" type="button" data-act="prev-separar" data-i="${i}">Separar</button>`:''}<button class="btn small danger" type="button" data-act="prev-quitar" data-i="${i}">Quitar</button></td></tr>`).join('')}</tbody></table></div>
+    <h3>Pedidos</h3>${noCoinciden().length?`<div class="note" role="alert">⚠ ${noCoinciden().length===1?'En 1 pedido la hoja de corte no da':`En ${noCoinciden().length} pedidos la hoja de corte no da`} las mismas cajas que el plano: ${noCoinciden().map(p=>esc(p.numero)).join(', ')}. Mira el detalle en su fila.</div>`:''}${prevMarcas.size>=2?`<div class="manual">${prevMarcas.size} pedidos marcados. <button class="btn small" type="button" data-act="prev-juntar">Juntar en un envío</button> <button class="btn small ghost" type="button" data-act="prev-desmarcar">Quitar marcas</button></div>`:'<p class="sub">Si dos pedidos van en las mismas cajas, márcalos y pulsa «Juntar en un envío».</p>'}<div class="scroll"><table class="prev"><thead><tr><th></th><th>Fecha</th><th>Nº pedido</th><th>Cliente / pérgola</th><th>Embalaje</th><th>Cajas</th><th class="n">Total</th><th class="n">m³</th><th></th></tr></thead><tbody>${prevision.map((e,i)=>`<tr${e.partes?' class="compartido"':''}><td><input type="checkbox" data-pmarca="${esc(e.id)}"${prevMarcas.has(e.id)?' checked':''} aria-label="Marcar para juntar"></td><td>${fechaEs(e.fecha)}</td>${e.partes?`<td>${e.partes.map(p=>esc(p.numero||'sin nº')).join('<br>')}</td><td>${e.partes.map(p=>esc(p.cliente||'')).join('<br>')}</td>`:`<td><input class="prev-in" data-pi="${i}" data-pk="numero" value="${esc(e.numero)}" aria-label="Nº de pedido"></td><td><input class="prev-in ancho" data-pi="${i}" data-pk="cliente" value="${esc(e.cliente)}" title="${esc(e.cliente)}" placeholder="Cliente sin leer: escríbelo" aria-label="Cliente">${e.estimado?`<small class="marca">Estimación desde el plano${e.notaPlano?' · '+esc(e.notaPlano):''}</small>`:''}${e.notaCliente?`<small class="marca">${esc(e.notaCliente)}</small>`:''}</td>`}<td><select class="prev-in t-${esc(e.tipo)}" data-pi="${i}" data-pk="tipo" aria-label="Tipo de embalaje">${Object.entries(TIPOS).map(([k,t])=>`<option value="${k}"${k===e.tipo?' selected':''}>${t}</option>`).join('')}</select></td><td>${e.sinCajas?`<span class="ojo">No hay cajas de ${esc(TIPOS[e.tipo].toLowerCase())} en el catálogo</span>`:e.cajas.map(c=>`<b class="t-${esc(c.tipo)}">${c.n} × ${esc(c.nombre)}</b>`).join(', ')}${e.fuera?` <span class="ojo">· ${e.fuera} ${e.fuera===1?'bulto no cabe':'bultos no caben'}</span>`:''}${e.sinPerfil?` <span class="ojo">· ${e.sinPerfil} ${e.sinPerfil===1?'línea sin perfil en el catálogo':'líneas sin perfil en el catálogo'}</span>`:''}${e.partes?` <span class="tag">Envío compartido · ${e.partes.length} pedidos</span>`:''}${e.origen==='pedido'?' <small class="sub">(del pedido, con sus retoques)</small>':''}${notaPlano(e)}</td><td class="n">${uds(e.total)}</td><td class="n">${(e.m3||0).toFixed(2)}</td><td class="act">${e.partes?`<button class="btn small ghost" type="button" data-act="prev-separar" data-i="${i}">Separar</button>`:''}<button class="btn small danger" type="button" data-act="prev-quitar" data-i="${i}">Quitar</button></td></tr>`).join('')}</tbody></table></div>
     <p class="sub">La previsión se guarda sola en este navegador. Los pedidos leídos de varias hojas usan la colocación automática; los que vienen de la pestaña Pedido guardan las cajas tal como estaban. Si cambias el embalaje de un pedido, se recalcula con la colocación automática. Un envío compartido cuenta sus cajas una sola vez; «Separar» vuelve a calcular cada pedido por su cuenta.</p>`;
 }
 function excelPrevision(){

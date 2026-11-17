@@ -168,6 +168,55 @@ function clienteCajetin(texto){
   const id=ln.findIndex((x,k)=>k>=ic&&k<=ic+3&&/\b\d{5,7}\b/.test(x));
   return id<0?'':debajo(id,2);
 }
+// Nº de cliente del cajetín: «CLIENTE: 104530» (Andrés, 14/11/2026), en la misma línea o, como suele leer el OCR, en una de
+// las de debajo. De 4 a 7 cifras: así no se confunde con el nº de pedido u oferta (8 cifras, 54007677). Sin ceros delante.
+function codigoCliente(texto){
+  const ln=String(texto||'').split('\n'),et=/\b(?:CLIENTE?|CUSTOMER|KUNDE|CLIENTE\s*N[º°o]?|N[º°o]\.?\s*CLIENTE)\b/i;
+  const cifras=x=>{const m=String(x||'').match(/(?:^|[^\d])(\d{4,7})(?!\d)/);return m?String(+m[1]):'';};
+  for(let i=0;i<ln.length;i++){
+    if(!et.test(ln[i])) continue;
+    const r=cifras(ln[i].replace(/.*?\b(?:CLIENTE?|CUSTOMER|KUNDE)\b/i,''));if(r) return r;
+    for(let j=i+1;j<=i+2&&j<ln.length;j++){const s=ln[j].trim();if(/^[^A-Za-z]*\d{4,7}\b/.test(s)){const r2=cifras(s);if(r2)return r2;}}
+  }
+  return '';
+}
+const normCodigo=x=>{const s=String(x==null?'':x).replace(/\D/g,'');return s?String(+s):'';};
+// Base de clientes de Llaza (para el traspaso, 14/11/2026): del nº de cliente salen la ciudad y el país, y de ahí el embalaje.
+// Acepta JSON (lista de objetos, o {clientes:[...]}) o CSV/TXT exportado del programa de gestión, separado por «;», «,» o
+// tabulador, con cabecera. Los nombres de columna valen en varias formas: código / nº cliente / cliente / id; nombre / razón
+// social; ciudad / población / localidad; provincia; país; código postal; y, si se quiere forzar, embalaje (cartón, madera
+// cerrada o abierta; o local, marítimo, terrestre). Devuelve [{codigo,nombre,ciudad,provincia,pais,cp,embalaje}].
+function leerClientes(texto){
+  const t=String(texto||'').replace(/^﻿/,'').trim();if(!t)return [];
+  let filas;
+  if(/^[\[{]/.test(t)){const j=JSON.parse(t);filas=Array.isArray(j)?j:(j.clientes||[]);}
+  else{
+    const lineas=t.split(/\r?\n/).filter(x=>x.trim()),cab=lineas[0];
+    const sep=['\t',';',','].sort((a,b)=>cab.split(b).length-cab.split(a).length)[0];
+    const celdas=l=>{const r=[];let c='',q=false;for(let i=0;i<l.length;i++){const ch=l[i];if(q){if(ch==='"'&&l[i+1]==='"'){c+='"';i++;}else if(ch==='"')q=false;else c+=ch;}else if(ch==='"')q=true;else if(ch===sep){r.push(c);c='';}else c+=ch;}r.push(c);return r.map(x=>x.trim());};
+    const k=celdas(cab);filas=lineas.slice(1).map(l=>{const v=celdas(l),o={};k.forEach((n,i)=>o[n]=v[i]||'');return o;});
+  }
+  const sin=x=>String(x).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]/g,'');
+  const COL={codigo:/^(codigo|cod|codcliente|codigocliente|ncliente|nocliente|numcliente|numerocliente|cliente|idcliente|id|code|customer|customerid|kunde|kundennr)$/,
+    nombre:/^(nombre|nombrecliente|razonsocial|nombrefiscal|nombrecomercial|name|denominacion)$/,ciudad:/^(ciudad|poblacion|localidad|municipio|city|town|ort)$/,
+    provincia:/^(provincia|region|estado|state|county)$/,pais:/^(pais|country|nacion|land)$/,cp:/^(cp|codigopostal|postal|zip|plz)$/,embalaje:/^(embalaje|destino|tipoembalaje|envio)$/};
+  return filas.map(f=>{
+    const o={};
+    for(const [n,v] of Object.entries(f||{})){const s=sin(n);for(const [c,re] of Object.entries(COL)) if(o[c]===undefined&&re.test(s)){o[c]=String(v==null?'':v).trim();break;}}
+    o.codigo=normCodigo(o.codigo);
+    return o;
+  }).filter(o=>o.codigo);
+}
+// Embalaje de un cliente de la base: el que diga su columna «embalaje» si la tiene; si no, el de su ciudad, provincia o país.
+function destinoDeCliente(c){
+  if(!c) return '';
+  const e=String(c.embalaje||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  if(/carton|local/.test(e)) return 'carton';
+  if(/cerrad|marit|barco|mar\b/.test(e)) return 'cerrada';
+  if(/abiert|terrest|camion/.test(e)) return 'abierta';
+  return destinoDeLugar([c.ciudad,c.provincia,c.pais].filter(Boolean).join(', '));
+}
+const lugarDeCliente=c=>c?[c.ciudad,c.provincia&&c.provincia!==c.ciudad?c.provincia:'',c.pais].filter(Boolean).join(', '):'';
 // Datos para piezasPlano sacados de un PDF que no es hoja de corte: del nombre del plano cliente escaneado
 // («54007677_4000x4000_TESTA.pdf» = nº, proyección × ancho, tipología) y del texto de la ficha de fabricación (PLANO.pdf):
 // tipo, módulos, nº de lamas, pilares y su altura. La ficha da la altura cortada de cada pilar («P1: 2754 mm») o solo la
@@ -201,6 +250,7 @@ function datosPlano(nombre,texto,op){
   }
   if((m=t.match(/(?:OFERTA|OFFER|QUOTE|ANGEBOT|OFFRE)[^0-9]{0,6}(\d{6,10})/i))) d.oferta=m[1];
   const ref=clienteCajetin(texto);if(ref)d.referencia=ref;
+  const cod=codigoCliente(texto);if(cod)d.codCliente=cod;
   const mod=todos(/\b(\d{1,2})\s*M[ÓO]DUL(?:OS|O|ES|E|I|EN)\b/gi);if(mod.length)d.modulos=voto(mod);
   const ht=todos(/\bH\s*(?:Total|Totale|Gesamt)\s*[:;.]?\s*(\d{4})\s*mm/gi),hl=todos(/\bH\s*(?:Libre|Free|Libero|Frei|Lichte)\s*[:;.]?\s*(\d{4})\s*m/gi);
   if(ht.length)d.hTotal=voto(ht);else if(hl.length)d.hTotal=voto(hl)+220;
@@ -350,7 +400,11 @@ function volBins(bins){return bins.reduce((s,b)=>s+vol(b.model),0);}
 // Si todos los modelos del tipo tienen `precio`, se usa el precio. Mientras no lo tengan, el material que lleva: la superficie exterior,
 // que penaliza una caja larga y baja frente a otra más corta y alta con el mismo volumen.
 function superficie(m){return 2*(m.extL*m.extA+m.extL*m.extH+m.extA*m.extH);}
-function costeDe(models){const conPrecio=models.length>0&&models.every(m=>Number(m.precio)>0);return m=>conPrecio?Number(m.precio):superficie(m);}
+// Antes que eso, el LARGO (Andrés, 17/11/2026: «la más corta es más barata en transporte»; elegía una MA-5000 para lamas de
+// 3795 mm porque la MA-4000, más alta, lleva más madera). Se suman los largos de las cajas, así que una caja de 5 m sigue
+// ganando a dos de 4 m; el precio o la superficie solo desempatan cajas del mismo largo total.
+const POR_LARGO=1e9;
+function costeDe(models){const conPrecio=models.length>0&&models.every(m=>Number(m.precio)>0);return m=>m.extL*POR_LARGO+(conPrecio?Number(m.precio):superficie(m));}
 function costeBins(bins,coste){return bins.reduce((s,b)=>s+coste(b.model),0);}
 function resto(items,models,coste){
   if(!items.length||!models.length) return {bins:[],unfit:items};
@@ -748,4 +802,4 @@ function diferencia(base,actual){
   for(const b of base) if(!actual.some(a=>a.id===b.id)) d[b.id]=null;
   return d;
 }
-if(typeof module!=='undefined') module.exports={asentar,soporte,encajar3D,huecos3D,apoyoFirme,sitio3D,ahorrarCajas,encajar,clienteCajetin,repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};
+if(typeof module!=='undefined') module.exports={codigoCliente,leerClientes,destinoDeCliente,lugarDeCliente,normCodigo,asentar,soporte,encajar3D,huecos3D,apoyoFirme,sitio3D,ahorrarCajas,encajar,clienteCajetin,repartir,buscarPlanos,esPlano,textoReal,destinoDeLugar,datosPlano,piezasPlano,lamasPlano,parseHoja,leerPagina,leerCabecera,packWith,plan,planGrupos,chocan,libre,apoyado,bajar,vol,volBins,superficie,costeDe,aplicar,diferencia};
